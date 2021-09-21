@@ -61,7 +61,7 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 		// Check N dot L result
 		if (nDotL > 0)
 		{
-			float G = G_Smith(roughnessValue, nDotV, nDotL); //TODO: Test out with GeometricShadowing(n, v, roughness) * GeometricShadowing(n, l, roughness);
+			float G = G_Smith(roughnessValue, nDotV, nDotL);
 			float G_Vis = G * vDotH / (nDotH * nDotV);
 			float Fc = pow(1 - vDotH, 5);
 			A += (1 - Fc) * G_Vis;
@@ -73,6 +73,7 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 	return float2(A, B) / MAX_SAMPLES;
 }
 
+// All from http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
 float4 main(VertexToPixel input) : SV_TARGET
 {
 	// Treat the uv range (0-1) as a grid of 

@@ -620,6 +620,15 @@ void Game::CreateUI(float dt)
 			ImGui::ShowDemoWindow();
 	}
 
+	// Toggle point lights
+	{
+		ImGui::SameLine();
+
+		bool visible = renderer->GetPointLightsVisible();
+		if (ImGui::Button(visible ? "Hide Lights" : "Show Lights"))
+			renderer->SetPointLightsVisible(!visible);
+	}
+
 	// All entity transforms
 	if (ImGui::CollapsingHeader("Lights"))
 	{

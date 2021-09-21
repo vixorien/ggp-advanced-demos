@@ -53,6 +53,9 @@ public:
 	unsigned int GetActiveLightCount();
 	void SetActiveLightCount(unsigned int count);
 
+	void SetPointLightsVisible(bool visible);
+	bool GetPointLightsVisible();
+
 private:
 	// The renderer needs access to all the core DX stuff
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
@@ -81,5 +84,6 @@ private:
 
 	// Note: Potentially replace this with an instanced "debug drawing" set of methods?
 	void DrawPointLights(Camera* camera);
+	bool pointLightsVisible;
 };
 

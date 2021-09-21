@@ -605,7 +605,7 @@ void Sky::IBLCreateBRDFLookUpTexture(int textureSize)
 	texDesc.Height = textureSize;
 	texDesc.ArraySize = 1; // Single texture
 	texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;  // Basic texture format
+	texDesc.Format = DXGI_FORMAT_R16G16_UNORM;  // Only two channels, each of which is double the precision
 	texDesc.MipLevels = 1; // Just one mip level
 	texDesc.MiscFlags = 0; // NOT a cube map!
 	texDesc.SampleDesc.Count = 1; // Can't be zero
@@ -672,7 +672,7 @@ void Sky::IBLCreateBRDFLookUpTexture(int textureSize)
 	D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 	rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;	// This points to a Texture2D
 	rtvDesc.Texture2D.MipSlice = 0;							// Which mip of that texture are we rendering into?
-	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			// Basic texture format
+	rtvDesc.Format = texDesc.Format;						// Match the format of the texture
 
 	ID3D11RenderTargetView* rtv;
 	device->CreateRenderTargetView(envBrdfFinalTexture, &rtvDesc, &rtv);

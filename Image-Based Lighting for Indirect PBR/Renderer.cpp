@@ -35,7 +35,8 @@ using namespace DirectX;
 		backBufferRTV(backBufferRTV),
 		depthBufferDSV(depthBufferDSV),
 		vsPerFrameConstantBuffer(0),
-		psPerFrameConstantBuffer(0)
+		psPerFrameConstantBuffer(0),
+		pointLightsVisible(true)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -179,8 +180,9 @@ void Renderer::Render(Camera* camera)
 		}
 	}
 
-	// Draw the lights. TODO: Make this toggle-able
-	DrawPointLights(camera);
+	// Draw the lights if necessary
+	if(pointLightsVisible)
+		DrawPointLights(camera);
 
 	// Draw the sky after all solid objects,
 	// but before transparent ones
@@ -215,6 +217,16 @@ unsigned int Renderer::GetActiveLightCount()
 void Renderer::SetActiveLightCount(unsigned int count)
 {
 	activeLightCount = min(count, MAX_LIGHTS);
+}
+
+void Renderer::SetPointLightsVisible(bool visible)
+{
+	pointLightsVisible = visible;
+}
+
+bool Renderer::GetPointLightsVisible()
+{
+	return pointLightsVisible;
 }
 
 

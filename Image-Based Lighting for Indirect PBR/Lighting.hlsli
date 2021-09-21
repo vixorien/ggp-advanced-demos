@@ -351,7 +351,7 @@ float3 IndirectSpecular(TextureCube envMap, int mips, Texture2D envBRDF, Sampler
 	float2 indirectBRDF = envBRDF.Sample(samp, float2(NdotV, roughness)).rg;
 	float3 indSpecFresnel = specColor * indirectBRDF.x + indirectBRDF.y; // Spec color is f0
 
-	// Sample the convolved environment map (second half of split-sum)
+	// Sample the convolved environment map (other half of split-sum)
 	float3 envSample = envMap.SampleLevel(samp, viewRefl, roughness * (mips - 1)).rgb;
 
 	// Adjust environment sample by fresnel
