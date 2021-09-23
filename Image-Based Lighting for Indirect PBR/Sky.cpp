@@ -307,7 +307,7 @@ void Sky::IBLCreateIrradianceMap(int cubeFaceSize)
 	srvDesc.TextureCube.MipLevels = 1;			// Only 1 mip level
 	srvDesc.TextureCube.MostDetailedMip = 0;	// Accessing the first (and only) mip
 	srvDesc.Format = texDesc.Format;			// Same format as texture
-	(void)device->CreateShaderResourceView(irrMapFinalTexture, &srvDesc, &irradianceIBL);
+	device->CreateShaderResourceView(irrMapFinalTexture, &srvDesc, irradianceIBL.GetAddressOf());
 
 	// Make sure the viewport matches the texture size
 	D3D11_VIEWPORT vp = {};
@@ -371,7 +371,7 @@ void Sky::IBLCreateIrradianceMap(int cubeFaceSize)
 		rtvDesc.Texture2DArray.ArraySize = 1;			// How much of the array do we have access to?
 		rtvDesc.Texture2DArray.FirstArraySlice = face;	// Which texture are we rendering into?
 		rtvDesc.Texture2DArray.MipSlice = 0;			// Which mip of that texture are we rendering into?
-		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;// Same format as accum texture
+		rtvDesc.Format = texDesc.Format;				// Same format as texture
 
 		ID3D11RenderTargetView* rtv;
 		device->CreateRenderTargetView(irrMapFinalTexture, &rtvDesc, &rtv);

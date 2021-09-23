@@ -44,6 +44,7 @@ public:
 	~Renderer();
 
 	void Render(Camera* camera);
+	void PreResize();
 	void PostResize(
 		unsigned int windowWidth,
 		unsigned int windowHeight,

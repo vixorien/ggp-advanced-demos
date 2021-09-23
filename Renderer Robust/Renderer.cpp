@@ -223,6 +223,12 @@ void Renderer::Render(Camera* camera)
 	context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 }
 
+void Renderer::PreResize()
+{
+	backBufferRTV.Reset();
+	depthBufferDSV.Reset();
+}
+
 void Renderer::PostResize(
 	unsigned int windowWidth,
 	unsigned int windowHeight,

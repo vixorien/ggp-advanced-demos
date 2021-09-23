@@ -433,6 +433,11 @@ void Game::GenerateLights()
 // --------------------------------------------------------
 void Game::OnResize()
 {
+	// Prepare to resize the window by having the renderer release
+	// its references to the back buffers, which is necessary
+	// before the swap chain can actually resize those buffers
+	renderer->PreResize();
+
 	// Handle base-level DX resize stuff
 	DXCore::OnResize();
 

@@ -26,6 +26,7 @@ public:
 	~Renderer();
 
 	void Render(Camera* camera, int lightCount_RemoveMeLater);
+	void PreResize();
 	void PostResize(
 		unsigned int windowWidth,
 		unsigned int windowHeight,
