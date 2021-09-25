@@ -47,7 +47,7 @@ Texture2D RoughnessTexture		: register(t2);
 Texture2D MetalTexture			: register(t3);
 
 // IBL (indirect PBR) textures
-Texture2D BRDFMap				: register(t4);
+Texture2D BrdfLookUpMap			: register(t4);
 TextureCube IrradianceIBLMap	: register(t5);
 TextureCube SpecularIBLMap		: register(t6);
 
@@ -108,14 +108,14 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal);
 	float3 indirectSpecular = IndirectSpecular(
 		SpecularIBLMap, SpecIBLTotalMipLevels,
-		BRDFMap, ClampSampler, // MUST use the clamp sampler here!
+		BrdfLookUpMap, ClampSampler, // MUST use the clamp sampler here!
 		viewRefl, NdotV,
 		roughness, specColor);
 
 	// Balance indirect diff/spec
 	float3 balancedDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal);
 	float3 fullIndirect = indirectSpecular + balancedDiff * surfaceColor.rgb;
-
+	
 	// Add the indirect to the direct
 	totalColor += fullIndirect;
 

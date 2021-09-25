@@ -143,7 +143,7 @@ void Renderer::Render(Camera* camera)
 				// Set IBL textures now, too
 				currentPS->SetShaderResourceView("IrradianceIBLMap", sky->GetIrradianceMap());
 				currentPS->SetShaderResourceView("SpecularIBLMap", sky->GetSpecularMap());
-				currentPS->SetShaderResourceView("BRDFMap", sky->GetBRDFLookUpTexture());
+				currentPS->SetShaderResourceView("BrdfLookUpMap", sky->GetBRDFLookUpTexture());
 			}
 
 			// Now that the material is set, we should

@@ -84,9 +84,9 @@ private:
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back);
 
 	// IBL precompute steps
-	void IBLCreateIrradianceMap(int cubeFaceSize);
-	void IBLCreateConvolvedSpecularMap(int cubeFaceSize);
-	void IBLCreateBRDFLookUpTexture(int textureSize);
+	void IBLCreateIrradianceMap();
+	void IBLCreateConvolvedSpecularMap();
+	void IBLCreateBRDFLookUpTexture();
 
 	const int IBLCubeSize = 256;
 	const int IBLLookUpTextureSize = 256;
@@ -96,7 +96,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> skySRV;			// Skybox
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> irradianceIBL;		// Incoming diffuse light
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> specularIBL;		// Incoming specular light
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> brdfMap;			// Holds some pre-calculated BRDF results
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> brdfLookUpMap;		// Holds some pre-calculated BRDF results
 
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions;
 

@@ -9,7 +9,7 @@ struct VertexToPixel
 
 // This vertex shader receives one piece of input: an id (ideally from 0 - 2, inclusive)
 // 
-// From those values (0, 1 or 2), it creates a uv coord and a screen position.
+// From those values (0, 1 or 2), it creates uv coords and a screen position.
 // If done correctly, the triangle that arises from those three vertices will
 // perfectly fill the screen, like so:
 //  ________________

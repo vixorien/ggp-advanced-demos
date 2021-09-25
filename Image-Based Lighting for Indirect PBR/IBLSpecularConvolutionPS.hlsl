@@ -23,14 +23,14 @@ SamplerState BasicSampler	: register(s0);
 
 
 // Convolves (blurs) the texture cube for a particular roughness and reflection vector.
-// This requires taking a huge amount of samples for the result to look acceptable, which
-// is why this is done as a pre-processes rather than doing it "live".
+// This requires taking a huge number of samples for the result to look acceptable, which
+// is why this is done as a pre-process rather than doing it "live".
 // 
 // roughness	- the roughness of the surface (rougher = blurrier)
 // R			- The direction of this reflection (which is also used for the normal and view dir)
 float3 ConvolveTextureCube(float roughness, float3 R)
 {
-	// Assume N == V == R
+	// Assume N == V == R, a common assumption to simplify the approximation quite a bit
 	float3 N = R;
 	float3 V = R;
 
@@ -86,7 +86,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	}
 	zDir = normalize(zDir);
 
-	// Handle this pixel and save
+	// Process the convolution for the direction of this pixel
 	float3 c = ConvolveTextureCube(roughness, zDir);
 	return float4(c, 1);
 }

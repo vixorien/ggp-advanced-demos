@@ -335,20 +335,20 @@ float3 IndirectDiffuse(TextureCube irrMap, SamplerState samp, float3 direction)
 //
 // envMap			- Pre-convolved environment map w/ mip levels
 // mips				- Number of mips in the environment map
-// envBRDF			- Pre-calc'd environment BRDF lookup texture
+// brdfLookUp		- Pre-calc'd environment BRDF lookup texture
 // samp				- Sampler to use (MUST BE CLAMP ADDRESS MODE for envBRDF to work right!!!)
 // viewRefl			- View reflection direction at this pixel
 // NdotV			- Dot(normal, view vector) at this pixel
 // roughness		- Roughness of this pixel
 // specColor		- Specular color of this pixel (already taking into account metalness)
 //
-float3 IndirectSpecular(TextureCube envMap, int mips, Texture2D envBRDF, SamplerState samp, float3 viewRefl, float NdotV, float roughness, float3 specColor)
+float3 IndirectSpecular(TextureCube envMap, int mips, Texture2D brdfLookUp, SamplerState samp, float3 viewRefl, float NdotV, float roughness, float3 specColor)
 {
 	// Ensure roughness isn't zero
 	roughness = max(roughness, MIN_ROUGHNESS);
 
 	// Calculate half of the split-sum approx (this texture is not gamma-corrected, as it just holds raw data)
-	float2 indirectBRDF = envBRDF.Sample(samp, float2(NdotV, roughness)).rg;
+	float2 indirectBRDF = brdfLookUp.Sample(samp, float2(NdotV, roughness)).rg;
 	float3 indSpecFresnel = specColor * indirectBRDF.x + indirectBRDF.y; // Spec color is f0
 
 	// Sample the convolved environment map (other half of split-sum)
