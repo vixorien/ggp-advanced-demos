@@ -174,9 +174,15 @@ void Game::LoadAssetsAndCreateEntities()
 	device->CreateSamplerState(&sampDesc, clampSampler.GetAddressOf());
 
 
-	// Create the sky using 6 images
+	// Create the sky
 	sky = new Sky(
-		assets.GetTexture("Skies\\SunnyCubeMap.dds"),
+		/*assets.GetTexture("Skies\\SunnyCubeMap.dds"),*/
+		assets.GetTexture("Skies\\Clouds Blue\\right.png"),
+		assets.GetTexture("Skies\\Clouds Blue\\left.png"),
+		assets.GetTexture("Skies\\Clouds Blue\\up.png"),
+		assets.GetTexture("Skies\\Clouds Blue\\down.png"),
+		assets.GetTexture("Skies\\Clouds Blue\\front.png"),
+		assets.GetTexture("Skies\\Clouds Blue\\back.png"),
 		samplerOptions,
 		device,
 		context);
