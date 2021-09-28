@@ -79,11 +79,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)AssImp\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)AssImp\lib\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)AssImp\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)AssImp\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)AssImp\lib\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)AssImp\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
