@@ -47,6 +47,8 @@ public:
 	void CreateSolidColorTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4 color);
 	void CreateTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4* pixels);
 
+	void CreateFloatTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4* pixels);
+
 	Mesh* GetMesh(std::string name);
 	SimplePixelShader* GetPixelShader(std::string name);
 	SimpleVertexShader* GetVertexShader(std::string name);

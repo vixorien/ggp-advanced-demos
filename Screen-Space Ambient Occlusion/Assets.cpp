@@ -357,6 +357,56 @@ void Assets::CreateTexture(std::string textureName, int width, int height, Direc
 	delete[] intPixels;
 }
 
+// --------------------------------------------------------------------------
+// Creates a texture of the specified size, using the specified colors as the
+// texture's pixel colors and adds it to the asset manager using the specified name.
+// The resulting texture will hold arbitrary float values instead of 0-1 values.
+// The texture format will be DXGI_FORMAT_R16G16B16A16_FLOAT
+//
+// textureName - name to use in the asset manager
+// width - width of the texture
+// height - height of the texture
+// pixels - color array for each pixel of the texture
+// --------------------------------------------------------------------------
+void Assets::CreateFloatTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4* pixels)
+{
+	// Valid size?
+	if (width <= 0 || height <= 0)
+		return;
+
+	// Create a simple texture of the specified size
+	D3D11_TEXTURE2D_DESC td = {};
+	td.ArraySize = 1;
+	td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	td.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	td.MipLevels = 1;
+	td.Height = height;
+	td.Width = width;
+	td.SampleDesc.Count = 1;
+
+	// Initial data for the texture
+	D3D11_SUBRESOURCE_DATA data = {};
+	data.pSysMem = pixels;
+	data.SysMemPitch = sizeof(float) * 4 * width;
+
+	// Actually create it
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
+	device->CreateTexture2D(&td, &data, texture.GetAddressOf());
+
+	// Create the shader resource view for this texture
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Format = td.Format;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+	device->CreateShaderResourceView(texture.Get(), &srvDesc, srv.GetAddressOf());
+
+	// Add to the asset manager
+	textures.insert({ textureName, srv });
+}
+
 
 // --------------------------------------------------------------------------
 // Gets the actual path to this executable

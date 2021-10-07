@@ -80,7 +80,7 @@ PS_Output main(VertexToPixel input)
 	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * Color.rgb;
 
 	// Total color for this pixel
-	float3 totalColor = float3(0,0,0);
+	float3 totalDirectLight = float3(0,0,0);
 
 	// Loop through all lights this frame
 	for(int i = 0; i < LightCount; i++)
@@ -89,15 +89,15 @@ PS_Output main(VertexToPixel input)
 		switch (Lights[i].Type)
 		{
 		case LIGHT_TYPE_DIRECTIONAL:
-			totalColor += DirLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
+			totalDirectLight += DirLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
 			break;
 
 		case LIGHT_TYPE_POINT:
-			totalColor += PointLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
+			totalDirectLight += PointLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
 			break;
 
 		case LIGHT_TYPE_SPOT:
-			totalColor += SpotLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
+			totalDirectLight += SpotLight(Lights[i], input.normal, input.worldPos, CameraPosition, specPower, surfaceColor.rgb);
 			break;
 		}
 	}
@@ -108,7 +108,7 @@ PS_Output main(VertexToPixel input)
 	// Multiple render target output
 	float gammaPower = 1.0f / 2.2f;
 	PS_Output output;
-	output.colorNoAmbient	= float4(pow(totalColor, gammaPower), 1); // Gamma correction
+	output.colorNoAmbient	= float4(pow(totalDirectLight, gammaPower), 1); // Gamma correction
 	output.ambientColor		= float4(pow(ambient, gammaPower), 1);
 	output.normals			= float4(input.normal * 0.5f + 0.5f, 1);
 	output.depths			= input.screenPosition.z;

@@ -156,12 +156,16 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.Initialize("..\\..\\..\\Assets\\", device, context);
 	assets.LoadAllAssets();
 
-	// Create a random texture
+	// Create a random texture for SSAO
 	const int randomTextureSize = 4;
 	XMFLOAT4* randomPixels = new XMFLOAT4[randomTextureSize * randomTextureSize];
 	for (int i = 0; i < randomTextureSize * randomTextureSize; i++)
-		randomPixels[i] = XMFLOAT4(RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1));
-	assets.CreateTexture("random", randomTextureSize, randomTextureSize, randomPixels);
+	{
+		XMVECTOR randomVec = XMVectorSet(RandomRange(-1, 1), RandomRange(-1, 1), 0, 0);
+		XMStoreFloat4(&randomPixels[i], XMVector3Normalize(randomVec));
+		randomPixels[i].z = 0;
+	}
+	assets.CreateFloatTexture("random", randomTextureSize, randomTextureSize, randomPixels);
 	delete[] randomPixels;
 
 
@@ -662,11 +666,26 @@ void Game::CreateUI(float dt)
 			renderer->SetPointLightsVisible(!visible);
 	}
 
-	// SSAO toggle
+	// SSAO options
 	{
+		ImGui::Text("SSAO Options"); ImGui::SameLine();
+
 		bool ssao = renderer->GetSSAOEnabled();
 		if (ImGui::Button(ssao ? "SSAO Enabled" : "SSAO Disabled"))
 			renderer->SetSSAOEnabled(!ssao);
+
+		ImGui::SameLine();
+		bool ssaoOnly = renderer->GetSSAOOutputOnly();
+		if (ImGui::Button("SSAO Output Only"))
+			renderer->SetSSAOOutputOnly(!ssaoOnly);
+
+		int ssaoSamples = renderer->GetSSAOSamples();
+		if (ImGui::SliderInt("SSAO Samples", &ssaoSamples, 1, 64))
+			renderer->SetSSAOSamples(ssaoSamples);
+
+		float ssaoRadius = renderer->GetSSAORadius();
+		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
+			renderer->SetSSAORadius(ssaoRadius);
 	}
 
 	// All entity transforms
@@ -718,8 +737,6 @@ void Game::CreateUI(float dt)
 		{
 			ImGui::Image(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
 		}
-
-		ImGui::Image(Assets::GetInstance().GetTexture("random").Get(), ImVec2(size.x, size.x));
 	}
 
 	ImGui::End();

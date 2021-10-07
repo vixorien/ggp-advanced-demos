@@ -2,6 +2,7 @@
 cbuffer externalData : register(b0)
 {
 	int ssaoEnabled;
+	int ssaoOutputOnly;
 	float2 pixelSize;
 };
 
@@ -23,12 +24,16 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Sample all three
 	float3 sceneColors = SceneColorsNoAmbient.Sample(BasicSampler, input.uv).rgb;
 	float3 ambient = Ambient.Sample(BasicSampler, input.uv).rgb;
+	float ao = SSAOBlur.Sample(BasicSampler, input.uv).r;
 
 	// Early out for no SSAO
 	if (!ssaoEnabled) 
 		return float4(sceneColors + ambient, 1);
 
-	// Sample AO and combine
-	float ao = SSAOBlur.Sample(BasicSampler, input.uv).r;
+	// Early out for SSAO only
+	if (ssaoOutputOnly)
+		return float4(ao.rrr, 1);
+
+	// Final combine
 	return float4(ambient * ao + sceneColors, 1);
 }

@@ -38,7 +38,7 @@ using namespace DirectX;
 		psPerFrameConstantBuffer(0),
 		pointLightsVisible(true),
 		ssaoSamples(64),
-		ssaoRadius(0.8f),
+		ssaoRadius(0.25f),
 		ssaoEnabled(true),
 		ambientNonPBR(0.1f, 0.1f, 0.25f)
 {
@@ -293,6 +293,7 @@ void Renderer::Render(Camera* camera)
 		ps->SetShaderResourceView("Ambient", renderTargetSRVs[RenderTargetType::SCENE_AMBIENT]);
 		ps->SetShaderResourceView("SSAOBlur", renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
 		ps->SetInt("ssaoEnabled", ssaoEnabled);
+		ps->SetInt("ssaoOutputOnly", ssaoOutputOnly);
 		ps->SetFloat2("pixelSize", XMFLOAT2(1.0f / windowWidth, 1.0f / windowHeight));
 		ps->CopyAllBufferData();
 		context->Draw(3, 0);
@@ -304,17 +305,6 @@ void Renderer::Render(Camera* camera)
 		context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 		DrawPointLights(camera);
 	}
-
-
-	//// Lastly, get the final color results to the screen!
-	//SimplePixelShader* ps = assets.GetPixelShader("SimpleTexturePS.cso");
-	//ps->SetShader();
-	//ps->SetShaderResourceView("Pixels", renderTargetSRVs[RenderTargetType::SCENE_COLORS_NO_AMBIENT]);
-	//// Note: not setting a sampler here for 2 reasons:
-	//// - 1: We don't have a sampler created here in the renderer
-	//// - 2: A null sampler just uses the default sampling options, which
-	////      are good enough for just plastering a texture on the screen
-	//context->Draw(3, 0);
 
 	// Draw IMGUI
 	ImGui::Render();
@@ -368,6 +358,15 @@ bool Renderer::GetPointLightsVisible() { return pointLightsVisible; }
 
 void Renderer::SetSSAOEnabled(bool enabled) { ssaoEnabled = enabled; }
 bool Renderer::GetSSAOEnabled() { return ssaoEnabled; }
+
+void Renderer::SetSSAORadius(float radius) { ssaoRadius = radius; }
+float Renderer::GetSSAORadius() { return ssaoRadius; }
+
+void Renderer::SetSSAOSamples(int samples) { ssaoSamples = max(0, min(samples, ARRAYSIZE(ssaoOffsets))); }
+int Renderer::GetSSAOSamples() { return ssaoSamples; }
+
+void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; }
+bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 { 

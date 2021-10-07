@@ -74,6 +74,15 @@ public:
 	void SetSSAOEnabled(bool enabled);
 	bool GetSSAOEnabled();
 
+	void SetSSAORadius(float radius);
+	float GetSSAORadius();
+
+	void SetSSAOSamples(int samples);
+	int GetSSAOSamples();
+
+	void SetSSAOOutputOnly(bool ssaoOnly);
+	bool GetSSAOOutputOnly();
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
 private:
@@ -95,6 +104,7 @@ private:
 	int ssaoSamples;
 	float ssaoRadius;
 	bool ssaoEnabled;
+	bool ssaoOutputOnly;
 
 	// Overall ambient for non-pbr shaders
 	DirectX::XMFLOAT3 ambientNonPBR;

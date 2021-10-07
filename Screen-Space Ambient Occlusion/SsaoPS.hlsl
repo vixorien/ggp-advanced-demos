@@ -9,7 +9,7 @@ cbuffer externalData : register(b0)
 	float4 offsets[64];
 	float ssaoRadius;
 	int ssaoSamples;
-	float2 randomScale;
+	float2 randomTextureScreenScale;
 };
 
 struct VertexToPixel
@@ -26,23 +26,7 @@ SamplerState BasicSampler	: register(s0);
 SamplerState ClampSampler	: register(s1);
 
 
-float3 WorldSpaceFromDepth(float depth, float2 uv)
-{
-	// Back to NDCs
-	uv = uv * 2.0f - 1.0f;
-	uv.y *= -1.0f; // Flip y due to UV <--> NDC 
-	float4 screenPos = float4(uv, depth, 1.0f);
 
-	// Back to view space first
-	float4 viewPos = mul(invProjMatrix, screenPos);
-	viewPos /= viewPos.w;
-
-	// Back to world space last
-	float4 worldPos = mul(invViewMatrix, viewPos);
-
-	// Should have the original world position now
-	return worldPos.xyz;
-}
 
 float3 ViewSpaceFromDepth(float depth, float2 uv)
 {
@@ -51,12 +35,9 @@ float3 ViewSpaceFromDepth(float depth, float2 uv)
 	uv.y *= -1.0f; // Flip y due to UV <--> NDC 
 	float4 screenPos = float4(uv, depth, 1.0f);
 
-	// Back to view space first
+	// Back to view space
 	float4 viewPos = mul(invProjMatrix, screenPos);
-	viewPos /= viewPos.w;
-
-	// Should have the original view position now
-	return viewPos.xyz;
+	return viewPos.xyz / viewPos.w;
 }
 
 
@@ -70,11 +51,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Get the view space position of this pixel
 	float3 pixelPositionViewSpace = ViewSpaceFromDepth(pixelDepth, input.uv);
 
-	// Sample random noise texture, drop z, normalize
-	// Assuming random texture is 4x4
-	float3 randomDir = Random.Sample(BasicSampler, input.uv * randomScale).xyz * 2 - 1;
-	randomDir.z = 0;
-	randomDir = normalize(randomDir);
+	// Assuming random texture is 4x4 and holds float values.
+	// Note: Setting z to 0 and re-normalizing due to texture sampling
+	float3 randomDir = Random.Sample(BasicSampler, input.uv * randomTextureScreenScale).xyz;
+	randomDir = normalize(float3(randomDir.xy, 0));
 
 	// Sample normal and convert to view space
 	float3 normal = Normals.Sample(BasicSampler, input.uv).xyz * 2 - 1;
@@ -100,14 +80,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 		samplePosScreen.y = 1.0f - samplePosScreen.y;
 
 		// Sample the this nearby depth
-		float sampleDepth = Depths.Sample(ClampSampler, samplePosScreen.xy).r;
+		float sampleDepth = Depths.SampleLevel(ClampSampler, samplePosScreen.xy, 0).r;
 		float sampleZ = ViewSpaceFromDepth(sampleDepth, samplePosScreen.xy).z;
 
 		float rangeCheck = smoothstep(0.0f, 1.0f, ssaoRadius / abs(pixelPositionViewSpace.z - sampleZ));
 		ao += (sampleZ < samplePosView.z ? 1.0f : 0.0f) * rangeCheck;
 	}
 
-	//ao /= ssaoSamples;
 	ao = 1.0f - ao / ssaoSamples;
 
 
