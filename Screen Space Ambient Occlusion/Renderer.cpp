@@ -90,8 +90,8 @@ using namespace DirectX;
 			XMVectorSet(0.1f, 0.1f, 0.1f, 1),
 			XMVectorSet(1, 1, 1, 1),
 			scale * scale);
-		v *= scaleVector;
-		XMStoreFloat4(&ssaoOffsets[i], v);
+
+		XMStoreFloat4(&ssaoOffsets[i], v * scaleVector);
 		
 	}
 }

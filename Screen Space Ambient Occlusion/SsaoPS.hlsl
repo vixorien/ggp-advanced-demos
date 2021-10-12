@@ -59,7 +59,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Sample normal and convert to view space
 	float3 normal = Normals.Sample(BasicSampler, input.uv).xyz * 2 - 1;
 	normal = normalize(mul((float3x3)viewMatrix, normal));
-
+	
 	// Calculate TBN matrix
 	float3 tangent = normalize(randomDir - normal * dot(randomDir, normal));
 	float3 bitangent = cross(tangent, normal);
@@ -84,7 +84,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 		float sampleZ = ViewSpaceFromDepth(sampleDepth, samplePosScreen.xy).z;
 
 		float rangeCheck = smoothstep(0.0f, 1.0f, ssaoRadius / abs(pixelPositionViewSpace.z - sampleZ));
-		ao += (sampleZ < samplePosView.z ? 1.0f : 0.0f) * rangeCheck;
+		ao += (sampleZ < samplePosView.z ? rangeCheck : 0.0f);
 	}
 
 	ao = 1.0f - ao / ssaoSamples;
