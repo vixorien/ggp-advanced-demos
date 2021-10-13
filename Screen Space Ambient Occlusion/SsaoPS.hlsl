@@ -31,8 +31,8 @@ SamplerState ClampSampler	: register(s1);
 float3 ViewSpaceFromDepth(float depth, float2 uv)
 {
 	// Back to NDCs
+	uv.y = 1.0f - uv.y; // Invert Y due to UV <--> NDC diff
 	uv = uv * 2.0f - 1.0f;
-	uv.y *= -1.0f; // Flip y due to UV <--> NDC 
 	float4 screenPos = float4(uv, depth, 1.0f);
 
 	// Back to view space
