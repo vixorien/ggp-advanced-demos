@@ -256,7 +256,7 @@ void Renderer::Render(Camera* camera)
 		ssaoPS->SetData("offsets", ssaoOffsets, sizeof(XMFLOAT4) * ARRAYSIZE(ssaoOffsets));
 		ssaoPS->SetFloat("ssaoRadius", ssaoRadius);
 		ssaoPS->SetInt("ssaoSamples", ssaoSamples);
-		ssaoPS->SetFloat2("randomScale", XMFLOAT2(windowWidth / 4.0f, windowHeight / 4.0f));
+		ssaoPS->SetFloat2("randomTextureScreenScale", XMFLOAT2(windowWidth / 4.0f, windowHeight / 4.0f));
 		ssaoPS->CopyAllBufferData();
 
 		ssaoPS->SetShaderResourceView("Normals", renderTargetSRVs[RenderTargetType::SCENE_NORMALS]);

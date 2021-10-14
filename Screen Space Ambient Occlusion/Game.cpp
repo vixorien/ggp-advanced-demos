@@ -157,16 +157,15 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.LoadAllAssets();
 
 	// Create a random texture for SSAO
-	const int randomTextureSize = 4;
-	XMFLOAT4* randomPixels = new XMFLOAT4[randomTextureSize * randomTextureSize];
-	for (int i = 0; i < randomTextureSize * randomTextureSize; i++)
+	const int textureSize = 4;
+	const int totalPixels = textureSize * textureSize;
+	XMFLOAT4 randomPixels[totalPixels] = {};
+	for (int i = 0; i < totalPixels; i++)
 	{
 		XMVECTOR randomVec = XMVectorSet(RandomRange(-1, 1), RandomRange(-1, 1), 0, 0);
 		XMStoreFloat4(&randomPixels[i], XMVector3Normalize(randomVec));
-		randomPixels[i].z = 0;
 	}
-	assets.CreateFloatTexture("random", randomTextureSize, randomTextureSize, randomPixels);
-	delete[] randomPixels;
+	assets.CreateFloatTexture("random", textureSize, textureSize, randomPixels);
 
 
 	// Describe and create our sampler state
@@ -501,6 +500,13 @@ void Game::LoadAssetsAndCreateEntities()
 	tree->GetTransform()->MoveAbsolute(12, -5, 0);
 	tree->GetTransform()->Scale(0.25f, 0.25f, 0.25f);
 
+	// Create a flat surface in the center
+	GameEntity* box = new GameEntity(assets.GetMesh("Models\\cube.obj"), solidShinyPlastic);
+	entities.push_back(box);
+	box->GetTransform()->MoveAbsolute(0, 0, 0);
+	box->GetTransform()->Scale(15, 0.1f, 3);
+
+
 	// Transform test =====================================
 	entities[0]->GetTransform()->AddChild(entities[1]->GetTransform(), true);
 }
@@ -666,28 +672,6 @@ void Game::CreateUI(float dt)
 			renderer->SetPointLightsVisible(!visible);
 	}
 
-	// SSAO options
-	{
-		ImGui::Text("SSAO Options"); ImGui::SameLine();
-
-		bool ssao = renderer->GetSSAOEnabled();
-		if (ImGui::Button(ssao ? "SSAO Enabled" : "SSAO Disabled"))
-			renderer->SetSSAOEnabled(!ssao);
-
-		ImGui::SameLine();
-		bool ssaoOnly = renderer->GetSSAOOutputOnly();
-		if (ImGui::Button("SSAO Output Only"))
-			renderer->SetSSAOOutputOnly(!ssaoOnly);
-
-		int ssaoSamples = renderer->GetSSAOSamples();
-		if (ImGui::SliderInt("SSAO Samples", &ssaoSamples, 1, 64))
-			renderer->SetSSAOSamples(ssaoSamples);
-
-		float ssaoRadius = renderer->GetSSAORadius();
-		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
-			renderer->SetSSAORadius(ssaoRadius);
-	}
-
 	// All entity transforms
 	if (ImGui::CollapsingHeader("Lights"))
 	{
@@ -728,15 +712,44 @@ void Game::CreateUI(float dt)
 		}
 	}
 
-	if (ImGui::CollapsingHeader("Render Targets"))
+	// SSAO Options
+	if (ImGui::CollapsingHeader("SSAO Options"))
+	{
+		ImVec2 size = ImGui::GetItemRectSize();
+		float rtHeight = size.x * ((float)height / width);
+
+		bool ssao = renderer->GetSSAOEnabled();
+		if (ImGui::Button(ssao ? "SSAO Enabled" : "SSAO Disabled"))
+			renderer->SetSSAOEnabled(!ssao);
+
+		ImGui::SameLine();
+		bool ssaoOnly = renderer->GetSSAOOutputOnly();
+		if (ImGui::Button("SSAO Output Only"))
+			renderer->SetSSAOOutputOnly(!ssaoOnly);
+
+		int ssaoSamples = renderer->GetSSAOSamples();
+		if (ImGui::SliderInt("SSAO Samples", &ssaoSamples, 1, 64))
+			renderer->SetSSAOSamples(ssaoSamples);
+
+		float ssaoRadius = renderer->GetSSAORadius();
+		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
+			renderer->SetSSAORadius(ssaoRadius);
+
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
+	}
+
+	if (ImGui::CollapsingHeader("All Render Targets"))
 	{
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
 
 		for (int i = 0; i < RenderTargetType::RENDER_TARGET_TYPE_COUNT; i++)
 		{
-			ImGui::Image(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
+			ImageWithHover(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
 		}
+
+		ImageWithHover(Assets::GetInstance().GetTexture("random").Get(), ImVec2(256, 256));
 	}
 
 	ImGui::End();
@@ -874,6 +887,43 @@ void Game::UILight(Light& light, int index)
 		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
 
 		ImGui::TreePop();
+	}
+}
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
+{
+	// Draw the image
+	ImGui::Image(user_texture_id, size);
+	
+	// Check for hover
+	if (ImGui::IsItemHovered())
+	{
+		// Zoom amount and aspect of the image
+		float zoom = 0.03f;
+		float aspect = (float)size.x / size.y;
+
+		// Get the coords of the image
+		ImVec2 topLeft = ImGui::GetItemRectMin();
+		ImVec2 bottomRight = ImGui::GetItemRectMax();
+		
+		// Get the mouse pos as a percent across the image, clamping near the edge
+		ImVec2 mousePosGlobal = ImGui::GetMousePos();
+		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
+		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
+
+		uvPercent.x = max(uvPercent.x, zoom / 2);
+		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
+		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
+		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
+
+		// Figure out the uv coords for the zoomed image
+		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
+		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
+
+		// Draw a floating box with a zoomed view of the image
+		ImGui::BeginTooltip();
+		ImGui::Image(user_texture_id, ImVec2(256,256), uvTL, uvBR);
+		ImGui::EndTooltip();
 	}
 }
 

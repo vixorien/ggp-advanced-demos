@@ -157,16 +157,15 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.LoadAllAssets();
 
 	// Create a random texture for SSAO
-	const int randomTextureSize = 4;
-	XMFLOAT4* randomPixels = new XMFLOAT4[randomTextureSize * randomTextureSize];
-	for (int i = 0; i < randomTextureSize * randomTextureSize; i++)
+	const int textureSize = 4;
+	const int totalPixels = textureSize * textureSize;
+	XMFLOAT4 randomPixels[totalPixels] = {};
+	for (int i = 0; i < totalPixels; i++)
 	{
 		XMVECTOR randomVec = XMVectorSet(RandomRange(-1, 1), RandomRange(-1, 1), 0, 0);
 		XMStoreFloat4(&randomPixels[i], XMVector3Normalize(randomVec));
-		randomPixels[i].z = 0;
 	}
-	assets.CreateFloatTexture("random", randomTextureSize, randomTextureSize, randomPixels);
-	delete[] randomPixels;
+	assets.CreateFloatTexture("random", textureSize, textureSize, randomPixels);
 
 
 	// Describe and create our sampler state
@@ -502,7 +501,7 @@ void Game::LoadAssetsAndCreateEntities()
 	tree->GetTransform()->Scale(0.25f, 0.25f, 0.25f);
 
 
-	// Create a flat surface to test reflections
+	// Create a flat surface in the center
 	GameEntity* box = new GameEntity(assets.GetMesh("Models\\cube.obj"), solidShinyPlastic);
 	entities.push_back(box);
 	box->GetTransform()->MoveAbsolute(0, 0, 0);
@@ -737,8 +736,8 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
 			renderer->SetSSAORadius(ssaoRadius);
 
-		ImGui::Image(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight));
-		ImGui::Image(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
 	}
 
 	// SSRs
@@ -767,7 +766,7 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderInt("SSR Max Refinement Steps", &refine, 0, 256))
 			renderer->SetSSRMaxRefinementSteps(refine);
 
-		ImGui::Image(renderer->GetRenderTargetSRV(RenderTargetType::SSR_COLORS).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSR_COLORS).Get(), ImVec2(size.x, rtHeight));
 	}
 
 	// Show off all the targets
@@ -778,7 +777,7 @@ void Game::CreateUI(float dt)
 
 		for (int i = 0; i < RenderTargetType::RENDER_TARGET_TYPE_COUNT; i++)
 		{
-			ImGui::Image(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
+			ImageWithHover(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
 		}
 	}
 
@@ -917,6 +916,43 @@ void Game::UILight(Light& light, int index)
 		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
 
 		ImGui::TreePop();
+	}
+}
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
+{
+	// Draw the image
+	ImGui::Image(user_texture_id, size);
+
+	// Check for hover
+	if (ImGui::IsItemHovered())
+	{
+		// Zoom amount and aspect of the image
+		float zoom = 0.03f;
+		float aspect = (float)size.x / size.y;
+
+		// Get the coords of the image
+		ImVec2 topLeft = ImGui::GetItemRectMin();
+		ImVec2 bottomRight = ImGui::GetItemRectMax();
+
+		// Get the mouse pos as a percent across the image, clamping near the edge
+		ImVec2 mousePosGlobal = ImGui::GetMousePos();
+		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
+		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
+
+		uvPercent.x = max(uvPercent.x, zoom / 2);
+		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
+		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
+		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
+
+		// Figure out the uv coords for the zoomed image
+		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
+		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
+
+		// Draw a floating box with a zoomed view of the image
+		ImGui::BeginTooltip();
+		ImGui::Image(user_texture_id, ImVec2(256, 256), uvTL, uvBR);
+		ImGui::EndTooltip();
 	}
 }
 

@@ -51,10 +51,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Get the view space position of this pixel
 	float3 pixelPositionViewSpace = ViewSpaceFromDepth(pixelDepth, input.uv);
 
-	// Assuming random texture is 4x4 and holds float values.
-	// Note: Setting z to 0 and re-normalizing due to texture sampling
+	// Assuming random texture is 4x4 and holds float values (already normalized)
 	float3 randomDir = Random.Sample(BasicSampler, input.uv * randomTextureScreenScale).xyz;
-	randomDir = normalize(float3(randomDir.xy, 0));
 
 	// Sample normal and convert to view space
 	float3 normal = Normals.Sample(BasicSampler, input.uv).xyz * 2 - 1;

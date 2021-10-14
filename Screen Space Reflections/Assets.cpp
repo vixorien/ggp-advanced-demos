@@ -361,7 +361,7 @@ void Assets::CreateTexture(std::string textureName, int width, int height, Direc
 // Creates a texture of the specified size, using the specified colors as the
 // texture's pixel colors and adds it to the asset manager using the specified name.
 // The resulting texture will hold arbitrary float values instead of 0-1 values.
-// The texture format will be DXGI_FORMAT_R16G16B16A16_FLOAT
+// The texture format will be DXGI_FORMAT_R32G32B32A32_FLOAT
 //
 // textureName - name to use in the asset manager
 // width - width of the texture
@@ -378,7 +378,7 @@ void Assets::CreateFloatTexture(std::string textureName, int width, int height, 
 	D3D11_TEXTURE2D_DESC td = {};
 	td.ArraySize = 1;
 	td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	td.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	td.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	td.MipLevels = 1;
 	td.Height = height;
 	td.Width = width;
