@@ -1,10 +1,9 @@
 
 cbuffer externalData : register(b0)
 {
-	matrix invViewMatrix;
-	matrix invProjMatrix;
 	matrix viewMatrix;
 	matrix projectionMatrix;
+	matrix invProjMatrix;
 
 	float4 offsets[64];
 	float ssaoRadius;
@@ -26,8 +25,6 @@ SamplerState BasicSampler	: register(s0);
 SamplerState ClampSampler	: register(s1);
 
 
-
-
 float3 ViewSpaceFromDepth(float depth, float2 uv)
 {
 	// Back to NDCs
@@ -40,6 +37,19 @@ float3 ViewSpaceFromDepth(float depth, float2 uv)
 	return viewPos.xyz / viewPos.w;
 }
 
+float2 UVFromViewSpacePosition(float3 viewSpacePosition)
+{
+	// Apply the projection matrix to the view space position then perspective divide
+	float4 samplePosScreen = mul(projectionMatrix, float4(viewSpacePosition, 1));
+	samplePosScreen.xyz /= samplePosScreen.w;
+
+	// Adjust from NDCs to UV coords (flip the Y!)
+	samplePosScreen.xy = samplePosScreen.xy * 0.5f + 0.5f;
+	samplePosScreen.y = 1.0f - samplePosScreen.y;
+	
+	// Return just the UVs
+	return samplePosScreen.xy;
+}
 
 float4 main(VertexToPixel input) : SV_TARGET
 {
@@ -63,30 +73,25 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 bitangent = cross(tangent, normal);
 	float3x3 TBN = float3x3(tangent, bitangent, normal);
 
-	// Loop and handle all samples
+	// Loop and total all samples
 	float ao = 0.0f;
 	for (int i = 0; i < ssaoSamples; i++)
 	{
-		// Rotate the offset and apply to position
-		float4 samplePosView = float4(
-			pixelPositionViewSpace + mul(offsets[i].xyz, TBN) * ssaoRadius, 1);
+		// Rotate the offset, scale and apply to position
+		float3 samplePosView = pixelPositionViewSpace + mul(offsets[i].xyz, TBN) * ssaoRadius;
 
 		// Get the UV coord of this position
-		float4 samplePosScreen = mul(projectionMatrix, samplePosView);
-		samplePosScreen.xyz /= samplePosScreen.w;
-		samplePosScreen.xy = samplePosScreen.xy * 0.5f + 0.5f;
-		samplePosScreen.y = 1.0f - samplePosScreen.y;
+		float2 samplePosScreen = UVFromViewSpacePosition(samplePosView);
 
 		// Sample the this nearby depth
 		float sampleDepth = Depths.SampleLevel(ClampSampler, samplePosScreen.xy, 0).r;
 		float sampleZ = ViewSpaceFromDepth(sampleDepth, samplePosScreen.xy).z;
 
+		// Compare the depths and fade result based on range (so far away objects aren’t occluded)
 		float rangeCheck = smoothstep(0.0f, 1.0f, ssaoRadius / abs(pixelPositionViewSpace.z - sampleZ));
 		ao += (sampleZ < samplePosView.z ? rangeCheck : 0.0f);
 	}
 
 	ao = 1.0f - ao / ssaoSamples;
-
-
 	return float4(ao.rrr, 1);
 }

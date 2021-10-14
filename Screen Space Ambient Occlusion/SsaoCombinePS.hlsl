@@ -3,7 +3,6 @@ cbuffer externalData : register(b0)
 {
 	int ssaoEnabled;
 	int ssaoOutputOnly;
-	float2 pixelSize;
 };
 
 struct VertexToPixel

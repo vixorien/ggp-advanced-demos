@@ -28,6 +28,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	}
 
 	// Average results and return
-	ao /= 16.0f; // 4x4 blur
+	ao /= 16.0f; // 4x4 blur is 16 samples
 	return float4(ao.rrr, 1);
 }
