@@ -50,7 +50,8 @@ struct PS_Output
 	float4 colorNoAmbient	: SV_TARGET0;
 	float4 ambientColor		: SV_TARGET1;
 	float4 normals			: SV_TARGET2;
-	float depths			: SV_TARGET3;
+	float4 metalRoughness	: SV_TARGET3;
+	float depths			: SV_TARGET4;
 };
 
 // Texture-related variables
@@ -111,6 +112,7 @@ PS_Output main(VertexToPixel input)
 	output.colorNoAmbient	= float4(pow(totalDirectLight, gammaPower), 1); // Gamma correction
 	output.ambientColor		= float4(pow(ambient, gammaPower), 1);
 	output.normals			= float4(input.normal /** 0.5f + 0.5f*/, 1);
+	output.metalRoughness	= float4(0, roughness, 0, 1); // No metalness in non-pbr materials
 	output.depths			= input.screenPosition.z;
 	return output;
 }

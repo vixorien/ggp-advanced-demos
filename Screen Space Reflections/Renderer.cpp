@@ -43,8 +43,8 @@ using namespace DirectX;
 		ssrMaxSearchDistance(5.0f),
 		ssrDepthThickness(0.015f),
 		ssrEdgeFadeThreshold(0.05f),
-		ssrMaxMajorSteps(64),
-		ssrMaxRefinementSteps(128),
+		ssrMaxMajorSteps(32),
+		ssrMaxRefinementSteps(64),
 		ambientNonPBR(0.1f, 0.1f, 0.25f)
 {
 	// Validate active light count
@@ -118,12 +118,13 @@ void Renderer::Render(Camera* camera)
 	const float depth[4] = { 1.0f, 0, 0, 0 };
 	context->ClearRenderTargetView(renderTargetRTVs[SCENE_DEPTHS].Get(), depth);
 
-	const int numTargets = 4;
+	const int numTargets = 5;
 	ID3D11RenderTargetView* targets[numTargets] = {};
 	targets[0] = renderTargetRTVs[RenderTargetType::SCENE_COLORS_NO_AMBIENT].Get();
 	targets[1] = renderTargetRTVs[RenderTargetType::SCENE_AMBIENT].Get();
 	targets[2] = renderTargetRTVs[RenderTargetType::SCENE_NORMALS].Get();
-	targets[3] = renderTargetRTVs[RenderTargetType::SCENE_DEPTHS].Get();
+	targets[3] = renderTargetRTVs[RenderTargetType::SCENE_METAL_ROUGH].Get();
+	targets[4] = renderTargetRTVs[RenderTargetType::SCENE_DEPTHS].Get();
 	context->OMSetRenderTargets(numTargets, targets, depthBufferDSV.Get());
 
 	// Collect all per-frame data and copy to GPU
@@ -250,6 +251,7 @@ void Renderer::Render(Camera* camera)
 		targets[1] = 0;
 		targets[2] = 0;
 		targets[3] = 0;
+		targets[4] = 0;
 		context->OMSetRenderTargets(numTargets, targets, 0);
 
 		SimplePixelShader* ssrPS = assets.GetPixelShader("ScreenSpaceReflectionsPS.cso");
@@ -268,6 +270,7 @@ void Renderer::Render(Camera* camera)
 
 		ssrPS->SetShaderResourceView("SceneColors", renderTargetSRVs[RenderTargetType::SCENE_COLORS_NO_AMBIENT]);
 		ssrPS->SetShaderResourceView("Normals", renderTargetSRVs[RenderTargetType::SCENE_NORMALS]);
+		ssrPS->SetShaderResourceView("MetalRoughness", renderTargetSRVs[RenderTargetType::SCENE_METAL_ROUGH]);
 		ssrPS->SetShaderResourceView("Depths", renderTargetSRVs[RenderTargetType::SCENE_DEPTHS]);
 		ssrPS->SetShaderResourceView("EnvironmentMap", sky->GetEnvironmentMap());
 
@@ -283,6 +286,7 @@ void Renderer::Render(Camera* camera)
 		targets[1] = 0;
 		targets[2] = 0;
 		targets[3] = 0;
+		targets[4] = 0;
 		context->OMSetRenderTargets(numTargets, targets, 0);
 
 		SimplePixelShader* ssaoPS = assets.GetPixelShader("SsaoPS.cso");
@@ -386,6 +390,7 @@ void Renderer::PostResize(
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_AMBIENT], renderTargetSRVs[RenderTargetType::SCENE_AMBIENT]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_NORMALS], renderTargetSRVs[RenderTargetType::SCENE_NORMALS], DXGI_FORMAT_R16G16B16A16_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_DEPTHS], renderTargetSRVs[RenderTargetType::SCENE_DEPTHS], DXGI_FORMAT_R32_FLOAT);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_METAL_ROUGH], renderTargetSRVs[RenderTargetType::SCENE_METAL_ROUGH]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_RESULTS], renderTargetSRVs[RenderTargetType::SSAO_RESULTS]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_BLUR], renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSR_COLORS], renderTargetSRVs[RenderTargetType::SSR_COLORS]);

@@ -21,8 +21,9 @@ struct VertexToPixel
 
 Texture2D SceneColors		: register(t0);
 Texture2D Normals			: register(t1);
-Texture2D Depths			: register(t2);
-TextureCube EnvironmentMap	: register(t3);
+Texture2D MetalRoughness	: register(t2);
+Texture2D Depths			: register(t3);
+TextureCube EnvironmentMap	: register(t4);
 SamplerState BasicSampler	: register(s0);
 SamplerState ClampSampler	: register(s1);
 
