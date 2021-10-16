@@ -79,7 +79,10 @@ float3 WorldSpaceFromDepth(float depth, float2 uv, matrix invViewMatrix, matrix 
 	return mul(invViewMatrix, viewPos).xyz;
 }
 
-
+float LinearDepth(float d, float zNear, float zFar)
+{
+	return zNear * zFar / (zFar + d * (zNear - zFar));
+}
 
 // === BASIC LIGHTING ===============================================
 

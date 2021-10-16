@@ -1,4 +1,6 @@
 
+#include "Lighting.hlsli"
+
 cbuffer externalData : register(b0)
 {
 	matrix invViewMatrix;
@@ -11,6 +13,8 @@ cbuffer externalData : register(b0)
 	float edgeFadeThreshold;
 	int maxMajorSteps;
 	int maxRefinementSteps;
+	float nearClip;
+	float farClip;
 };
 
 struct VertexToPixel
@@ -19,13 +23,15 @@ struct VertexToPixel
 	float2 uv           : TEXCOORD0;
 };
 
-Texture2D SceneColors		: register(t0);
-Texture2D Normals			: register(t1);
-Texture2D MetalRoughness	: register(t2);
-Texture2D Depths			: register(t3);
-TextureCube EnvironmentMap	: register(t4);
-SamplerState BasicSampler	: register(s0);
-SamplerState ClampSampler	: register(s1);
+Texture2D SceneDirectLight		: register(t0);
+Texture2D SceneIndirectSpecular	: register(t1);
+Texture2D SceneAmbient			: register(t2);
+Texture2D Normals				: register(t3);
+Texture2D SpecColorRoughness	: register(t4);
+Texture2D Depths				: register(t5);
+Texture2D BRDFLookUp			: register(t6);
+SamplerState BasicSampler		: register(s0);
+SamplerState ClampSampler		: register(s1);
 
 float3 ViewSpaceFromDepth(float2 uv, float depth)
 {
@@ -52,6 +58,19 @@ float3 UVandDepthFromViewSpacePosition(float3 positionViewSpace)
 	screenPos.y = 1.0f - screenPos.y;
 	return screenPos.xyz;
 }
+
+float3 ApplyPBRToReflection(float roughness, float3 normal, float3 view, float3 specColor, float3 reflectionColor)
+{
+	// Calculate half of the split-sum approx
+	float NdotV = saturate(dot(normal, view));
+	float2 indirectBRDF = BRDFLookUp.Sample(BasicSampler, float2(NdotV, roughness)).rg;
+	float3 indSpecFresnel = specColor * indirectBRDF.x + indirectBRDF.y;
+
+	// Adjust environment sample by fresnel
+	return reflectionColor * indSpecFresnel;
+}
+
+
 
 // Might need: https://www.comp.nus.edu.sg/~lowkl/publications/lowk_persp_interp_techrep.pdf
 
@@ -186,11 +205,11 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Sample depth first and early out for sky box
 	float pixelDepth = Depths.Sample(ClampSampler, input.uv).r;
 	if (pixelDepth == 1.0f)
-		return float4(0,0,0,1);
+		return float4(0,0,0,0);
 
 	// Get the size of the window
 	float2 windowSize = 0;
-	SceneColors.GetDimensions(windowSize.x, windowSize.y);
+	SceneDirectLight.GetDimensions(windowSize.x, windowSize.y);
 
 	// Get the view space position of this pixel
 	float3 pixelPositionViewSpace = ViewSpaceFromDepth(input.uv, pixelDepth);
@@ -211,10 +230,20 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float fade = FadeReflections(validHit, hitPos, reflViewSpace, pixelPositionViewSpace, sceneDepthAtHit, windowSize);
 
 	// Get the color at the hit position and interpolate as necessary
-	float3 sky = EnvironmentMap.Sample(BasicSampler, mul((float3x3)invViewMatrix, reflViewSpace)).rgb;
-	float3 reflectedColor = SceneColors.Sample(BasicSampler, hitPos.xy).rgb;
+	float3 colorDirect = SceneDirectLight.Sample(ClampSampler, hitPos.xy).rgb;
+	float4 colorIndirect = SceneIndirectSpecular.Sample(ClampSampler, hitPos.xy);
+	float4 colorAmbient = SceneAmbient.Sample(ClampSampler, hitPos.xy);
+	float isPBR = colorAmbient.a;
 
+	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient, colorIndirect.rgb, colorIndirect.a);
+	float3 reflectedColor = colorDirect + indirectTotal;
+
+	// Handle tinting the reflection
+	float4 specColorRough = SpecColorRoughness.Sample(ClampSampler, input.uv);
+	float3 viewWorldSpace = normalize(mul(invViewMatrix, float4(pixelPositionViewSpace, 1.0f)).xyz);
+	reflectedColor = isPBR ? ApplyPBRToReflection(specColorRough.a, normal, viewWorldSpace, specColorRough.rgb, reflectedColor) : reflectedColor;
+	
 	// Combine colors
-	float3 finalColor = reflectedColor * fade + sky * (1.0f - fade);
-	return float4(finalColor, 1);
+	float3 finalColor = reflectedColor * fade;
+	return float4(finalColor, fade);
 }

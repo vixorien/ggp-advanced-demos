@@ -25,6 +25,11 @@ public:
 	DirectX::XMFLOAT4X4 GetWorldMatrix();
 	DirectX::XMFLOAT4X4 GetWorldInverseTransposeMatrix();
 
+	// Local direction vector getters
+	DirectX::XMFLOAT3 GetUp();
+	DirectX::XMFLOAT3 GetRight();
+	DirectX::XMFLOAT3 GetForward();
+
 	void AddChild(Transform* child, bool makeChildRelative = true);
 	void RemoveChild(Transform* child, bool applyParentTransform = true);
 	void SetParent(Transform* newParent, bool makeChildRelative = true);
@@ -43,6 +48,12 @@ private:
 	DirectX::XMFLOAT3 pitchYawRoll;
 	DirectX::XMFLOAT3 scale;
 
+	// Local orientation vectors
+	bool vectorsDirty;
+	DirectX::XMFLOAT3 up;
+	DirectX::XMFLOAT3 right;
+	DirectX::XMFLOAT3 forward;
+
 	// World matrix and inverse transpose of the world matrix
 	bool matricesDirty;
 	DirectX::XMFLOAT4X4 worldMatrix;
@@ -50,6 +61,7 @@ private:
 
 	// Helper to update both matrices if necessary
 	void UpdateMatrices();
+	void UpdateVectors();
 	void MarkChildTransformsDirty();
 
 	// Helpers for conversion

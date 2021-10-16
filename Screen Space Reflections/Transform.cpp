@@ -13,8 +13,14 @@ Transform::Transform()
 	pitchYawRoll = XMFLOAT3(0, 0, 0);
 	scale = XMFLOAT3(1, 1, 1);
 
+	up = XMFLOAT3(0, 1, 0);
+	right = XMFLOAT3(1, 0, 0);
+	forward = XMFLOAT3(0, 0, 1);
+
 	// No need to recalc yet
 	matricesDirty = false;
+	vectorsDirty = false;
+
 
 	// No parent or children yet
 	parent = 0;
@@ -49,6 +55,7 @@ void Transform::Rotate(float p, float y, float r)
 	pitchYawRoll.y += y;
 	pitchYawRoll.z += r;
 	matricesDirty = true;
+	vectorsDirty = true;
 }
 
 void Transform::Scale(float x, float y, float z)
@@ -73,6 +80,7 @@ void Transform::SetRotation(float p, float y, float r)
 	pitchYawRoll.y = y;
 	pitchYawRoll.z = r;
 	matricesDirty = true;
+	vectorsDirty = true;
 }
 
 void Transform::SetScale(float x, float y, float z)
@@ -102,6 +110,7 @@ void Transform::SetTransformsFromMatrix(DirectX::XMFLOAT4X4 worldMatrix)
 
 	// Things have changed
 	matricesDirty = true;
+	vectorsDirty = true;
 }
 
 DirectX::XMFLOAT3 Transform::GetPosition() { return position; }
@@ -110,6 +119,23 @@ DirectX::XMFLOAT3 Transform::GetPitchYawRoll() { return pitchYawRoll; }
 
 DirectX::XMFLOAT3 Transform::GetScale() { return scale; }
 
+DirectX::XMFLOAT3 Transform::GetUp()
+{
+	UpdateVectors();
+	return up;
+}
+
+DirectX::XMFLOAT3 Transform::GetRight()
+{
+	UpdateVectors();
+	return right;
+}
+
+DirectX::XMFLOAT3 Transform::GetForward()
+{
+	UpdateVectors();
+	return forward;
+}
 
 DirectX::XMFLOAT4X4 Transform::GetWorldMatrix()
 {
@@ -275,6 +301,22 @@ void Transform::UpdateMatrices()
 		// now out of date
 		MarkChildTransformsDirty();
 	}
+}
+
+void Transform::UpdateVectors()
+{
+	// Do we need to update?
+	if (!vectorsDirty)
+		return;
+
+	// Update all three vectors
+	XMVECTOR rotationQuat = XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3(&pitchYawRoll));
+	XMStoreFloat3(&up, XMVector3Rotate(XMVectorSet(0, 1, 0, 0), rotationQuat));
+	XMStoreFloat3(&right, XMVector3Rotate(XMVectorSet(1, 0, 0, 0), rotationQuat));
+	XMStoreFloat3(&forward, XMVector3Rotate(XMVectorSet(0, 0, 1, 0), rotationQuat));
+
+	// Vectors are up to date
+	vectorsDirty = false;
 }
 
 void Transform::MarkChildTransformsDirty()

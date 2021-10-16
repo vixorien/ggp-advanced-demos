@@ -47,11 +47,12 @@ struct VertexToPixel
 
 struct PS_Output
 {
-	float4 colorNoAmbient	: SV_TARGET0;
-	float4 ambientColor		: SV_TARGET1;
-	float4 normals			: SV_TARGET2;
-	float4 metalRoughness	: SV_TARGET3;
-	float depths			: SV_TARGET4;
+	float4 directLight		: SV_TARGET0;
+	float4 indirectSpecular	: SV_TARGET1;
+	float4 ambientColor		: SV_TARGET2;
+	float4 normals			: SV_TARGET3;
+	float4 specColorRoughness : SV_TARGET4;
+	float depths : SV_TARGET5;
 };
 
 // Texture-related variables
@@ -109,10 +110,11 @@ PS_Output main(VertexToPixel input)
 	// Multiple render target output
 	float gammaPower = 1.0f / 2.2f;
 	PS_Output output;
-	output.colorNoAmbient	= float4(pow(totalDirectLight, gammaPower), 1); // Gamma correction
-	output.ambientColor		= float4(pow(ambient, gammaPower), 1);
+	output.directLight		= float4(totalDirectLight, 1);	// Don't gamma correct anything yet!
+	output.indirectSpecular = float4(0, 0, 0, 0);			
+	output.ambientColor		= float4(ambient, 0); // 0 = non-PBR
 	output.normals			= float4(input.normal /** 0.5f + 0.5f*/, 1);
-	output.metalRoughness	= float4(0, roughness, 0, 1); // No metalness in non-pbr materials
+	output.specColorRoughness = float4(F0_NON_METAL.rrr, roughness); // No metalness in non-pbr materials
 	output.depths			= input.screenPosition.z;
 	return output;
 }

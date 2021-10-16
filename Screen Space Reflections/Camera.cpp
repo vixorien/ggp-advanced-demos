@@ -4,10 +4,12 @@
 using namespace DirectX;
 
 // Creates a camera at the specified position
-Camera::Camera(float x, float y, float z, float moveSpeed, float mouseLookSpeed, float aspectRatio)
+Camera::Camera(float x, float y, float z, float moveSpeed, float mouseLookSpeed, float aspectRatio, float nearClip, float farClip)
 {
 	this->movementSpeed = moveSpeed;
 	this->mouseLookSpeed = mouseLookSpeed;
+	this->nearClip = nearClip;
+	this->farClip = farClip;
 	transform.SetPosition(x, y, z);
 
 	UpdateViewMatrix();
@@ -77,8 +79,8 @@ void Camera::UpdateProjectionMatrix(float aspectRatio)
 	XMMATRIX P = XMMatrixPerspectiveFovLH(
 		0.25f * XM_PI,		// Field of View Angle
 		aspectRatio,		// Aspect ratio
-		0.01f,				// Near clip plane distance
-		100.0f);			// Far clip plane distance
+		nearClip,			// Near clip plane distance
+		farClip);			// Far clip plane distance
 	XMStoreFloat4x4(&projMatrix, P);
 }
 
@@ -86,3 +88,9 @@ Transform* Camera::GetTransform()
 {
 	return &transform;
 }
+
+float Camera::GetNearClip() { return nearClip; }
+float Camera::GetFarClip() { return farClip; }
+
+void Camera::SetNearClip(float nearClip) { this->nearClip = nearClip; }
+void Camera::SetFarClip(float farClip) { this->farClip = farClip; }

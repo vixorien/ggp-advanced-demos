@@ -41,11 +41,12 @@ struct VertexToPixel
 
 struct PS_Output
 {
-	float4 colorNoAmbient	: SV_TARGET0;
-	float4 ambientColor		: SV_TARGET1;
-	float4 normals			: SV_TARGET2;
-	float4 metalRoughness	: SV_TARGET3;
-	float depths			: SV_TARGET4;
+	float4 directLight		: SV_TARGET0;
+	float4 indirectSpecular	: SV_TARGET1;
+	float4 ambientColor		: SV_TARGET2;
+	float4 normals			: SV_TARGET3;
+	float4 specColorRoughness : SV_TARGET4;
+	float depths			: SV_TARGET5;
 };
 
 
@@ -114,7 +115,7 @@ PS_Output main(VertexToPixel input)
 	float NdotV = saturate(dot(input.normal, viewToCam));
 
 	// Indirect lighting
-	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal);
+	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal) * surfaceColor.rgb;
 	float3 indirectSpecular = IndirectSpecular(
 		SpecularIBLMap, SpecIBLTotalMipLevels,
 		BrdfLookUpMap, ClampSampler, // MUST use the clamp sampler here!
@@ -122,15 +123,16 @@ PS_Output main(VertexToPixel input)
 		roughness, specColor);
 
 	// Balance indirect diff/spec
-	float3 balancedIndirectDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal) * surfaceColor.rgb;
+	//float3 balancedIndirectDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal) * surfaceColor.rgb;
 
 	// Multiple render target output
 	float gammaPower = 1.0f / 2.2f;
 	PS_Output output;
-	output.colorNoAmbient	= float4(pow(totalDirectLight + indirectSpecular, gammaPower), 1); // Gamma correction
-	output.ambientColor		= float4(pow(balancedIndirectDiff, gammaPower), 1); // Gamma correction
+	output.directLight		= float4(totalDirectLight, 1);		// Don't gamma correct anything yet!
+	output.indirectSpecular = float4(indirectSpecular, metal);	
+	output.ambientColor		= float4(indirectDiffuse, 1); // 1 = PBR
 	output.normals			= float4(input.normal /** 0.5f + 0.5f*/, 1);
-	output.metalRoughness   = float4(metal, roughness, 0, 1);
+	output.specColorRoughness = float4(specColor, roughness);
 	output.depths			= input.screenPosition.z;
 	return output;
 }
