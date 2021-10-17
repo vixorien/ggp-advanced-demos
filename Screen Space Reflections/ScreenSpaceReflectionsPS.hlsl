@@ -240,7 +240,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	// Handle tinting the reflection
 	float4 specColorRough = SpecColorRoughness.Sample(ClampSampler, input.uv);
-	float3 viewWorldSpace = normalize(mul(invViewMatrix, float4(pixelPositionViewSpace, 1.0f)).xyz);
+	float3 viewWorldSpace = -normalize(mul(invViewMatrix, float4(pixelPositionViewSpace, 1.0f)).xyz);
 	reflectedColor = isPBR ? ApplyPBRToReflection(specColorRough.a, normal, viewWorldSpace, specColorRough.rgb, reflectedColor) : reflectedColor;
 	
 	// Combine colors

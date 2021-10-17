@@ -107,6 +107,9 @@ private:
 	bool ssaoEnabled;
 	bool ssaoOutputOnly;
 
+	// Refraction related
+	
+
 	// Overall ambient for non-pbr shaders
 	DirectX::XMFLOAT3 ambientNonPBR;
 

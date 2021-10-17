@@ -6,6 +6,8 @@ cbuffer externalData : register(b0)
 	float3 viewVector;
 	int ssaoEnabled;
 	int ssaoOutputOnly;
+	int ssrEnabled;
+	int ssrOutputOnly;
 	float2 pixelSize;
 };
 
@@ -50,26 +52,33 @@ float4 main(VertexToPixel input) : SV_TARGET
 	if (!ssaoEnabled)
 		ao = 1.0f;
 
+	// Early out for SSR only
+	float4 ssr = SSR.Sample(BasicSampler, input.uv);
+	if (ssrOutputOnly)
+		return float4(ssr.rgb, 1);
+
 	// Sample everything else
 	float3 colorDirect = SceneDirectLight.Sample(BasicSampler, input.uv).rgb;
-	float4 colorIndirect = SceneIndirectSpecular.Sample(BasicSampler, input.uv);
+	float4 indirectSpecularMetal = SceneIndirectSpecular.Sample(BasicSampler, input.uv);
+	float3 colorIndirect = indirectSpecularMetal.rgb;
+	float metal = indirectSpecularMetal.a;
 	float3 colorAmbient = SceneAmbient.Sample(BasicSampler, input.uv).rgb;
 	float3 normal = Normals.Sample(BasicSampler, input.uv).rgb;
-	float4 ssr = SSR.Sample(BasicSampler, input.uv);
 	float4 ssrBlur = SSRBlur.Sample(BasicSampler, input.uv);
-
 	float4 specRough = SpecularColorRoughness.Sample(BasicSampler, input.uv);
 	float3 specColor = specRough.rgb;
 	float roughness = specRough.a;
 
-	// Adjust SSR based on roughness
-	ssr.rgb = lerp(ssr.rgb, ssrBlur.rgb, roughness);
+	// Adjust SSR blur based on roughness
+	//ssrBlur.rgb *= roughness;
+	//ssr.rgb = lerp(ssr.rgb, ssrBlur.rgb, roughness);
+	//ssr.a = lerp(ssr.a, ssrBlur.a, roughness);
 
 	// Combine indirect lighting render and ssr
-	colorIndirect.rgb = lerp(colorIndirect.rgb, ssr.rgb, ssr.a);
+	colorIndirect.rgb = ssrEnabled ? lerp(colorIndirect.rgb, ssr.rgb, ssr.a) : colorIndirect.rgb;
 
 	// Total everything up
-	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient, colorIndirect.rgb, colorIndirect.a);
+	float3 indirectTotal = colorIndirect + DiffuseEnergyConserve(colorAmbient, colorIndirect, metal);
 	float3 totalColor = colorAmbient * ao + colorDirect + colorIndirect;
 	return float4(pow(totalColor, 1.0f / 2.2f), 1);
 	

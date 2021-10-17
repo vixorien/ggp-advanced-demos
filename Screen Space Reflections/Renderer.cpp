@@ -45,6 +45,8 @@ using namespace DirectX;
 		ssrEdgeFadeThreshold(0.05f),
 		ssrMaxMajorSteps(64),
 		ssrMaxRefinementSteps(32),
+		ssrOutputOnly(false),
+		ssrEnabled(true),
 		ambientNonPBR(0.1f, 0.1f, 0.25f)
 {
 	// Validate active light count
@@ -246,6 +248,7 @@ void Renderer::Render(Camera* camera)
 	XMStoreFloat4x4(&invProj, XMMatrixInverse(0, XMLoadFloat4x4(&proj)));
 
 	// Render screen-space reflection
+	if(ssrEnabled)
 	{
 		targets[0] = renderTargetRTVs[RenderTargetType::SSR_COLORS].Get();
 		targets[1] = 0;
@@ -285,6 +288,7 @@ void Renderer::Render(Camera* camera)
 	}
 
 	// Blur SSR
+	if (ssrEnabled)
 	{
 		SimplePixelShader* blurPS = assets.GetPixelShader("GaussianBlurPS.cso");
 		blurPS->SetShader();
@@ -313,6 +317,7 @@ void Renderer::Render(Camera* camera)
 	}
 
 	// Render the SSAO results
+	if(ssaoEnabled)
 	{
 		// Set up ssao render pass
 		targets[0] = renderTargetRTVs[RenderTargetType::SSAO_RESULTS].Get();
@@ -320,6 +325,7 @@ void Renderer::Render(Camera* camera)
 		targets[2] = 0;
 		targets[3] = 0;
 		targets[4] = 0;
+		targets[5] = 0;
 		context->OMSetRenderTargets(numTargets, targets, 0);
 
 		SimplePixelShader* ssaoPS = assets.GetPixelShader("SsaoPS.cso");
@@ -345,9 +351,11 @@ void Renderer::Render(Camera* camera)
 
 
 	// SSAO Blur step
+	if (ssaoEnabled)
 	{
 		// Set up blur (assuming all other targets are null here)
 		targets[0] = renderTargetRTVs[RenderTargetType::SSAO_BLUR].Get();
+
 		context->OMSetRenderTargets(1, targets, 0);
 
 		SimplePixelShader* ps = assets.GetPixelShader("SsaoBlurPS.cso");
@@ -360,8 +368,13 @@ void Renderer::Render(Camera* camera)
 
 	// Final combine
 	{
-		// Re-enable back buffer (assuming all other targets are null here)
+		// Re-enable back buffer (and remove all other targets in case SSAO and SSR are off)
 		targets[0] = backBufferRTV.Get();
+		targets[1] = 0;
+		targets[2] = 0;
+		targets[3] = 0;
+		targets[4] = 0;
+		targets[5] = 0;
 		context->OMSetRenderTargets(1, targets, 0);
 
 		SimplePixelShader* ps = assets.GetPixelShader("FinalCombinePS.cso");
@@ -377,6 +390,8 @@ void Renderer::Render(Camera* camera)
 		ps->SetShaderResourceView("BRDFLookUp", sky->GetBRDFLookUpTexture());
 		ps->SetInt("ssaoEnabled", ssaoEnabled);
 		ps->SetInt("ssaoOutputOnly", ssaoOutputOnly);
+		ps->SetInt("ssrEnabled", ssrEnabled);
+		ps->SetInt("ssrOutputOnly", ssrOutputOnly);
 		ps->SetFloat2("pixelSize", XMFLOAT2(1.0f / windowWidth, 1.0f / windowHeight));
 		ps->SetFloat3("viewVector", camera->GetTransform()->GetForward());
 		ps->CopyAllBufferData();
@@ -396,7 +411,8 @@ void Renderer::Render(Camera* camera)
 
 	// Present and re-bind the RTV
 	swapChain->Present(0, 0);
-	context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
+	targets[0] = backBufferRTV.Get();
+	context->OMSetRenderTargets(numTargets, targets, depthBufferDSV.Get());
 
 	// Unbind all SRVs at the end of the frame so they're not still bound for input
 	// when we begin the MRTs of the next frame
@@ -454,20 +470,24 @@ float Renderer::GetSSAORadius() { return ssaoRadius; }
 void Renderer::SetSSAOSamples(int samples) { ssaoSamples = max(0, min(samples, ARRAYSIZE(ssaoOffsets))); }
 int Renderer::GetSSAOSamples() { return ssaoSamples; }
 
-void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; }
+void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; if (ssaoOnly) ssrOutputOnly = false; }
 bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 
 float Renderer::GetSSRMaxSearchDistance() { return ssrMaxSearchDistance; }
 float Renderer::GetSSRDepthThickness() { return ssrDepthThickness; }
 float Renderer::GetSSREdgeFadeThreshold() { return ssrEdgeFadeThreshold; }
 int Renderer::GetSSRMaxMajorSteps() { return ssrMaxMajorSteps; }
-int Renderer::GetSSMaxRefinementSteps() { return ssrMaxRefinementSteps; }
+int Renderer::GetSSRMaxRefinementSteps() { return ssrMaxRefinementSteps; }
+bool Renderer::GetSSREnabled() { return ssrEnabled; }
+bool Renderer::GetSSROutputOnly() { return ssrOutputOnly; }
 
 void Renderer::SetSSRMaxSearchDistance(float depth) { ssrMaxSearchDistance = depth; }
 void Renderer::SetSSRDepthThickness(float thickness) { ssrDepthThickness = thickness; }
 void Renderer::SetSSREdgeFadeThreshold(float threshold) { ssrEdgeFadeThreshold = threshold; }
 void Renderer::SetSSRMaxMajorSteps(int steps) { ssrMaxMajorSteps = steps; }
 void Renderer::SetSSRMaxRefinementSteps(int steps) { ssrMaxRefinementSteps = steps; }
+void Renderer::SetSSREnabled(bool enabled) { ssrEnabled = enabled; }
+void Renderer::SetSSROutputOnly(bool ssrOnly) { ssrOutputOnly = ssrOnly; if (ssrOnly) ssaoOutputOnly = false; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 { 

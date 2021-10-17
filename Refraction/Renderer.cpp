@@ -327,7 +327,7 @@ void Renderer::Render(Camera* camera)
 
 		// Grab the refractive shader
 		SimplePixelShader* refractionPS = assets.GetPixelShader("RefractionPS.cso");
-
+		
 		// Loop and draw each one
 		for (auto ge : refractiveEntities)
 		{

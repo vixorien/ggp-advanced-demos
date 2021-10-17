@@ -92,13 +92,17 @@ public:
 	float GetSSRDepthThickness();
 	float GetSSREdgeFadeThreshold();
 	int GetSSRMaxMajorSteps();
-	int GetSSMaxRefinementSteps();
+	int GetSSRMaxRefinementSteps();
+	bool GetSSREnabled();
+	bool GetSSROutputOnly();
 
 	void SetSSRMaxSearchDistance(float depth);
 	void SetSSRDepthThickness(float thickness);
 	void SetSSREdgeFadeThreshold(float threshold);
 	void SetSSRMaxMajorSteps(int steps);
 	void SetSSRMaxRefinementSteps(int steps);
+	void SetSSREnabled(bool enabled);
+	void SetSSROutputOnly(bool ssrOnly);
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
@@ -129,6 +133,8 @@ private:
 	float ssrEdgeFadeThreshold;
 	int ssrMaxMajorSteps;
 	int ssrMaxRefinementSteps;
+	bool ssrEnabled;
+	bool ssrOutputOnly;
 
 	// Overall ambient for non-pbr shaders
 	DirectX::XMFLOAT3 ambientNonPBR;

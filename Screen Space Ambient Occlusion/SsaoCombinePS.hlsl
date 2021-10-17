@@ -26,13 +26,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float ao = SSAOBlur.Sample(BasicSampler, input.uv).r;
 
 	// Early out for no SSAO
-	if (!ssaoEnabled) 
-		return float4(sceneColors + ambient, 1);
+	if (!ssaoEnabled)
+		ao = 1.0f;
 
 	// Early out for SSAO only
 	if (ssaoOutputOnly)
 		return float4(ao.rrr, 1);
 
 	// Final combine
-	return float4(ambient * ao + sceneColors, 1);
+	return float4(pow(ambient * ao + sceneColors, 1.0f / 2.2f), 1);
 }

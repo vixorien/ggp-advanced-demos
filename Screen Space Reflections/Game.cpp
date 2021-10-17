@@ -723,10 +723,13 @@ void Game::CreateUI(float dt)
 		if (ImGui::Button(ssao ? "SSAO Enabled" : "SSAO Disabled"))
 			renderer->SetSSAOEnabled(!ssao);
 
-		ImGui::SameLine();
-		bool ssaoOnly = renderer->GetSSAOOutputOnly();
-		if (ImGui::Button("SSAO Output Only"))
-			renderer->SetSSAOOutputOnly(!ssaoOnly);
+		if (ssao)
+		{
+			ImGui::SameLine();
+			bool ssaoOnly = renderer->GetSSAOOutputOnly();
+			if (ImGui::Button("SSAO Output Only"))
+				renderer->SetSSAOOutputOnly(!ssaoOnly);
+		}
 
 		int ssaoSamples = renderer->GetSSAOSamples();
 		if (ImGui::SliderInt("SSAO Samples", &ssaoSamples, 1, 64))
@@ -746,12 +749,24 @@ void Game::CreateUI(float dt)
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
 
+		bool ssr = renderer->GetSSREnabled();
+		if (ImGui::Button(ssr ? "SSR Enabled" : "SSR Disabled"))
+			renderer->SetSSREnabled(!ssr);
+
+		if (ssr)
+		{
+			ImGui::SameLine();
+			bool ssrOnly = renderer->GetSSROutputOnly();
+			if (ImGui::Button("SSR Output Only"))
+				renderer->SetSSROutputOnly(!ssrOnly);
+		}
+
 		float dist = renderer->GetSSRMaxSearchDistance();
 		if (ImGui::SliderFloat("SSR Max Search Distance", &dist, 0.0f, 10.0f))
 			renderer->SetSSRMaxSearchDistance(dist);
 
 		float thick = renderer->GetSSRDepthThickness();
-		if (ImGui::SliderFloat("SSR Depth Buffer Thickness", &thick, 0.0f, 0.05f))
+		if (ImGui::SliderFloat("SSR Depth Buffer Thickness", &thick, 0.0f, 0.05f, "%.5f"))
 			renderer->SetSSRDepthThickness(thick);
 
 		float edge = renderer->GetSSREdgeFadeThreshold();
@@ -762,7 +777,7 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderInt("SSR Max Major Search Steps", &major, 0, 256))
 			renderer->SetSSRMaxMajorSteps(major);
 
-		int refine = renderer->GetSSMaxRefinementSteps();
+		int refine = renderer->GetSSRMaxRefinementSteps();
 		if (ImGui::SliderInt("SSR Max Refinement Steps", &refine, 0, 256))
 			renderer->SetSSRMaxRefinementSteps(refine);
 
