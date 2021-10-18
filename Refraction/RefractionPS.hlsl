@@ -118,7 +118,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	// Get the depth at the offset and verify its valid
 	float silhouette = RefractionSilhouette.Sample(ClampSampler, refractedUV).r;
-	if (useRefractionSilhouette && silhouette == 0)
+	if (useRefractionSilhouette && silhouette < 1)
 	{
 		// Invalid spot for the offset so default to THIS pixel's UV for the "refraction"
 		refractedUV = screenUV;

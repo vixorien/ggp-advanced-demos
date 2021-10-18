@@ -130,7 +130,7 @@ void Game::Init()
 	renderer = new Renderer(
 		entities,
 		lights,
-		MAX_LIGHTS / 2, // Half the maximum lights are active to start with
+		5, // Fewer lights to start
 		sky,
 		width,
 		height,
@@ -605,6 +605,9 @@ void Game::Update(float deltaTime, float totalTime)
 	entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
 	float scale = 2.0f + sin(totalTime) / 2.0f;
 	entities[0]->GetTransform()->SetScale(scale, scale, scale);
+
+	// Rotate the other refractive object, too
+	entities[4]->GetTransform()->Rotate(0, deltaTime, 0);
 
 	// Parent/unparent for testing
 	if (input.KeyPress('P')) entities[0]->GetTransform()->AddChild(entities[1]->GetTransform());

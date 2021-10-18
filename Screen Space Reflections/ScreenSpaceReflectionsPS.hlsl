@@ -235,7 +235,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 colorAmbient = SceneAmbient.Sample(ClampSampler, hitPos.xy);
 	float isPBR = colorAmbient.a;
 
-	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient, colorIndirect.rgb, colorIndirect.a);
+	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient.rgb, colorIndirect.rgb, colorIndirect.a);
 	float3 reflectedColor = colorDirect + indirectTotal;
 
 	// Handle tinting the reflection
