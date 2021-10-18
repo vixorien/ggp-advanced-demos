@@ -17,6 +17,7 @@ enum RenderTargetType
 	SCENE_DEPTHS,
 	SSAO_RESULTS,
 	SSAO_BLUR,
+	REFRACTION_SILHOUETTE,
 	FINAL_COMPOSITE,
 
 	// Count is always the last one!
@@ -84,6 +85,16 @@ public:
 	void SetSSAOOutputOnly(bool ssaoOnly);
 	bool GetSSAOOutputOnly();
 
+	bool GetUseRefractionSilhouette();
+	bool GetRefractionFromNormalMap();
+	float GetIndexOfRefraction();
+	float GetRefractionScale();
+
+	void SetUseRefractionSilhouette(bool silhouette);
+	void SetRefractionFromNormalMap(bool fromNormals);
+	void SetIndexOfRefraction(float index);
+	void SetRefractionScale(float scale);
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
 private:
@@ -108,7 +119,11 @@ private:
 	bool ssaoOutputOnly;
 
 	// Refraction related
-	
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> refractionSilhouetteDepthState;
+	bool useRefractionSilhouette;
+	bool refractionFromNormalMap;
+	float indexOfRefraction;
+	float refractionScale;
 
 	// Overall ambient for non-pbr shaders
 	DirectX::XMFLOAT3 ambientNonPBR;

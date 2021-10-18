@@ -744,6 +744,31 @@ void Game::CreateUI(float dt)
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
 	}
 
+	// Refraction options
+	if (ImGui::CollapsingHeader("Refraction Options"))
+	{
+		ImVec2 size = ImGui::GetItemRectSize();
+		float rtHeight = size.x * ((float)height / width);
+
+		bool refrNormals = renderer->GetRefractionFromNormalMap();
+		if (ImGui::Button(refrNormals ? "Refraction from Normal Map" : "Refraction from IoR"))
+			renderer->SetRefractionFromNormalMap(!refrNormals);
+
+		ImGui::SameLine();
+		bool silh = renderer->GetUseRefractionSilhouette();
+		if (ImGui::Button(silh ? "Refraction Silhouette Enabled" : "Refraction Silhouette Disabled"))
+			renderer->SetUseRefractionSilhouette(!silh);
+
+		float ior = renderer->GetIndexOfRefraction();
+		if (ImGui::SliderFloat("Index of Refraction", &ior, 0.0f, 2.0f))
+			renderer->SetIndexOfRefraction(ior);
+
+		float refrScale = renderer->GetRefractionScale();
+		if (ImGui::SliderFloat("Refraction Scale", &refrScale, -1.0f, 1.0f))
+			renderer->SetRefractionScale(refrScale);
+	}
+
+
 	if (ImGui::CollapsingHeader("All Render Targets"))
 	{
 		ImVec2 size = ImGui::GetItemRectSize();

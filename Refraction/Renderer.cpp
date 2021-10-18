@@ -11,7 +11,7 @@
 
 using namespace DirectX;
 
- Renderer::Renderer(
+Renderer::Renderer(
 	const std::vector<GameEntity*>& entities,
 	const std::vector<Light>& lights,
 	unsigned int activeLightCount,
@@ -23,24 +23,27 @@ using namespace DirectX;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain,
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> backBufferRTV,
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthBufferDSV) :
-		entities(entities),
-		lights(lights),
-		activeLightCount(activeLightCount),
-		sky(sky),
-		windowWidth(windowWidth),
-		windowHeight(windowHeight),
-		device(device),
-		context(context),
-		swapChain(swapChain),
-		backBufferRTV(backBufferRTV),
-		depthBufferDSV(depthBufferDSV),
-		vsPerFrameConstantBuffer(0),
-		psPerFrameConstantBuffer(0),
-		pointLightsVisible(true),
-		ssaoSamples(64),
-		ssaoRadius(0.25f),
-		ssaoEnabled(true),
-		ambientNonPBR(0.1f, 0.1f, 0.25f)
+	entities(entities),
+	lights(lights),
+	activeLightCount(activeLightCount),
+	sky(sky),
+	windowWidth(windowWidth),
+	windowHeight(windowHeight),
+	device(device),
+	context(context),
+	swapChain(swapChain),
+	backBufferRTV(backBufferRTV),
+	depthBufferDSV(depthBufferDSV),
+	vsPerFrameConstantBuffer(0),
+	psPerFrameConstantBuffer(0),
+	pointLightsVisible(true),
+	ssaoSamples(64),
+	ssaoRadius(0.25f),
+	ssaoEnabled(true),
+	ambientNonPBR(0.1f, 0.1f, 0.25f),
+	refractionScale(0.1f),
+	useRefractionSilhouette(false),
+	indexOfRefraction(0.5f)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -94,6 +97,14 @@ using namespace DirectX;
 		XMStoreFloat4(&ssaoOffsets[i], v * scaleVector);
 		
 	}
+
+	// Depth state for refraction silhouette
+	D3D11_DEPTH_STENCIL_DESC depthDesc = {};
+	depthDesc.DepthEnable = true;
+	depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO; // No depth writing
+	depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
+	device->CreateDepthStencilState(&depthDesc, refractionSilhouetteDepthState.GetAddressOf());
+	
 }
 
 Renderer::~Renderer()
@@ -319,50 +330,99 @@ void Renderer::Render(Camera* camera)
 		context->Draw(3, 0);
 	}
 
-	// Now draw refractive objects (if any)
+	// Now refraction (if necessary)
 	{
-		// Set up pipeline for refractive draw
-		// Same target (back buffer), but now we need the depth buffer again
-		context->OMSetRenderTargets(1, targets, depthBufferDSV.Get());
-
-		// Grab the refractive shader
-		SimplePixelShader* refractionPS = assets.GetPixelShader("RefractionPS.cso");
-		
-		// Loop and draw each one
-		for (auto ge : refractiveEntities)
+		// Loop and render the refractive objects to the silhouette texture (if use silhouettes)
+		if(useRefractionSilhouette)
 		{
-			// Get this material and sub the refraction PS for now
-			Material* mat = ge->GetMaterial();
-			SimplePixelShader* prevPS = mat->GetPS();
-			mat->SetPS(refractionPS);
+			targets[0] = renderTargetRTVs[RenderTargetType::REFRACTION_SILHOUETTE].Get();
+			context->OMSetRenderTargets(1, targets, depthBufferDSV.Get());
 
-			// Overall material prep
-			mat->PrepareMaterial(ge->GetTransform(), camera);
-			mat->SetPerMaterialDataAndResources(true);
+			// Depth state
+			context->OMSetDepthStencilState(refractionSilhouetteDepthState.Get(), 0);
 
-			// Set up the refraction specific data
-			refractionPS->SetFloat2("screenSize", XMFLOAT2(windowWidth, windowHeight));
-			refractionPS->SetMatrix4x4("viewMatrix", camera->GetView());
-			refractionPS->CopyBufferData("perObject");
-			
-			// Set textures
-			refractionPS->SetShaderResourceView("ScreenPixels", renderTargetSRVs[RenderTargetType::FINAL_COMPOSITE].Get());
-			refractionPS->SetShaderResourceView("IrradianceIBLMap", sky->GetIrradianceMap());
-			refractionPS->SetShaderResourceView("SpecularIBLMap", sky->GetSpecularMap());
-			refractionPS->SetShaderResourceView("BrdfLookUpMap", sky->GetBRDFLookUpTexture());
+			// Grab the solid color shader
+			SimplePixelShader* solidColorPS = assets.GetPixelShader("SolidColorPS.cso");
 
-			// Reset "per frame" buffers
-			context->VSSetConstantBuffers(0, 1, vsPerFrameConstantBuffer.GetAddressOf());
-			context->PSSetConstantBuffers(0, 1, psPerFrameConstantBuffer.GetAddressOf());
+			// Loop and draw each one
+			for (auto ge : refractiveEntities)
+			{
+				// Get this material and sub the refraction PS for now
+				Material* mat = ge->GetMaterial();
+				SimplePixelShader* prevPS = mat->GetPS();
+				mat->SetPS(solidColorPS);
 
-			// Draw
-			ge->GetMesh()->SetBuffersAndDraw(context);
+				// Overall material prep
+				mat->PrepareMaterial(ge->GetTransform(), camera);
+				mat->SetPerMaterialDataAndResources(true);
 
-			// Reset this material's PS
-			mat->SetPS(prevPS);
+				// Set up the refraction specific data
+				solidColorPS->SetFloat3("Color", XMFLOAT3(1,1,1));
+				solidColorPS->CopyBufferData("externalData");
+
+				// Reset "per frame" buffer for VS
+				context->VSSetConstantBuffers(0, 1, vsPerFrameConstantBuffer.GetAddressOf());
+
+				// Draw
+				ge->GetMesh()->SetBuffersAndDraw(context);
+
+				// Reset this material's PS
+				mat->SetPS(prevPS);
+			}
+
+			// Reset depth state
+			context->OMSetDepthStencilState(0, 0);
 		}
 
-		
+		// Loop and draw refractive objects
+		{
+			// Set up pipeline for refractive draw
+			// Same target (back buffer), but now we need the depth buffer again
+			targets[0] = backBufferRTV.Get();
+			context->OMSetRenderTargets(1, targets, depthBufferDSV.Get());
+
+			// Grab the refractive shader
+			SimplePixelShader* refractionPS = assets.GetPixelShader("RefractionPS.cso");
+
+			// Loop and draw each one
+			for (auto ge : refractiveEntities)
+			{
+				// Get this material and sub the refraction PS for now
+				Material* mat = ge->GetMaterial();
+				SimplePixelShader* prevPS = mat->GetPS();
+				mat->SetPS(refractionPS);
+
+				// Overall material prep
+				mat->PrepareMaterial(ge->GetTransform(), camera);
+				mat->SetPerMaterialDataAndResources(true);
+
+				// Set up the refraction specific data
+				refractionPS->SetFloat2("screenSize", XMFLOAT2((float)windowWidth, (float)windowHeight));
+				refractionPS->SetMatrix4x4("viewMatrix", camera->GetView());
+				refractionPS->SetMatrix4x4("projMatrix", camera->GetProjection());
+				refractionPS->SetInt("useRefractionSilhouette", useRefractionSilhouette);
+				refractionPS->SetInt("refractionFromNormalMap", refractionFromNormalMap);
+				refractionPS->SetFloat("indexOfRefraction", indexOfRefraction);
+				refractionPS->SetFloat("refractionScale", refractionScale);
+				refractionPS->CopyBufferData("perObject");
+
+				// Set textures
+				refractionPS->SetShaderResourceView("ScreenPixels", renderTargetSRVs[RenderTargetType::FINAL_COMPOSITE].Get());
+				refractionPS->SetShaderResourceView("RefractionSilhouette", renderTargetSRVs[RenderTargetType::REFRACTION_SILHOUETTE].Get());
+				refractionPS->SetShaderResourceView("EnvironmentMap", sky->GetEnvironmentMap());
+				
+
+				// Reset "per frame" buffers
+				context->VSSetConstantBuffers(0, 1, vsPerFrameConstantBuffer.GetAddressOf());
+				context->PSSetConstantBuffers(0, 1, psPerFrameConstantBuffer.GetAddressOf());
+
+				// Draw
+				ge->GetMesh()->SetBuffersAndDraw(context);
+
+				// Reset this material's PS
+				mat->SetPS(prevPS);
+			}
+		}
 	}
 
 
@@ -416,6 +476,8 @@ void Renderer::PostResize(
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FINAL_COMPOSITE], renderTargetSRVs[RenderTargetType::FINAL_COMPOSITE]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_RESULTS], renderTargetSRVs[RenderTargetType::SSAO_RESULTS]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_BLUR], renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::REFRACTION_SILHOUETTE], renderTargetSRVs[RenderTargetType::REFRACTION_SILHOUETTE], DXGI_FORMAT_R8_UNORM);
+	
 }
 
 unsigned int Renderer::GetActiveLightCount() { return activeLightCount; }
@@ -435,6 +497,16 @@ int Renderer::GetSSAOSamples() { return ssaoSamples; }
 
 void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; }
 bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
+
+bool Renderer::GetUseRefractionSilhouette() { return useRefractionSilhouette; }
+bool Renderer::GetRefractionFromNormalMap() { return refractionFromNormalMap; }
+float Renderer::GetIndexOfRefraction() { return indexOfRefraction; }
+float Renderer::GetRefractionScale() { return refractionScale; }
+
+void Renderer::SetUseRefractionSilhouette(bool silhouette) { useRefractionSilhouette = silhouette; }
+void Renderer::SetRefractionFromNormalMap(bool fromNormals) { refractionFromNormalMap = fromNormals; }
+void Renderer::SetIndexOfRefraction(float index) { indexOfRefraction = index; }
+void Renderer::SetRefractionScale(float scale) { refractionScale = scale; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 { 
