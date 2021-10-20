@@ -72,7 +72,12 @@ float3 ApplyPBRToReflection(float roughness, float3 normal, float3 view, float3 
 
 
 
+
 // Might need: https://www.comp.nus.edu.sg/~lowkl/publications/lowk_persp_interp_techrep.pdf
+float PerspectiveInterpolation(float depthStart, float depthEnd, float t)
+{
+	return 1.0f / lerp(1.0f / depthStart, 1.0f / depthEnd, t);
+}
 
 // Not needed currently
 static const float FLOAT32_MAX = 3.402823466e+38f;
@@ -109,10 +114,11 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 		{
 			// Successful hit, but we may be too deep into the depth buffer,
 			// so binary search our way back towards the surface
+			float3 midPosUVSpace = posUVSpace; // In case we never end loop
 			for (int r = 0; r < maxRefinementSteps; r++)
 			{
 				// Check mid-way between the last two spots
-				float3 midPosUVSpace = lerp(lastFailedPos, posUVSpace, 0.5f);
+				midPosUVSpace = lerp(lastFailedPos, posUVSpace, 0.5f);
 				sampleDepth = Depths.SampleLevel(ClampSampler, midPosUVSpace.xy, 0).r;
 				depthDiff = midPosUVSpace.z - sampleDepth;
 
@@ -122,7 +128,7 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 					// Found it
 					validHit = true;
 					sceneDepthAtHit = sampleDepth;
-					return posUVSpace;
+					return midPosUVSpace;
 				}
 				else if (depthDiff < 0) // We're in front
 				{
@@ -136,7 +142,7 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 
 			// The refinement failed, so we call it quits
 			validHit = false;
-			return posUVSpace;
+			return midPosUVSpace;
 		}
 
 		// If we're here, we had a failed hit

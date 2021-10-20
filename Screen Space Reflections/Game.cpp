@@ -130,7 +130,7 @@ void Game::Init()
 	renderer = new Renderer(
 		entities,
 		lights,
-		MAX_LIGHTS / 2, // Half the maximum lights are active to start with
+		5, // Just a few lights to start
 		sky,
 		width,
 		height,
