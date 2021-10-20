@@ -743,7 +743,7 @@ void Game::CreateUI(float dt)
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
 	}
 
-	// SSRs
+	// SSR Options
 	if (ImGui::CollapsingHeader("Screen Space Reflections"))
 	{
 		ImVec2 size = ImGui::GetItemRectSize();
@@ -765,8 +765,12 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderFloat("SSR Max Search Distance", &dist, 0.0f, 10.0f))
 			renderer->SetSSRMaxSearchDistance(dist);
 
+		float rough = renderer->GetSSRRoughnessThreshold();
+		if (ImGui::SliderFloat("SSR Roughness Threshold", &rough, 0.0f, 1.0f))
+			renderer->SetSSRRoughnessThreshold(rough);
+
 		float thick = renderer->GetSSRDepthThickness();
-		if (ImGui::SliderFloat("SSR Depth Buffer Thickness", &thick, 0.0f, 0.05f, "%.5f"))
+		if (ImGui::SliderFloat("SSR Depth Buffer Thickness (UNUSED)", &thick, 0.0f, 0.05f, "%.5f"))
 			renderer->SetSSRDepthThickness(thick);
 
 		float edge = renderer->GetSSREdgeFadeThreshold();

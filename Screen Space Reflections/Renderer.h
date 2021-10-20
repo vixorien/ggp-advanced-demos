@@ -90,6 +90,7 @@ public:
 
 	float GetSSRMaxSearchDistance();
 	float GetSSRDepthThickness();
+	float GetSSRRoughnessThreshold();
 	float GetSSREdgeFadeThreshold();
 	int GetSSRMaxMajorSteps();
 	int GetSSRMaxRefinementSteps();
@@ -98,6 +99,7 @@ public:
 
 	void SetSSRMaxSearchDistance(float depth);
 	void SetSSRDepthThickness(float thickness);
+	void SetSSRRoughnessThreshold(float threshold);
 	void SetSSREdgeFadeThreshold(float threshold);
 	void SetSSRMaxMajorSteps(int steps);
 	void SetSSRMaxRefinementSteps(int steps);
@@ -130,6 +132,7 @@ private:
 	// SSR variables
 	float ssrMaxSearchDistance;
 	float ssrDepthThickness;
+	float ssrRoughnessThreshold;
 	float ssrEdgeFadeThreshold;
 	int ssrMaxMajorSteps;
 	int ssrMaxRefinementSteps;

@@ -42,6 +42,7 @@ using namespace DirectX;
 		ssaoEnabled(true),
 		ssrMaxSearchDistance(5.0f),
 		ssrDepthThickness(0.015f),
+		ssrRoughnessThreshold(1.0f),
 		ssrEdgeFadeThreshold(0.05f),
 		ssrMaxMajorSteps(64),
 		ssrMaxRefinementSteps(32),
@@ -267,6 +268,7 @@ void Renderer::Render(Camera* camera)
 		ssrPS->SetMatrix4x4("projectionMatrix", proj);
 		ssrPS->SetFloat("maxSearchDistance",ssrMaxSearchDistance);
 		ssrPS->SetFloat("depthThickness", ssrDepthThickness);
+		ssrPS->SetFloat("roughnessThreshold", ssrRoughnessThreshold);
 		ssrPS->SetFloat("edgeFadeThreshold", ssrEdgeFadeThreshold);
 		ssrPS->SetInt("maxMajorSteps", ssrMaxMajorSteps);
 		ssrPS->SetInt("maxRefinementSteps", ssrMaxRefinementSteps);
@@ -475,6 +477,7 @@ bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 
 float Renderer::GetSSRMaxSearchDistance() { return ssrMaxSearchDistance; }
 float Renderer::GetSSRDepthThickness() { return ssrDepthThickness; }
+float Renderer::GetSSRRoughnessThreshold() { return ssrRoughnessThreshold; }
 float Renderer::GetSSREdgeFadeThreshold() { return ssrEdgeFadeThreshold; }
 int Renderer::GetSSRMaxMajorSteps() { return ssrMaxMajorSteps; }
 int Renderer::GetSSRMaxRefinementSteps() { return ssrMaxRefinementSteps; }
@@ -483,6 +486,7 @@ bool Renderer::GetSSROutputOnly() { return ssrOutputOnly; }
 
 void Renderer::SetSSRMaxSearchDistance(float depth) { ssrMaxSearchDistance = depth; }
 void Renderer::SetSSRDepthThickness(float thickness) { ssrDepthThickness = thickness; }
+void Renderer::SetSSRRoughnessThreshold(float threshold) { ssrRoughnessThreshold = threshold; }
 void Renderer::SetSSREdgeFadeThreshold(float threshold) { ssrEdgeFadeThreshold = threshold; }
 void Renderer::SetSSRMaxMajorSteps(int steps) { ssrMaxMajorSteps = steps; }
 void Renderer::SetSSRMaxRefinementSteps(int steps) { ssrMaxRefinementSteps = steps; }

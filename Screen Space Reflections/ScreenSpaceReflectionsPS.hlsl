@@ -11,6 +11,7 @@ cbuffer externalData : register(b0)
 	float maxSearchDistance;
 	float depthThickness;
 	float edgeFadeThreshold;
+	float roughnessThreshold;
 	int maxMajorSteps;
 	int maxRefinementSteps;
 	float nearClip;
@@ -92,20 +93,16 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 	// The origin is just this UV and its depth
 	float3 originUVSpace = float3(thisUV, thisDepth);
 	float3 endUVSpace = UVandDepthFromViewSpacePosition(pixelPositionViewSpace + reflViewSpace * maxSearchDistance);
-	float3 deltaUVSpace = endUVSpace - originUVSpace;
-	
-	// The ray direction, also in UV/Depth space
-	float3 rayDirUVSpace = normalize(deltaUVSpace);
+	float3 rayUVSpace = endUVSpace - originUVSpace;
 
 	// Prepare to loop
 	float t = 0;
-	float stepSize = length(deltaUVSpace) / maxMajorSteps;
 	float3 lastFailedPos = originUVSpace;
 	for (int i = 0; i < maxMajorSteps; i++)
 	{
 		// Calculate how much to advance and adjust
-		t += stepSize;
-		float3 posUVSpace = originUVSpace + rayDirUVSpace * t;
+		t = (float)i / maxMajorSteps;
+		float3 posUVSpace = originUVSpace + rayUVSpace * t;
 
 		// Check depth here and compare
 		float sampleDepth = Depths.SampleLevel(ClampSampler, posUVSpace.xy, 0).r;
@@ -213,6 +210,12 @@ float4 main(VertexToPixel input) : SV_TARGET
 	if (pixelDepth == 1.0f)
 		return float4(0,0,0,0);
 
+	// Get the specular color and roughness of this pixel,
+	// then test to see if this pixel is too rough for reflections
+	float4 specColorRough = SpecColorRoughness.Sample(ClampSampler, input.uv);
+	if (specColorRough.a > roughnessThreshold)
+		return float4(0, 0, 0, 0);
+
 	// Get the size of the window
 	float2 windowSize = 0;
 	SceneDirectLight.GetDimensions(windowSize.x, windowSize.y);
@@ -245,7 +248,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 reflectedColor = colorDirect + indirectTotal;
 
 	// Handle tinting the reflection
-	float4 specColorRough = SpecColorRoughness.Sample(ClampSampler, input.uv);
 	float3 viewWorldSpace = -normalize(mul(invViewMatrix, float4(pixelPositionViewSpace, 1.0f)).xyz);
 	reflectedColor = isPBR ? ApplyPBRToReflection(specColorRough.a, normal, viewWorldSpace, specColorRough.rgb, reflectedColor) : reflectedColor;
 	
