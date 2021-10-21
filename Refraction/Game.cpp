@@ -762,13 +762,18 @@ void Game::CreateUI(float dt)
 		if (ImGui::Button(silh ? "Refraction Silhouette Enabled" : "Refraction Silhouette Disabled"))
 			renderer->SetUseRefractionSilhouette(!silh);
 
-		float ior = renderer->GetIndexOfRefraction();
-		if (ImGui::SliderFloat("Index of Refraction", &ior, 0.0f, 2.0f))
-			renderer->SetIndexOfRefraction(ior);
-
 		float refrScale = renderer->GetRefractionScale();
 		if (ImGui::SliderFloat("Refraction Scale", &refrScale, -1.0f, 1.0f))
 			renderer->SetRefractionScale(refrScale);
+
+		if (!refrNormals)
+		{
+			float ior = renderer->GetIndexOfRefraction();
+			if (ImGui::SliderFloat("Index of Refraction", &ior, 0.0f, 2.0f))
+				renderer->SetIndexOfRefraction(ior);
+		}
+
+
 	}
 
 

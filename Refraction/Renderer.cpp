@@ -43,6 +43,7 @@ Renderer::Renderer(
 	ambientNonPBR(0.1f, 0.1f, 0.25f),
 	refractionScale(0.1f),
 	useRefractionSilhouette(false),
+	refractionFromNormalMap(true),
 	indexOfRefraction(0.5f)
 {
 	// Validate active light count
