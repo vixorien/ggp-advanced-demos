@@ -41,10 +41,10 @@ void Material::PrepareMaterial(Transform* transform, Camera* cam)
 	ps->CopyBufferData("perMaterial");
 
 	// Loop and set any other resources
-	for (auto t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
-	for (auto s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
+	for (auto& t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
+	for (auto& t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
+	for (auto& s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
+	for (auto& s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
 }
 
 void Material::SetPerMaterialDataAndResources(bool copyToGPUNow)
@@ -65,10 +65,10 @@ void Material::SetPerMaterialDataAndResources(bool copyToGPUNow)
 	}
 
 	// Loop and set any other resources
-	for (auto t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
-	for (auto s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
+	for (auto& t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
+	for (auto& t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
+	for (auto& s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
+	for (auto& s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
 }
 
 void Material::AddPSTextureSRV(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv)
