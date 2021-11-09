@@ -138,7 +138,7 @@ void Emitter::Update(float dt, float currentTime)
 	// Enough time to emit?
 	while (timeSinceLastEmit > secondsPerParticle)
 	{
-		SpawnParticle(currentTime);
+		EmitParticle(currentTime);
 		timeSinceLastEmit -= secondsPerParticle;
 	}
 
@@ -179,7 +179,7 @@ void Emitter::Update(float dt, float currentTime)
 
 void Emitter::UpdateSingleParticle(float currentTime, int index)
 {
-	float age = currentTime - particles[index].SpawnTime;
+	float age = currentTime - particles[index].EmitTime;
 
 	// Update and check for death
 	if (age >= lifetime)
@@ -191,7 +191,7 @@ void Emitter::UpdateSingleParticle(float currentTime, int index)
 	}
 }
 
-void Emitter::SpawnParticle(float currentTime)
+void Emitter::EmitParticle(float currentTime)
 {
 	// Any left to spawn?
 	if (livingParticleCount == maxParticles)
@@ -201,7 +201,7 @@ void Emitter::SpawnParticle(float currentTime)
 	int spawnedIndex = indexFirstDead;
 
 	// Update the spawn time of the first dead particle
-	particles[spawnedIndex].SpawnTime = currentTime;
+	particles[spawnedIndex].EmitTime = currentTime;
 	particles[spawnedIndex].StartPosition = XMFLOAT3(0, 0, 0);
 
 	// Here is where you could make particle spawning more interesting

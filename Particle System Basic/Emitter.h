@@ -11,8 +11,7 @@
 // so we need to care about alignment
 struct Particle
 {
-	// 4 floats
-	float SpawnTime;
+	float EmitTime;
 	DirectX::XMFLOAT3 StartPosition;
 };
 
@@ -63,6 +62,6 @@ private:
 
 	// Simulation methods
 	void UpdateSingleParticle(float currentTime, int index);
-	void SpawnParticle(float currentTime);
+	void EmitParticle(float currentTime);
 };
 

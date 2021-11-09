@@ -8,7 +8,7 @@ cbuffer externalData : register(b0)
 // Struct representing a single particle
 struct Particle
 {
-	float SpawnTime;
+	float EmitTime;
 	float3 StartPosition;
 };
 
@@ -57,7 +57,7 @@ VertexToPixel main(uint id : SV_VertexID)
 	float3 pos = p.StartPosition;
 
 	// Calculate the age
-	float age = currentTime - p.SpawnTime;
+	float age = currentTime - p.EmitTime;
 	pos += float3(0.1f, 0, 0) * age;
 
 	// Here is where you could do LOTS of other particle
