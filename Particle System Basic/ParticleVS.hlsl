@@ -34,6 +34,21 @@ VertexToPixel main(uint id : SV_VertexID)
 	uint particleID = id / 4; // Every group of 4 verts are ONE particle!
 	uint cornerID = id % 4; // 0,1,2,3 = the corner of the particle "quad"
 
+	// Grab one particle and its starting position
+	Particle p = ParticleData.Load(particleID);
+	float3 pos = p.StartPosition;
+
+	// Calculate the age
+	float age = currentTime - p.EmitTime;
+
+	// Perform an incredibly simple particle simulation:
+	// Move right a little bit based on the particle's age
+	pos += float3(0.1f, 0, 0) * age;
+
+	// === Here is where you could do LOTS of other particle
+	// === simulation updates, like rotation, acceleration, forces,
+	// === fading, color interpolation, size changes, etc.
+
 	// Offsets for the 4 corners of a quad - we'll only
 	// use one for each vertex, but which one depends
 	// on the cornerID above.
@@ -42,27 +57,6 @@ VertexToPixel main(uint id : SV_VertexID)
 	offsets[1] = float2(+1.0f, +1.0f);  // TR
 	offsets[2] = float2(+1.0f, -1.0f);  // BR
 	offsets[3] = float2(-1.0f, -1.0f);  // BL
-
-	// UVs for the 4 corners of a quad - again, only
-	// using one for each vertex, but which one depends
-	// on the cornerID above.
-	float2 uvs[4];
-	uvs[0] = float2(0, 0); // TL
-	uvs[1] = float2(1, 0); // TR
-	uvs[2] = float2(1, 1); // BR
-	uvs[3] = float2(0, 1); // BL
-
-	// Grab one particle and its starting position
-	Particle p = ParticleData.Load(particleID);
-	float3 pos = p.StartPosition;
-
-	// Calculate the age
-	float age = currentTime - p.EmitTime;
-	pos += float3(0.1f, 0, 0) * age;
-
-	// Here is where you could do LOTS of other particle
-	// simulation updates, like rotation, acceleration, forces,
-	// fading, color interpolation, size changes, etc.
 
 	// Billboarding!
 	// Offset the position based on the camera's right and up vectors
@@ -73,7 +67,14 @@ VertexToPixel main(uint id : SV_VertexID)
 	matrix viewProj = mul(projection, view);
 	output.position = mul(viewProj, float4(pos, 1.0f));
 
-	// Pass UVs through, too
+	// UVs for the 4 corners of a quad - again, only
+	// using one for each vertex, but which one depends
+	// on the cornerID above.
+	float2 uvs[4];
+	uvs[0] = float2(0, 0); // TL
+	uvs[1] = float2(1, 0); // TR
+	uvs[2] = float2(1, 1); // BR
+	uvs[3] = float2(0, 1); // BL
 	output.uv = uvs[cornerID];
 
 	return output;
