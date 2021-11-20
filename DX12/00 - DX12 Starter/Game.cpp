@@ -25,7 +25,8 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(true)
+	vsync(true),
+	offset(0)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -419,9 +420,12 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
+	// Update triangle's offset
+	offset += deltaTime * 0.05f;
+
 	// Collect data
 	VertShaderExternalData data = {};
-	data.offset = XMFLOAT3(0.25f, 0.25f, 0);
+	data.offset = XMFLOAT3(offset, 0, 0);
 
 	// Copy data to the constant buffer
 	// Note: Apparently upload heaps (like constant buffers) do NOT need to be

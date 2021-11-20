@@ -173,15 +173,6 @@ Mesh::Mesh(const char* objFile)
 }
 
 
-
-Mesh::~Mesh(void)
-{
-	vertexBuffer->Release();
-	indexBuffer->Release();
-
-}
-
-
 void Mesh::CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArray, int numIndices)
 {
 	// Save the index count

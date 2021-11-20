@@ -22,6 +22,7 @@ public:
 private:
 
 	bool vsync;
+	float offset;
 
 	// Initialization helper methods - feel free to customize, combine, etc.
 	void CreateRootSigAndPipelineState();

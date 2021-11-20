@@ -64,8 +64,9 @@ void Game::Init()
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
-	CreateConstantBuffer();
 	CreateBasicGeometry();
+
+	camera = std::make_shared<Camera>(0, 0, -5, 5.0f, 1.0f, XM_PIDIV4, width / (float)height);
 }
 
 
@@ -88,7 +89,7 @@ void Game::CreateRootSigAndPipelineState()
 	}
 
 	// Input layout
-	const unsigned int inputElementCount = 2;
+	const unsigned int inputElementCount = 4;
 	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {};
 	{
 		// Create an input layout that describes the vertex format
@@ -102,11 +103,23 @@ void Game::CreateRootSigAndPipelineState()
 		inputElements[0].SemanticName = "POSITION";					// This is "POSITTION" - needs to match the semantics in our vertex shader input!
 		inputElements[0].SemanticIndex = 0;							// This is the 0th position (there could be more)
 
-		// Set up the second element - a color, which is 4 more float values
+		// Set up the second element - a UV, which is 2 more float values
 		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
-		inputElements[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;	// 4x 32-bit floats
-		inputElements[1].SemanticName = "COLOR";					// Match our vertex shader input!
-		inputElements[1].SemanticIndex = 0;							// This is the 0th color (there could be more)
+		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;			// 2x 32-bit floats
+		inputElements[1].SemanticName = "TEXCOORD";					// Match our vertex shader input!
+		inputElements[1].SemanticIndex = 0;							// This is the 0th uv (there could be more)
+
+		// Set up the third element - a normal, which is 3 more float values
+		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[2].SemanticName = "NORMAL";					// Match our vertex shader input!
+		inputElements[2].SemanticIndex = 0;							// This is the 0th normal (there could be more)
+
+		// Set up the fourth element - a tangent, which is 2 more float values
+		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[3].SemanticName = "TANGENT";					// Match our vertex shader input!
+		inputElements[3].SemanticIndex = 0;							// This is the 0th tangent (there could be more)
 	}
 
 	// Root Signature
@@ -210,69 +223,31 @@ void Game::CreateRootSigAndPipelineState()
 
 
 // --------------------------------------------------------
-// Creates the constant buffer used to send data to the
-// vertex shader (and all associated memo
-// --------------------------------------------------------
-void Game::CreateConstantBuffer()
-{
-	// Create a descriptor heap to store constant buffer descriptors.  
-	// One big heap is good enough to hold all cbv/srv/uav descriptors.
-	D3D12_DESCRIPTOR_HEAP_DESC cbDesc = {};
-	cbDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	cbDesc.NodeMask = 0;
-	cbDesc.NumDescriptors = 1;
-	cbDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	device->CreateDescriptorHeap(&cbDesc, IID_PPV_ARGS(vsConstBufferDescriptorHeap.GetAddressOf()));
-
-	D3D12_HEAP_PROPERTIES heapProps = {};
-	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapProps.CreationNodeMask = 1;
-	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	heapProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Upload heap since we'll be copying often!
-	heapProps.VisibleNodeMask = 1;
-
-	// Buffers must be multiples of 256 bytes!
-	unsigned int bufferSize = sizeof(VertShaderExternalData);
-	bufferSize = (bufferSize + 255); // Add 255 so we can drop last few bits
-	bufferSize = bufferSize & ~255;  // Flip 255 and then use it to mask 
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Alignment = 0;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resDesc.Format = DXGI_FORMAT_UNKNOWN;
-	resDesc.Height = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-	resDesc.Width = bufferSize;
-
-	// Create a constant buffer resource heap
-	device->CreateCommittedResource(
-		&heapProps,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		0,
-		IID_PPV_ARGS(vsConstBufferUploadHeap.GetAddressOf()));
-
-	// Need to get a view to the constant buffer
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = vsConstBufferUploadHeap->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = bufferSize; // Must be 256-byte aligned!
-	device->CreateConstantBufferView(&cbvDesc, vsConstBufferDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
-
-// --------------------------------------------------------
 // Creates the geometry we're going to draw - a single triangle for now
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
 	// Load meshes
-	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/sphere.obj").c_str()));
+	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/cube.obj").c_str());
+	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/sphere.obj").c_str());
+	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/helix.obj").c_str());
+	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/cylinder.obj").c_str());
+
+	// Create entities
+	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube);
+	entityCube->GetTransform()->SetPosition(3, 0, 0);
+
+	std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix);
+	entityHelix->GetTransform()->SetPosition(0, 0, 0);
+
+	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere);
+	entitySphere->GetTransform()->SetPosition(-3, 0, 0);
+
+	// Add to list
+	entities.push_back(entityCube);
+	entities.push_back(entityHelix);
+	entities.push_back(entitySphere);
 }
 
 
@@ -296,18 +271,7 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	// Collect data
-	VertShaderExternalData data = {};
-	data.offset = XMFLOAT3(0.25f, 0.25f, 0);
-
-	// Copy data to the constant buffer
-	// Note: Apparently upload heaps (like constant buffers) do NOT need to be
-	// unmapped to be used by the GPU.  Keeping it mapped can speed things up.
-	// See examples here: https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/nf-d3d12-id3d12resource-map
-	void* gpuAddress;
-	vsConstBufferUploadHeap->Map(0, 0, &gpuAddress);
-	memcpy(gpuAddress, &data, sizeof(VertShaderExternalData));
-	vsConstBufferUploadHeap->Unmap(0, 0);
+	camera->Update(deltaTime);
 }
 
 // --------------------------------------------------------
@@ -353,6 +317,9 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Rendering here!
 	{
+		// Grab the helper as we need it for a few things below
+		DX12Helper& dx12Helper = DX12Helper::GetInstance();
+
 		// Set overall pipeline state
 		commandList->SetPipelineState(pipelineState.Get());
 
@@ -360,10 +327,8 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
 		// Set constant buffer
-		commandList->SetDescriptorHeaps(1, vsConstBufferDescriptorHeap.GetAddressOf());
-		commandList->SetGraphicsRootDescriptorTable(
-			0,
-			vsConstBufferDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetConstantBufferDescriptorHeap();
+		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
 		// Set up other commands for rendering
 		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
@@ -372,17 +337,36 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		// Loop through the meshes
-		for (auto& m : meshes)
+		for (auto& e : entities)
 		{
-			D3D12_VERTEX_BUFFER_VIEW vbv = m->GetVB();
-			D3D12_INDEX_BUFFER_VIEW  ibv = m->GetIB();
+			// Set up the data we intend to use for drawing this entity
+			VertexShaderExternalData vsData = {};
+			vsData.world = e->GetTransform()->GetWorldMatrix();
+			vsData.view = camera->GetView();
+			vsData.projection = camera->GetProjection();
+
+			// Send this to a chunk of the constant buffer heap
+			// and grab the GPU handle for it so we can set it for this draw
+			D3D12_GPU_DESCRIPTOR_HANDLE cbHandle = dx12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
+				(void*)(&vsData), sizeof(VertexShaderExternalData));
+
+			// Set this constant buffer handle
+			// Note: This assumes that descriptor table 0 is the
+			//       place to put this particular descriptor.  This
+			//       is based on how we set up our root signature.
+			commandList->SetGraphicsRootDescriptorTable(0, cbHandle);
+
+			// Grab the mesh and its buffer views
+			std::shared_ptr<Mesh> mesh = e->GetMesh();
+			D3D12_VERTEX_BUFFER_VIEW vbv = mesh->GetVB();
+			D3D12_INDEX_BUFFER_VIEW  ibv = mesh->GetIB();
 
 			// Set the geometry
 			commandList->IASetVertexBuffers(0, 1, &vbv);
 			commandList->IASetIndexBuffer(&ibv);
 
 			// Draw
-			commandList->DrawIndexedInstanced(m->GetIndexCount(), 1, 0, 0, 0);
+			commandList->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
 		}
 	}
 

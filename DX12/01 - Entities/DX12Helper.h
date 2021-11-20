@@ -41,11 +41,16 @@ public:
 
 	// Resource creation
 	HRESULT CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data, ID3D12Resource** buffer);
+	
+	// Dynamic resources
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetConstantBufferDescriptorHeap();
+	D3D12_GPU_DESCRIPTOR_HANDLE FillNextConstantBufferAndGetGPUDescriptorHandle(
+		void* data,
+		unsigned int dataSizeInBytes);
 
-	// Command list
+
+	// Command list & synchronization
 	void CloseExecuteAndResetCommandList();
-
-	// Synchronization
 	void WaitForGPU();
 
 
@@ -66,5 +71,24 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Fence> waitFence;
 	HANDLE								waitFenceEvent;
 	unsigned long						waitFenceCounter;
+
+	// Maximum number of constant buffers, assuming each buffer
+	// is 256 bytes or less.  Larger buffers are fine, but will
+	// result in fewer buffers in use at any time
+	const int maxConstantBuffers = 1000;
+	
+	// GPU-side contant buffer upload heap
+	Microsoft::WRL::ComPtr<ID3D12Resource> cbUploadHeap;
+	UINT64 cbUploadHeapSizeInBytes;
+	UINT64 cbUploadHeapOffsetInBytes;
+	void* cbUploadHeapStartAddress;
+
+	// GPU-side CBV/SRV descriptor heap
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvDescriptorHeap;
+	SIZE_T cbvDescriptorHeapIncrementSize;
+	unsigned int cbvDescriptorOffset;
+
+	void CreateConstantBufferUploadHeap();
+	void CreateConstantBufferViewDescriptorHeap();
 };
 
