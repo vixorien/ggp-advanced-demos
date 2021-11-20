@@ -228,11 +228,11 @@ void Game::CreateRootSigAndPipelineState()
 void Game::CreateBasicGeometry()
 {
 	// Load meshes
-	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/cube.obj").c_str());
-	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/sphere.obj").c_str());
-	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/helix.obj").c_str());
-	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/torus.obj").c_str());
-	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../Assets/Models/cylinder.obj").c_str());
+	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
+	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/sphere.obj").c_str());
+	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/helix.obj").c_str());
+	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cylinder.obj").c_str());
 
 	// Create entities
 	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube);
