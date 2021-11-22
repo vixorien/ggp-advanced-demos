@@ -1,10 +1,13 @@
 #include "Lighting.hlsli"
 
+// Alignment matters!!!
 cbuffer ExternalData : register(b0)
 {
 	float2 uvScale;
 	float2 uvOffset;
 	float3 cameraPosition;
+	int lightCount;
+	Light lights[MAX_LIGHTS];
 }
 
 // Struct representing the data we expect to receive from earlier pipeline stages
@@ -20,7 +23,8 @@ struct VertexToPixel
 // Texture related
 Texture2D AlbedoTexture			: register(t0);
 Texture2D NormalMap				: register(t1);
-
+Texture2D RoughnessMap			: register(t2);
+Texture2D MetalMap				: register(t3);
 SamplerState BasicSampler		: register(s0);
 
 // --------------------------------------------------------
@@ -35,13 +39,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Scale and offset uv as necessary
 	input.uv = input.uv * uvScale + uvOffset;
 
-	// Define a basic "test" light
-	Light light;
-	light.Type = LIGHT_TYPE_DIRECTIONAL;
-	light.Direction = normalize(float3(1, -1, 1));
-	light.Intensity = 1.0f;
-	light.Color = float3(1, 1, 1);
-
 	// Normal mapping
 	input.normal = NormalMapping(NormalMap, BasicSampler, input.uv, input.normal, input.tangent);
 
@@ -49,8 +46,41 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
 	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2);
 
-	// Calculate our single "test" light
-	float3 totalLight = DirLight(light, input.normal, input.worldPos, cameraPosition, 0.5f, surfaceColor.rgb, 1.0f);
+	// Sample the other maps
+	float roughness = RoughnessMap.Sample(BasicSampler, input.uv).r;
+	float metal = MetalMap.Sample(BasicSampler, input.uv).r;
+	
+	// Specular color - Assuming albedo texture is actually holding specular color if metal == 1
+	// Note the use of lerp here - metal is generally 0 or 1, but might be in between
+	// because of linear texture sampling, so we want lerp the specular color to match
+	float3 specColor = lerp(F0_NON_METAL.rrr, surfaceColor.rgb, metal);
+
+	// Keep a running total of light
+	float3 totalLight = surfaceColor.rgb;
+
+	// Loop and handle all lights
+	for (int i = 0; i < lightCount; i++)
+	{
+		// Grab this light and normalize the direction (just in case)
+		Light light = lights[i];
+		light.Direction = normalize(light.Direction);
+
+		// Run the correct lighting calculation based on the light's type
+		switch (lights[i].Type)
+		{
+		case LIGHT_TYPE_DIRECTIONAL:
+			totalLight += DirLightPBR(light, input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			break;
+
+		case LIGHT_TYPE_POINT:
+			totalLight += PointLightPBR(light, input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			break;
+
+		case LIGHT_TYPE_SPOT:
+			totalLight += SpotLightPBR(light, input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			break;
+		}
+	}
 
 	// Gamma correct and return
 	return float4(pow(totalLight, 1.0f / 2.2f), 1.0f);

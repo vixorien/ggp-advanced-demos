@@ -36,6 +36,11 @@ void DX12Helper::Initialize(
 	waitFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
 	waitFenceCounter = 0;
 
+	// Create the fence for frame sync
+	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(frameSyncFence.GetAddressOf()));
+	frameSyncFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
+	frameSyncFenceCounter = 0;
+
 	// Create the constant buffer upload heap
 	CreateConstantBufferUploadHeap();
 	CreateCBVSRVDescriptorHeap();
@@ -199,16 +204,20 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetCBVSRVDescriptorHeap
 // --------------------------------------------------------
 D3D12_GPU_DESCRIPTOR_HANDLE DX12Helper::FillNextConstantBufferAndGetGPUDescriptorHandle(void* data, unsigned int dataSizeInBytes)
 {
-	// Where in the upload heap will this data go?
-	D3D12_GPU_VIRTUAL_ADDRESS virtualGPUAddress =
-		cbUploadHeap->GetGPUVirtualAddress() + cbUploadHeapOffsetInBytes;
-
 	// How much space will we need?  Each CBV must point to a chunk of
 	// the upload heap that is a multiple of 256 bytes, so we need to 
 	// calculate and reserve that amount.
 	SIZE_T reservationSize = (SIZE_T)dataSizeInBytes;
 	reservationSize = (reservationSize + 255); // Add 255 so we can drop last few bits
 	reservationSize = reservationSize & ~255;  // Flip 255 and then use it to mask 
+
+	// Ensure this upload will fit in the remaining space.  If not, reset to beginning.
+	if (cbUploadHeapOffsetInBytes + reservationSize >= cbUploadHeapSizeInBytes)
+		cbUploadHeapOffsetInBytes = 0;
+
+	// Where in the upload heap will this data go?
+	D3D12_GPU_VIRTUAL_ADDRESS virtualGPUAddress =
+		cbUploadHeap->GetGPUVirtualAddress() + cbUploadHeapOffsetInBytes;
 
 	// === Copy data to the upload heap ===
 	{
@@ -330,6 +339,40 @@ void DX12Helper::WaitForGPU()
 		// sit an wait until that fence is hit.
 		waitFence->SetEventOnCompletion(waitFenceCounter, waitFenceEvent);
 		WaitForSingleObject(waitFenceEvent, INFINITE);
+	}
+}
+
+
+// --------------------------------------------------------
+// Adds a signal to the command queue so we can track
+// which frames have been completed.
+// --------------------------------------------------------
+void DX12Helper::SignalFrameCompletion()
+{
+	// Signal that we're done with this frame
+	frameSyncFenceCounter++;
+	commandQueue->Signal(frameSyncFence.Get(), frameSyncFenceCounter);
+}
+
+
+
+// --------------------------------------------------------
+// Ensures we're never more than several frames ahead
+// of the GPU and waits if we are.
+// --------------------------------------------------------
+void DX12Helper::SyncGPUMaxFrames()
+{
+	// Handle our cpu/gpu frame sync
+	// Difference between our count and the completed fence shouldn't exceed gpuSyncFrames
+	if (frameSyncFenceCounter > maxGPUSyncFrames &&
+		frameSyncFenceCounter - frameSyncFence->GetCompletedValue() >= maxGPUSyncFrames)
+	{
+		// Set the event and wait for it to complete
+		frameSyncFence->SetEventOnCompletion(frameSyncFenceCounter, frameSyncFenceEvent);
+		if (frameSyncFenceEvent != 0)
+		{
+			WaitForSingleObject(frameSyncFenceEvent, INFINITE);
+		}
 	}
 }
 

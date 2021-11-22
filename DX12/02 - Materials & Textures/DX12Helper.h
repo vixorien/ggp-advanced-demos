@@ -33,8 +33,12 @@ private:
 		cbvDescriptorOffset(0),
 		cbvSrvDescriptorHeapIncrementSize(0),
 		srvDescriptorOffset(0),
+		waitFence(0),
 		waitFenceCounter(0),
-		waitFenceEvent(0)
+		waitFenceEvent(0),
+		frameSyncFence(0),
+		frameSyncFenceCounter(0),
+		frameSyncFenceEvent(0)
 	{};
 #pragma endregion
 
@@ -62,10 +66,13 @@ public:
 		unsigned int dataSizeInBytes);
 	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy, unsigned int numDescriptorsToCopy);
 
-	// Command list & synchronization
+	// Command list & basic synchronization
 	void CloseExecuteAndResetCommandList();
 	void WaitForGPU();
 
+	// Frame sync
+	void SignalFrameCompletion();
+	void SyncGPUMaxFrames();
 
 private:
 
@@ -84,6 +91,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Fence> waitFence;
 	HANDLE								waitFenceEvent;
 	unsigned long						waitFenceCounter;
+
+	// Frame sync'ing
+	Microsoft::WRL::ComPtr<ID3D12Fence> frameSyncFence;
+	HANDLE								frameSyncFenceEvent;
+	unsigned long						frameSyncFenceCounter;
+	unsigned int						maxGPUSyncFrames = 3;
 
 	// Maximum number of constant buffers, assuming each buffer
 	// is 256 bytes or less.  Larger buffers are fine, but will

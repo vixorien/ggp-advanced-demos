@@ -5,12 +5,18 @@
 #include "DX12Helper.h"
 #include "Material.h"
 
+#include <stdlib.h>     // For seeding random and rand()
+#include <time.h>       // For grabbing time (to seed random)
+
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
 #include <d3dcompiler.h>
 
 // For the DirectX Math library
 using namespace DirectX;
+
+// Helper macro for getting a float between min and max
+#define RandomRange(min, max) (float)rand() / RAND_MAX * (max - min) + min
 
 // --------------------------------------------------------
 // Constructor
@@ -27,7 +33,8 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(true)
+	vsync(true),
+	lightCount(10)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -61,11 +68,15 @@ Game::~Game()
 // --------------------------------------------------------
 void Game::Init()
 {
+	// Seed random
+	srand((unsigned int)time(0));
+
 	// Helper methods for loading shaders, creating some basic
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
 	CreateBasicGeometry();
+	GenerateLights();
 
 	camera = std::make_shared<Camera>(0.0f, 0.0f, -5.0f, 5.0f, 1.0f, XM_PIDIV4, width / (float)height);
 }
@@ -144,7 +155,7 @@ void Game::CreateRootSigAndPipelineState()
 		// Create a range of SRV's for textures
 		D3D12_DESCRIPTOR_RANGE srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.NumDescriptors = 2;		// Set to max number of textures at once (match pixel shader!)
+		srvRange.NumDescriptors = 4;		// Set to max number of textures at once (match pixel shader!)
 		srvRange.BaseShaderRegister = 0;	// Starts at s0 (match pixel shader!)
 		srvRange.RegisterSpace = 0;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -275,6 +286,8 @@ void Game::CreateBasicGeometry()
 	// Load textures
 	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_albedo.png").c_str());
 	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_normals.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_roughness.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_metal.png").c_str());
 
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
@@ -282,8 +295,9 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
 	cobbleMat->AddTexture(cobblestoneNormals, 1);
+	cobbleMat->AddTexture(cobblestoneRoughness, 2);
+	cobbleMat->AddTexture(cobblestoneMetal, 3);
 	cobbleMat->FinalizeTextures();
-
 
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
@@ -306,6 +320,54 @@ void Game::CreateBasicGeometry()
 	entities.push_back(entityCube);
 	entities.push_back(entityHelix);
 	entities.push_back(entitySphere);
+}
+
+
+void Game::GenerateLights()
+{
+	// Reset
+	lights.clear();
+
+	// Setup directional lights
+	Light dir1 = {};
+	dir1.Type = LIGHT_TYPE_DIRECTIONAL;
+	dir1.Direction = XMFLOAT3(1, -1, 1);
+	dir1.Color = XMFLOAT3(0.8f, 0.8f, 0.8f);
+	dir1.Intensity = 1.0f;
+
+	Light dir2 = {};
+	dir2.Type = LIGHT_TYPE_DIRECTIONAL;
+	dir2.Direction = XMFLOAT3(-1, -0.25f, 0);
+	dir2.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	dir2.Intensity = 1.0f;
+
+	Light dir3 = {};
+	dir3.Type = LIGHT_TYPE_DIRECTIONAL;
+	dir3.Direction = XMFLOAT3(0, -1, 1);
+	dir3.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	dir3.Intensity = 1.0f;
+
+	// Add light to the list
+	lights.push_back(dir1);
+	lights.push_back(dir2);
+	lights.push_back(dir3);
+
+	// Create the rest of the lights
+	while (lights.size() < MAX_LIGHTS)
+	{
+		Light point = {};
+		point.Type = LIGHT_TYPE_POINT;
+		point.Position = XMFLOAT3(RandomRange(-15.0f, 15.0f), RandomRange(-2.0f, 5.0f), RandomRange(-15.0f, 15.0f));
+		point.Color = XMFLOAT3(RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1));
+		point.Range = RandomRange(5.0f, 10.0f);
+		point.Intensity = RandomRange(0.1f, 3.0f);
+
+		// Add to the list
+		lights.push_back(point);
+	}
+	
+	// Make sure we're exactly MAX_LIGHTS big
+	lights.resize(MAX_LIGHTS);
 }
 
 
@@ -345,6 +407,13 @@ void Game::Update(float deltaTime, float totalTime)
 // --------------------------------------------------------
 void Game::Draw(float deltaTime, float totalTime)
 {
+	// Grab the helper
+	DX12Helper& dx12Helper = DX12Helper::GetInstance();
+
+	// Ensure we're not too many frames ahead of the GPU
+	// If we are, we'll wait here until the GPU catches up
+	dx12Helper.SyncGPUMaxFrames();
+
 	// Grab the current back buffer for this frame
 	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = backBuffers[currentSwapBuffer];
 
@@ -380,12 +449,6 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Rendering here!
 	{
-		// Grab the helper as we need it for a few things below
-		DX12Helper& dx12Helper = DX12Helper::GetInstance();
-
-		// Set overall pipeline state
-		commandList->SetPipelineState(pipelineState.Get());
-
 		// Root sig (must happen before root descriptor table)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
@@ -404,6 +467,9 @@ void Game::Draw(float deltaTime, float totalTime)
 		{
 			// Grab the material for this entity
 			std::shared_ptr<Material> mat = e->GetMaterial();
+
+			// Set the pipeline state for this material
+			commandList->SetPipelineState(mat->GetPipelineState().Get());
 
 			// Set up the vertex shader data we intend to use for drawing this entity
 			{
@@ -431,6 +497,8 @@ void Game::Draw(float deltaTime, float totalTime)
 				psData.uvScale = mat->GetUVScale();
 				psData.uvOffset = mat->GetUVOffset();
 				psData.cameraPosition = camera->GetTransform()->GetPosition();
+				psData.lightCount = lightCount;
+				memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
 
 				// Send this to a chunk of the constant buffer heap
 				// and grab the GPU handle for it so we can set it for this draw
@@ -475,7 +543,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->ResourceBarrier(1, &rb);
 
 		// Must occur BEFORE present
-		DX12Helper::GetInstance().CloseExecuteAndResetCommandList();
+		dx12Helper.CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
 		swapChain->Present(vsync ? 1 : 0, 0);
@@ -486,4 +554,7 @@ void Game::Draw(float deltaTime, float totalTime)
 			currentSwapBuffer = 0;
 
 	}
+
+	// Signal that this frame has completed
+	dx12Helper.SignalFrameCompletion();
 }
