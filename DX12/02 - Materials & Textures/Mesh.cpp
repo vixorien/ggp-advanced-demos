@@ -15,6 +15,11 @@ Mesh::Mesh(Vertex* vertArray, int numVerts, unsigned int* indexArray, int numInd
 
 Mesh::Mesh(const char* objFile)
 {
+	// Initialize in the event the load fails
+	numIndices = 0;
+	ibView = {};
+	vbView = {};
+
 	// File input object
 	std::ifstream obj(objFile);
 
@@ -182,8 +187,8 @@ void Mesh::CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArr
 	CalculateTangents(vertArray, numVerts, indexArray, numIndices);
 
 	// Create the two buffers
-	DX12Helper::GetInstance().CreateStaticBuffer(sizeof(Vertex), numVerts, vertArray, vertexBuffer.GetAddressOf());
-	DX12Helper::GetInstance().CreateStaticBuffer(sizeof(unsigned int), numIndices, indexArray, indexBuffer.GetAddressOf());
+	vertexBuffer = DX12Helper::GetInstance().CreateStaticBuffer(sizeof(Vertex), numVerts, vertArray);
+	indexBuffer = DX12Helper::GetInstance().CreateStaticBuffer(sizeof(unsigned int), numIndices, indexArray);
 
 	// Set up the views
 	vbView.StrideInBytes = sizeof(Vertex);

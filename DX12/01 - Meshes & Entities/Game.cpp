@@ -2,6 +2,7 @@
 #include "Vertex.h"
 #include "Input.h"
 #include "BufferStructs.h"
+#include "DX12Helper.h"
 
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
@@ -25,8 +26,7 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(true),
-	offset(0)
+	vsync(true)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -51,7 +51,7 @@ Game::~Game()
 
 	// However, we DO need to wait here until the GPU
 	// is actually done with its work
-	WaitForGPU();
+	DX12Helper::GetInstance().WaitForGPU();
 }
 
 // --------------------------------------------------------
@@ -64,8 +64,9 @@ void Game::Init()
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
-	CreateConstantBuffer();
 	CreateBasicGeometry();
+
+	camera = std::make_shared<Camera>(0.0f, 0.0f, -5.0f, 5.0f, 1.0f, XM_PIDIV4, width / (float)height);
 }
 
 
@@ -88,7 +89,7 @@ void Game::CreateRootSigAndPipelineState()
 	}
 
 	// Input layout
-	const unsigned int inputElementCount = 2;
+	const unsigned int inputElementCount = 4;
 	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {};
 	{
 		// Create an input layout that describes the vertex format
@@ -102,11 +103,23 @@ void Game::CreateRootSigAndPipelineState()
 		inputElements[0].SemanticName = "POSITION";					// This is "POSITTION" - needs to match the semantics in our vertex shader input!
 		inputElements[0].SemanticIndex = 0;							// This is the 0th position (there could be more)
 
-		// Set up the second element - a color, which is 4 more float values
+		// Set up the second element - a UV, which is 2 more float values
 		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
-		inputElements[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;	// 4x 32-bit floats
-		inputElements[1].SemanticName = "COLOR";					// Match our vertex shader input!
-		inputElements[1].SemanticIndex = 0;							// This is the 0th color (there could be more)
+		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;			// 2x 32-bit floats
+		inputElements[1].SemanticName = "TEXCOORD";					// Match our vertex shader input!
+		inputElements[1].SemanticIndex = 0;							// This is the 0th uv (there could be more)
+
+		// Set up the third element - a normal, which is 3 more float values
+		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[2].SemanticName = "NORMAL";					// Match our vertex shader input!
+		inputElements[2].SemanticIndex = 0;							// This is the 0th normal (there could be more)
+
+		// Set up the fourth element - a tangent, which is 2 more float values
+		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[3].SemanticName = "TANGENT";					// Match our vertex shader input!
+		inputElements[3].SemanticIndex = 0;							// This is the 0th tangent (there could be more)
 	}
 
 	// Root Signature
@@ -210,195 +223,33 @@ void Game::CreateRootSigAndPipelineState()
 
 
 // --------------------------------------------------------
-// Creates the constant buffer used to send data to the
-// vertex shader (and all associated memo
-// --------------------------------------------------------
-void Game::CreateConstantBuffer()
-{
-	// Create a descriptor heap to store constant buffer descriptors.  
-	// One big heap is good enough to hold all cbv/srv/uav descriptors.
-	D3D12_DESCRIPTOR_HEAP_DESC cbDesc = {};
-	cbDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	cbDesc.NodeMask = 0;
-	cbDesc.NumDescriptors = 1;
-	cbDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	device->CreateDescriptorHeap(&cbDesc, IID_PPV_ARGS(vsConstBufferDescriptorHeap.GetAddressOf()));
-
-	D3D12_HEAP_PROPERTIES heapProps = {};
-	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapProps.CreationNodeMask = 1;
-	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	heapProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Upload heap since we'll be copying often!
-	heapProps.VisibleNodeMask = 1;
-
-	// Buffers must be multiples of 256 bytes!
-	unsigned int bufferSize = sizeof(VertShaderExternalData);
-	bufferSize = (bufferSize + 255); // Add 255 so we can drop last few bits
-	bufferSize = bufferSize & ~255;  // Flip 255 and then use it to mask 
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Alignment = 0;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resDesc.Format = DXGI_FORMAT_UNKNOWN;
-	resDesc.Height = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-	resDesc.Width = bufferSize;
-
-	// Create a constant buffer resource heap
-	device->CreateCommittedResource(
-		&heapProps,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		0,
-		IID_PPV_ARGS(vsConstBufferUploadHeap.GetAddressOf()));
-
-	// Need to get a view to the constant buffer
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = vsConstBufferUploadHeap->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = bufferSize; // Must be 256-byte aligned!
-	device->CreateConstantBufferView(&cbvDesc, vsConstBufferDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
-
-// --------------------------------------------------------
 // Creates the geometry we're going to draw - a single triangle for now
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
-	// Create some temporary variables to represent colors
-	// - Not necessary, just makes things more readable
-	XMFLOAT4 red = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-	XMFLOAT4 green = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	XMFLOAT4 blue = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+	// Load meshes
+	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
+	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/sphere.obj").c_str());
+	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/helix.obj").c_str());
+	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cylinder.obj").c_str());
 
-	// Set up the vertices of the triangle we would like to draw
-	// - We're going to copy this array, exactly as it exists in memory
-	//    over to a DirectX-controlled data structure (the vertex buffer)
-	// - Note: Since we don't have a camera or really any concept of
-	//    a "3d world" yet, we're simply describing positions within the
-	//    bounds of how the rasterizer sees our screen: [-1 to +1] on X and Y
-	// - This means (0,0) is at the very center of the screen.
-	// - These are known as "Normalized Device Coordinates" or "Homogeneous 
-	//    Screen Coords", which are ways to describe a position without
-	//    knowing the exact size (in pixels) of the image/window/etc.  
-	// - Long story short: Resizing the window also resizes the triangle,
-	//    since we're describing the triangle in terms of the window itself
-	Vertex vertices[] =
-	{
-		{ XMFLOAT3(+0.0f, +0.5f, +0.0f), red },
-		{ XMFLOAT3(+0.5f, -0.5f, +0.0f), blue },
-		{ XMFLOAT3(-0.5f, -0.5f, +0.0f), green },
-	};
+	// Create entities
+	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube);
+	entityCube->GetTransform()->SetPosition(3, 0, 0);
 
-	// Set up the indices, which tell us which vertices to use and in which order
-	// - This is somewhat redundant for just 3 vertices (it's a simple example)
-	// - Indices are technically not required if the vertices are in the buffer 
-	//    in the correct order and each one will be used exactly once
-	// - But just to see how it's done...
-	unsigned int indices[] = { 0, 1, 2 };
+	std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix);
+	entityHelix->GetTransform()->SetPosition(0, 0, 0);
 
-	// Create the two buffers
-	CreateStaticBuffer(sizeof(Vertex), ARRAYSIZE(vertices), vertices, vertexBuffer.GetAddressOf());
-	CreateStaticBuffer(sizeof(unsigned int), ARRAYSIZE(indices), indices, indexBuffer.GetAddressOf());
+	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere);
+	entitySphere->GetTransform()->SetPosition(-3, 0, 0);
 
-	// Set up the views
-	vbView.StrideInBytes = sizeof(Vertex);
-	vbView.SizeInBytes = sizeof(Vertex) * ARRAYSIZE(vertices);
-	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-
-	ibView.Format = DXGI_FORMAT_R32_UINT;
-	ibView.SizeInBytes = sizeof(unsigned int) * ARRAYSIZE(indices);
-	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
+	// Add to list
+	entities.push_back(entityCube);
+	entities.push_back(entityHelix);
+	entities.push_back(entitySphere);
 }
 
-
-
-HRESULT Game::CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data, ID3D12Resource** buffer)
-{
-	// Potential result
-	HRESULT hr = 0;
-
-	// We first need to make an upload heap where we can copy data to the GPU
-	D3D12_HEAP_PROPERTIES props = {};
-	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	props.CreationNodeMask = 1;
-	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	props.Type = D3D12_HEAP_TYPE_DEFAULT;
-	props.VisibleNodeMask = 1;
-
-	D3D12_RESOURCE_DESC desc = {};
-	desc.Alignment = 0;
-	desc.DepthOrArraySize = 1;
-	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	desc.Format = DXGI_FORMAT_UNKNOWN;
-	desc.Height = 1; // Assuming this is a regular buffer, not a texture
-	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	desc.Width = dataStride * dataCount; // Size of the buffer
-
-	hr = device->CreateCommittedResource(
-		&props,
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		D3D12_RESOURCE_STATE_COPY_DEST, // Will eventually be "common", but we're copying to it first!
-		0,
-		IID_PPV_ARGS(buffer));
-	if (FAILED(hr))
-		return hr;
-
-	// Now create an intermediate upload heap for copying initial data
-	D3D12_HEAP_PROPERTIES uploadProps = {};
-	uploadProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	uploadProps.CreationNodeMask = 1;
-	uploadProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	uploadProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Can only ever be Generic_Read state
-	uploadProps.VisibleNodeMask = 1;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap;
-	hr = device->CreateCommittedResource(
-		&uploadProps,
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		0,
-		IID_PPV_ARGS(uploadHeap.GetAddressOf()));
-	if (FAILED(hr))
-		return hr;
-
-	// Do a straight map/memcpy/unmap
-	void* gpuAddress = 0;
-	hr = uploadHeap->Map(0, 0, &gpuAddress);
-	if (FAILED(hr))
-		return hr;
-	memcpy(gpuAddress, data, dataStride * dataCount);
-	uploadHeap->Unmap(0, 0);
-
-	// Copy the whole buffer from uploadheap to vert buffer
-	commandList->CopyResource(*buffer, uploadHeap.Get());
-
-	// Transition the buffer to generic read for the rest of the app lifetime (presumable)
-	D3D12_RESOURCE_BARRIER rb = {};
-	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	rb.Transition.pResource = *buffer;
-	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	commandList->ResourceBarrier(1, &rb);
-
-	// Execute the command list and report success
-	CloseExecuteAndResetCommandList();
-	return S_OK;
-}
 
 
 // --------------------------------------------------------
@@ -420,22 +271,14 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	// Update triangle's offset
-	offset += deltaTime * 0.05f;
+	// Spin entities
+	for (auto& e : entities)
+	{
+		e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
+	}
 
-	// Collect data
-	VertShaderExternalData data = {};
-	data.offset = XMFLOAT3(offset, 0, 0);
-
-	// Copy data to the constant buffer
-	// Note that this is a VERY poor way of actually handling
-	// constant buffers in DX12 and will really only work if
-	// you have a single object on the screen.  See the next
-	// demo for an example of a much more appropriate CB setup.
-	void* gpuAddress;
-	vsConstBufferUploadHeap->Map(0, 0, &gpuAddress);
-	memcpy(gpuAddress, &data, sizeof(VertShaderExternalData));
-	vsConstBufferUploadHeap->Unmap(0, 0);
+	// Other updates
+	camera->Update(deltaTime);
 }
 
 // --------------------------------------------------------
@@ -478,6 +321,9 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Rendering here!
 	{
+		// Grab the helper as we need it for a few things below
+		DX12Helper& dx12Helper = DX12Helper::GetInstance();
+
 		// Set overall pipeline state
 		commandList->SetPipelineState(pipelineState.Get());
 
@@ -485,21 +331,47 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
 		// Set constant buffer
-		commandList->SetDescriptorHeaps(1, vsConstBufferDescriptorHeap.GetAddressOf());
-		commandList->SetGraphicsRootDescriptorTable(
-			0,
-			vsConstBufferDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetConstantBufferDescriptorHeap();
+		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
 		// Set up other commands for rendering
 		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
 		commandList->RSSetViewports(1, &viewport);
 		commandList->RSSetScissorRects(1, &scissorRect);
-		commandList->IASetVertexBuffers(0, 1, &vbView);
-		commandList->IASetIndexBuffer(&ibView);
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		// Draw
-		commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+		// Loop through the meshes
+		for (auto& e : entities)
+		{
+			// Set up the data we intend to use for drawing this entity
+			VertexShaderExternalData vsData = {};
+			vsData.world = e->GetTransform()->GetWorldMatrix();
+			vsData.view = camera->GetView();
+			vsData.projection = camera->GetProjection();
+
+			// Send this to a chunk of the constant buffer heap
+			// and grab the GPU handle for it so we can set it for this draw
+			D3D12_GPU_DESCRIPTOR_HANDLE cbHandle = dx12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
+				(void*)(&vsData), sizeof(VertexShaderExternalData));
+
+			// Set this constant buffer handle
+			// Note: This assumes that descriptor table 0 is the
+			//       place to put this particular descriptor.  This
+			//       is based on how we set up our root signature.
+			commandList->SetGraphicsRootDescriptorTable(0, cbHandle);
+
+			// Grab the mesh and its buffer views
+			std::shared_ptr<Mesh> mesh = e->GetMesh();
+			D3D12_VERTEX_BUFFER_VIEW vbv = mesh->GetVB();
+			D3D12_INDEX_BUFFER_VIEW  ibv = mesh->GetIB();
+
+			// Set the geometry
+			commandList->IASetVertexBuffers(0, 1, &vbv);
+			commandList->IASetIndexBuffer(&ibv);
+
+			// Draw
+			commandList->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
+		}
 	}
 
 	// Present
@@ -515,7 +387,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->ResourceBarrier(1, &rb);
 
 		// Must occur BEFORE present
-		CloseExecuteAndResetCommandList();
+		DX12Helper::GetInstance().CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
 		swapChain->Present(vsync ? 1 : 0, 0);

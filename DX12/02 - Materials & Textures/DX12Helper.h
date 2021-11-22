@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include <wrl/client.h>
+#include <vector>
 
 class DX12Helper
 {
@@ -25,7 +26,16 @@ public:
 
 private:
 	static DX12Helper* instance;
-	DX12Helper() {};
+	DX12Helper() :
+		cbUploadHeapOffsetInBytes(0),
+		cbUploadHeapSizeInBytes(0),
+		cbUploadHeapStartAddress(0),
+		cbvDescriptorOffset(0),
+		cbvSrvDescriptorHeapIncrementSize(0),
+		srvDescriptorOffset(0),
+		waitFenceCounter(0),
+		waitFenceEvent(0)
+	{};
 #pragma endregion
 
 public:
@@ -39,15 +49,18 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator
 	);
 
+	// Getters
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetCBVSRVDescriptorHeap();
+
 	// Resource creation
-	HRESULT CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data, ID3D12Resource** buffer);
+	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(const wchar_t* file, bool generateMips = true);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data);
 	
-	// Dynamic resources
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetConstantBufferDescriptorHeap();
+	// Resource usage
 	D3D12_GPU_DESCRIPTOR_HANDLE FillNextConstantBufferAndGetGPUDescriptorHandle(
 		void* data,
 		unsigned int dataSizeInBytes);
-
+	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy, unsigned int numDescriptorsToCopy);
 
 	// Command list & synchronization
 	void CloseExecuteAndResetCommandList();
@@ -74,8 +87,18 @@ private:
 
 	// Maximum number of constant buffers, assuming each buffer
 	// is 256 bytes or less.  Larger buffers are fine, but will
-	// result in fewer buffers in use at any time
-	const int maxConstantBuffers = 1000;
+	// result in fewer buffers in use at any time.
+	// This is also used as the max number of CBVs possible.
+	const unsigned int maxConstantBuffers = 1000;
+
+	// Maximum number of texture descriptors (SRVs) we can have.
+	// Each material will have a chunk of this, plus any 
+	// non-material textures we may need for our program.
+	// Note: If we delayed the creation of this heap until 
+	//       after all textures and materials were created,
+	//       we could come up with an exact amount.  The following
+	//       constant ensures we (hopefully) never run out of room.
+	const unsigned int maxTextureDescriptors = 1000;
 	
 	// GPU-side contant buffer upload heap
 	Microsoft::WRL::ComPtr<ID3D12Resource> cbUploadHeap;
@@ -84,11 +107,16 @@ private:
 	void* cbUploadHeapStartAddress;
 
 	// GPU-side CBV/SRV descriptor heap
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvDescriptorHeap;
-	SIZE_T cbvDescriptorHeapIncrementSize;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvSrvDescriptorHeap;
+	SIZE_T cbvSrvDescriptorHeapIncrementSize;
 	unsigned int cbvDescriptorOffset;
+	unsigned int srvDescriptorOffset;
 
 	void CreateConstantBufferUploadHeap();
-	void CreateConstantBufferViewDescriptorHeap();
+	void CreateCBVSRVDescriptorHeap();
+
+	// Textures
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> textures;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> cpuSideTextureDescriptorHeaps;
 };
 
