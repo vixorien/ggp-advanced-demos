@@ -283,11 +283,24 @@ void Game::CreateRootSigAndPipelineState()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
+	// Quick macro to simplify texture loading lines below
+#define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(x).c_str())
+
 	// Load textures
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_albedo.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_normals.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_roughness.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal = DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(L"../../../../Assets/Textures/cobblestone_metal.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = LoadTexture(L"../../../../Assets/Textures/cobblestone_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals = LoadTexture(L"../../../../Assets/Textures/cobblestone_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness = LoadTexture(L"../../../../Assets/Textures/cobblestone_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal = LoadTexture(L"../../../../Assets/Textures/cobblestone_metal.png");
+
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeAlbedo = LoadTexture(L"../../../../Assets/Textures/bronze_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeNormals = LoadTexture(L"../../../../Assets/Textures/bronze_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeRoughness = LoadTexture(L"../../../../Assets/Textures/bronze_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeMetal = LoadTexture(L"../../../../Assets/Textures/bronze_metal.png");
+
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedAlbedo = LoadTexture(L"../../../../Assets/Textures/scratched_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedNormals = LoadTexture(L"../../../../Assets/Textures/scratched_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness = LoadTexture(L"../../../../Assets/Textures/scratched_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal = LoadTexture(L"../../../../Assets/Textures/scratched_metal.png");
 
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
@@ -299,6 +312,20 @@ void Game::CreateBasicGeometry()
 	cobbleMat->AddTexture(cobblestoneMetal, 3);
 	cobbleMat->FinalizeTextures();
 
+	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	bronzeMat->AddTexture(bronzeAlbedo, 0);
+	bronzeMat->AddTexture(bronzeNormals, 1);
+	bronzeMat->AddTexture(bronzeRoughness, 2);
+	bronzeMat->AddTexture(bronzeMetal, 3);
+	bronzeMat->FinalizeTextures();
+
+	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	scratchedMat->AddTexture(scratchedAlbedo, 0);
+	scratchedMat->AddTexture(scratchedNormals, 1);
+	scratchedMat->AddTexture(scratchedRoughness, 2);
+	scratchedMat->AddTexture(scratchedMetal, 3);
+	scratchedMat->FinalizeTextures();
+
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
 	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/sphere.obj").c_str());
@@ -307,15 +334,15 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cylinder.obj").c_str());
 
 	// Create entities
-	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, cobbleMat);
+	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
 	entityCube->GetTransform()->SetPosition(3, 0, 0);
 
 	std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix, cobbleMat);
 	entityHelix->GetTransform()->SetPosition(0, 0, 0);
 
-	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, cobbleMat);
+	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, bronzeMat);
 	entitySphere->GetTransform()->SetPosition(-3, 0, 0);
-
+	
 	// Add to list
 	entities.push_back(entityCube);
 	entities.push_back(entityHelix);
@@ -409,10 +436,6 @@ void Game::Draw(float deltaTime, float totalTime)
 {
 	// Grab the helper
 	DX12Helper& dx12Helper = DX12Helper::GetInstance();
-
-	// Ensure we're not too many frames ahead of the GPU
-	// If we are, we'll wait here until the GPU catches up
-	dx12Helper.SyncGPUMaxFrames();
 
 	// Grab the current back buffer for this frame
 	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = backBuffers[currentSwapBuffer];
@@ -543,6 +566,11 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->ResourceBarrier(1, &rb);
 
 		// Must occur BEFORE present
+		// Note: Resetting the allocator every frame requires us to sync the CPU & GPU,
+		//       since we cannot reset the allocator if its command list is executing.
+		//       This is a pretty big performance hit, as we can't proceed until the GPU
+		//       is totally done.  A better solution would be to have several allocators
+		//       and command lists, and rotate through them with each successive frame.
 		dx12Helper.CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
@@ -555,6 +583,4 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	}
 
-	// Signal that this frame has completed
-	dx12Helper.SignalFrameCompletion();
 }
