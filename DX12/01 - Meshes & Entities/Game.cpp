@@ -26,7 +26,7 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(true)
+	vsync(false)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -260,6 +260,12 @@ void Game::OnResize()
 {
 	// Handle base-level DX resize stuff
 	DXCore::OnResize();
+
+	// Update the camera's projection to match the new size
+	if (camera)
+	{
+		camera->UpdateProjectionMatrix((float)width / height);
+	}
 }
 
 // --------------------------------------------------------

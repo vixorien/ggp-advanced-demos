@@ -25,7 +25,7 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(true),
+	vsync(false),
 	offset(0)
 {
 
@@ -35,6 +35,8 @@ Game::Game(HINSTANCE hInstance)
 	printf("Console window created successfully.  Feel free to printf() here.\n");
 #endif
 
+	ibView = {};
+	vbView = {};
 }
 
 // --------------------------------------------------------

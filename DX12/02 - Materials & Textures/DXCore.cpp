@@ -50,8 +50,8 @@ DXCore::DXCore(
 	this->titleBarStats = debugTitleBarStats;
 
 	// Initialize fields
-	this->hasFocus = true; 
-	
+	this->hasFocus = true;
+
 	this->fpsFrameCount = 0;
 	this->fpsTimeElapsed = 0.0f;
 	this->currentTime = 0;
@@ -89,17 +89,17 @@ HRESULT DXCore::InitWindow()
 {
 	// Start window creation by filling out the
 	// appropriate window class struct
-	WNDCLASS wndClass		= {}; // Zero out the memory
-	wndClass.style			= CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
-	wndClass.lpfnWndProc	= DXCore::WindowProc;
-	wndClass.cbClsExtra		= 0;
-	wndClass.cbWndExtra		= 0;
-	wndClass.hInstance		= hInstance;						// Our app's handle
-	wndClass.hIcon			= LoadIcon(NULL, IDI_APPLICATION);	// Default icon
-	wndClass.hCursor		= LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
-	wndClass.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wndClass.lpszMenuName	= NULL;
-	wndClass.lpszClassName	= "Direct3DWindowClass";
+	WNDCLASS wndClass = {}; // Zero out the memory
+	wndClass.style = CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
+	wndClass.lpfnWndProc = DXCore::WindowProc;
+	wndClass.cbClsExtra = 0;
+	wndClass.cbWndExtra = 0;
+	wndClass.hInstance = hInstance;						// Our app's handle
+	wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);	// Default icon
+	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
+	wndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wndClass.lpszMenuName = NULL;
+	wndClass.lpszClassName = "Direct3DWindowClass";
 
 	// Attempt to register the window class we've defined
 	if (!RegisterClass(&wndClass))
@@ -179,7 +179,7 @@ HRESULT DXCore::InitDirectX()
 	D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 	debugController->EnableDebugLayer();
 #endif
-	
+
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
 
@@ -340,7 +340,7 @@ HRESULT DXCore::InitDirectX()
 			&props,
 			D3D12_HEAP_FLAG_NONE,
 			&depthBufferDesc,
-			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
 			&clear,
 			IID_PPV_ARGS(depthStencilBuffer.GetAddressOf()));
 
@@ -356,17 +356,6 @@ HRESULT DXCore::InitDirectX()
 			dsvHandle);
 	}
 
-	// Transition the depth buffer to the proper state
-	D3D12_RESOURCE_BARRIER rb = {};
-	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	rb.Transition.pResource = depthStencilBuffer.Get();
-	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-	commandList->ResourceBarrier(1, &rb);
-
 	// Set up the viewport so we render into the correct
 	// portion of the render target
 	viewport = {};
@@ -376,7 +365,6 @@ HRESULT DXCore::InitDirectX()
 	viewport.Height = (float)height;
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
-	commandList->RSSetViewports(1, &viewport);
 
 	// Define a scissor rectangle that defines a portion of
 	// the render target for clipping.  This is different from
@@ -388,11 +376,9 @@ HRESULT DXCore::InitDirectX()
 	scissorRect.top = 0;
 	scissorRect.right = width;
 	scissorRect.bottom = height;
-	commandList->RSSetScissorRects(1, &scissorRect);
 
-	// Actually execute the current command list
-	// and wait for the GPU to catch up
-	DX12Helper::GetInstance().CloseExecuteAndResetCommandList();
+	// Wait for the GPU before we proceed
+	DX12Helper::GetInstance().WaitForGPU();
 
 	// Return the "everything is ok" HRESULT value
 	return S_OK;
@@ -409,7 +395,116 @@ HRESULT DXCore::InitDirectX()
 // --------------------------------------------------------
 void DXCore::OnResize()
 {
-	// NOT IMPLEMENTED YET!
+	DX12Helper& dx12Helper = DX12Helper::GetInstance();
+
+	// Wait for the GPU to finish all work, since we'll
+	// be destroying and recreating resources
+	dx12Helper.WaitForGPU();
+
+	// Release the back buffers using ComPtr's Reset()
+	for (unsigned int i = 0; i < numBackBuffers; i++)
+		backBuffers[i].Reset();
+
+	// Resize the swap chain (assuming a basic color format here)
+	swapChain->ResizeBuffers(numBackBuffers, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+
+	// Go through the steps to setup the back buffers again
+	// Note: This assumes the descriptor heap already exists
+	// and that the rtvDescriptorSize was previously set
+	for (unsigned int i = 0; i < numBackBuffers; i++)
+	{
+		// Grab this buffer from the swap chain
+		swapChain->GetBuffer(i, IID_PPV_ARGS(backBuffers[i].GetAddressOf()));
+
+		// Make a handle for it
+		rtvHandles[i] = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+		rtvHandles[i].ptr += rtvDescriptorSize * i;
+
+		// Create the render target view
+		device->CreateRenderTargetView(backBuffers[i].Get(), 0, rtvHandles[i]);
+	}
+
+	// Reset back to the first back buffer
+	currentSwapBuffer = 0;
+
+	// Reset the depth buffer and create it again
+	{
+		depthStencilBuffer.Reset();
+
+		// Describe the depth stencil buffer resource
+		D3D12_RESOURCE_DESC depthBufferDesc = {};
+		depthBufferDesc.Alignment = 0;
+		depthBufferDesc.DepthOrArraySize = 1;
+		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		depthBufferDesc.Height = height;
+		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		depthBufferDesc.MipLevels = 1;
+		depthBufferDesc.SampleDesc.Count = 1;
+		depthBufferDesc.SampleDesc.Quality = 0;
+		depthBufferDesc.Width = width;
+
+		// Describe the clear value that will most often be used
+		// for this buffer (which optimizes the clearing of the buffer)
+		D3D12_CLEAR_VALUE clear = {};
+		clear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		clear.DepthStencil.Depth = 1.0f;
+		clear.DepthStencil.Stencil = 0;
+
+		// Describe the memory heap that will house this resource
+		D3D12_HEAP_PROPERTIES props = {};
+		props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		props.CreationNodeMask = 1;
+		props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		props.Type = D3D12_HEAP_TYPE_DEFAULT;
+		props.VisibleNodeMask = 1;
+
+		// Actually create the resource, and the heap in which it
+		// will reside, and map the resource to that heap
+		device->CreateCommittedResource(
+			&props,
+			D3D12_HEAP_FLAG_NONE,
+			&depthBufferDesc,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			&clear,
+			IID_PPV_ARGS(depthStencilBuffer.GetAddressOf()));
+
+		// Now recreate the depth stencil view
+		dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+		device->CreateDepthStencilView(
+			depthStencilBuffer.Get(),
+			0,	// Default view (first mip)
+			dsvHandle);
+	}
+
+	// Recreate the viewport and scissor rects, too,
+	// since the window size has changed
+	{
+		// Set up the viewport so we render into the correct
+		// portion of the render target
+		viewport = {};
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = (float)width;
+		viewport.Height = (float)height;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+
+		// Define a scissor rectangle that defines a portion of
+		// the render target for clipping.  This is different from
+		// a viewport in that it is applied after the pixel shader.
+		// We need at least one of these, but we're rendering to 
+		// the entire window, so it'll be the same size.
+		scissorRect = {};
+		scissorRect.left = 0;
+		scissorRect.top = 0;
+		scissorRect.right = width;
+		scissorRect.bottom = height;
+	}
+
+	// Wait for the GPU before we proceed
+	dx12Helper.WaitForGPU();
 }
 
 
@@ -447,7 +542,7 @@ HRESULT DXCore::Run()
 		{
 			// Update timer and title bar (if necessary)
 			UpdateTimer();
-			if(titleBarStats)
+			if (titleBarStats)
 				UpdateTitleBarStats();
 
 			// Update the input manager
@@ -525,10 +620,10 @@ void DXCore::UpdateTitleBarStats()
 	std::ostringstream output;
 	output.precision(6);
 	output << titleBarText <<
-		"    Width: "		<< width <<
-		"    Height: "		<< height <<
-		"    FPS: "			<< fpsFrameCount <<
-		"    Frame Time: "	<< mspf << "ms";
+		"    Width: " << width <<
+		"    Height: " << height <<
+		"    FPS: " << fpsFrameCount <<
+		"    Frame Time: " << mspf << "ms";
 
 	// Append the version of DirectX the app is using
 	switch (dxFeatureLevel)
@@ -578,7 +673,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	rect.Bottom = windowLines;
 	SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), TRUE, &rect);
 
-	FILE *stream;
+	FILE* stream;
 	freopen_s(&stream, "CONIN$", "r", stdin);
 	freopen_s(&stream, "CONOUT$", "w", stdout);
 	freopen_s(&stream, "CONOUT$", "w", stderr);
@@ -622,7 +717,7 @@ std::string DXCore::GetExePath()
 		// are null-terminated, so putting a "zero" character in 
 		// there simply denotes the end of the string.
 		*lastSlash = 0;
-		
+
 		// Set the remainder as the path
 		path = currentDir;
 	}
@@ -689,46 +784,46 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	// Check the incoming message and handle any we care about
 	switch (uMsg)
 	{
-	// This is the message that signifies the window closing
+		// This is the message that signifies the window closing
 	case WM_DESTROY:
 		PostQuitMessage(0); // Send a quit message to our own program
 		return 0;
 
-	// Prevent beeping when we "alt-enter" into fullscreen
-	case WM_MENUCHAR: 
+		// Prevent beeping when we "alt-enter" into fullscreen
+	case WM_MENUCHAR:
 		return MAKELRESULT(0, MNC_CLOSE);
 
-	// Prevent the overall window from becoming too small
+		// Prevent the overall window from becoming too small
 	case WM_GETMINMAXINFO:
 		((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
 		((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
 		return 0;
 
-	// Sent when the window size changes
+		// Sent when the window size changes
 	case WM_SIZE:
 		// Don't adjust anything when minimizing,
 		// since we end up with a width/height of zero
 		// and that doesn't play well with the GPU
 		if (wParam == SIZE_MINIMIZED)
 			return 0;
-		
+
 		// Save the new client area dimensions.
 		width = LOWORD(lParam);
 		height = HIWORD(lParam);
 
 		// If DX is initialized, resize 
 		// our required buffers
-		if (device) 
+		if (device)
 			OnResize();
 
 		return 0;
 
-	// Has the mouse wheel been scrolled?
+		// Has the mouse wheel been scrolled?
 	case WM_MOUSEWHEEL:
 		Input::GetInstance().SetWheelDelta(GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
 		return 0;
-	
-	// Is our focus state changing?
+
+		// Is our focus state changing?
 	case WM_SETFOCUS:	hasFocus = true;	return 0;
 	case WM_KILLFOCUS:	hasFocus = false;	return 0;
 	case WM_ACTIVATE:	hasFocus = (LOWORD(wParam) != WA_INACTIVE); return 0;
