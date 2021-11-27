@@ -27,6 +27,7 @@ public:
 private:
 	static DX12Helper* instance;
 	DX12Helper() :
+		numBackBuffers(1),
 		cbUploadHeapOffsetInBytes(0),
 		cbUploadHeapSizeInBytes(0),
 		cbUploadHeapStartAddress(0),
@@ -35,7 +36,11 @@ private:
 		srvDescriptorOffset(0),
 		waitFence(0),
 		waitFenceCounter(0),
-		waitFenceEvent(0)
+		waitFenceEvent(0),
+		frameSyncFence(0),
+		frameSyncFenceCounters{},
+		frameSyncFenceEvent(0),
+		commandAllocators{}
 	{};
 #pragma endregion
 
@@ -47,7 +52,8 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12Device> device,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
+		unsigned int numBackBuffers
 	);
 
 	// Getters
@@ -64,10 +70,14 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy, unsigned int numDescriptorsToCopy);
 
 	// Command list & basic synchronization
-	void CloseExecuteAndResetCommandList();
+	void ExecuteCommandList();
 	void WaitForGPU();
+	unsigned int SyncSwapChain(unsigned int currentSwapBufferIndex);
 
 private:
+
+	// Back buffer count for frame syncing
+	unsigned int numBackBuffers;
 
 	// Overall device
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
@@ -78,12 +88,17 @@ private:
 	// complex engines but should be fine for us
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>	commandList;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue>			commandQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>		commandAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>*		commandAllocators;
 
 	// Basic CPU/GPU synchronization
 	Microsoft::WRL::ComPtr<ID3D12Fence> waitFence;
 	HANDLE								waitFenceEvent;
-	unsigned long						waitFenceCounter;
+	UINT64								waitFenceCounter;
+
+	// Frame sync'ing
+	Microsoft::WRL::ComPtr<ID3D12Fence> frameSyncFence;
+	HANDLE								frameSyncFenceEvent;
+	UINT64*								frameSyncFenceCounters;
 
 	// Maximum number of constant buffers, assuming each buffer
 	// is 256 bytes or less.  Larger buffers are fine, but will

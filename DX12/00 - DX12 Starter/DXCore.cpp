@@ -235,7 +235,7 @@ HRESULT DXCore::InitDirectX()
 	{
 		// Create a description of how our swap chain should work
 		DXGI_SWAP_CHAIN_DESC swapDesc = {};
-		swapDesc.BufferCount = 2;
+		swapDesc.BufferCount = numBackBuffers;
 		swapDesc.BufferDesc.Width = width;
 		swapDesc.BufferDesc.Height = height;
 		swapDesc.BufferDesc.RefreshRate.Numerator = 60;

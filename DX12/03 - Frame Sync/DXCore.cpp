@@ -50,8 +50,8 @@ DXCore::DXCore(
 	this->titleBarStats = debugTitleBarStats;
 
 	// Initialize fields
-	this->hasFocus = true; 
-	
+	this->hasFocus = true;
+
 	this->fpsFrameCount = 0;
 	this->fpsTimeElapsed = 0.0f;
 	this->currentTime = 0;
@@ -89,17 +89,17 @@ HRESULT DXCore::InitWindow()
 {
 	// Start window creation by filling out the
 	// appropriate window class struct
-	WNDCLASS wndClass		= {}; // Zero out the memory
-	wndClass.style			= CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
-	wndClass.lpfnWndProc	= DXCore::WindowProc;
-	wndClass.cbClsExtra		= 0;
-	wndClass.cbWndExtra		= 0;
-	wndClass.hInstance		= hInstance;						// Our app's handle
-	wndClass.hIcon			= LoadIcon(NULL, IDI_APPLICATION);	// Default icon
-	wndClass.hCursor		= LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
-	wndClass.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wndClass.lpszMenuName	= NULL;
-	wndClass.lpszClassName	= "Direct3DWindowClass";
+	WNDCLASS wndClass = {}; // Zero out the memory
+	wndClass.style = CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
+	wndClass.lpfnWndProc = DXCore::WindowProc;
+	wndClass.cbClsExtra = 0;
+	wndClass.cbWndExtra = 0;
+	wndClass.hInstance = hInstance;						// Our app's handle
+	wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);	// Default icon
+	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
+	wndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wndClass.lpszMenuName = NULL;
+	wndClass.lpszClassName = "Direct3DWindowClass";
 
 	// Attempt to register the window class we've defined
 	if (!RegisterClass(&wndClass))
@@ -179,7 +179,7 @@ HRESULT DXCore::InitDirectX()
 	D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 	debugController->EnableDebugLayer();
 #endif
-	
+
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
 
@@ -213,10 +213,13 @@ HRESULT DXCore::InitDirectX()
 	// Set up DX12 command allocator / queue / list, 
 	// which are necessary pieces for issuing standard API calls
 	{
-		// Set up allocator
-		device->CreateCommandAllocator(
-			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(commandAllocator.GetAddressOf()));
+		for (unsigned int i = 0; i < numBackBuffers; i++)
+		{
+			// Set up allocators
+			device->CreateCommandAllocator(
+				D3D12_COMMAND_LIST_TYPE_DIRECT,
+				IID_PPV_ARGS(commandAllocators[i].GetAddressOf()));
+		}
 
 		// Command queue
 		D3D12_COMMAND_QUEUE_DESC qDesc = {};
@@ -228,7 +231,7 @@ HRESULT DXCore::InitDirectX()
 		device->CreateCommandList(
 			0,								// Which physical GPU will handle these tasks?  0 for single GPU setup
 			D3D12_COMMAND_LIST_TYPE_DIRECT,	// Type of command list - direct is for standard API calls
-			commandAllocator.Get(),			// The allocator for this list
+			commandAllocators[0].Get(),		// The allocator for this list (to start)
 			0,								// Initial pipeline state - none for now
 			IID_PPV_ARGS(commandList.GetAddressOf()));
 	}
@@ -240,7 +243,8 @@ HRESULT DXCore::InitDirectX()
 			device,
 			commandList,
 			commandQueue,
-			commandAllocator);
+			commandAllocators,
+			numBackBuffers);
 	}
 
 	// Swap chain creation
@@ -256,7 +260,7 @@ HRESULT DXCore::InitDirectX()
 		swapDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		swapDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 		swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		swapDesc.Flags = 0; // DX12: Do we need DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH?
+		swapDesc.Flags = 0;
 		swapDesc.OutputWindow = hWnd;
 		swapDesc.SampleDesc.Count = 1;
 		swapDesc.SampleDesc.Quality = 0;
@@ -542,7 +546,7 @@ HRESULT DXCore::Run()
 		{
 			// Update timer and title bar (if necessary)
 			UpdateTimer();
-			if(titleBarStats)
+			if (titleBarStats)
 				UpdateTitleBarStats();
 
 			// Update the input manager
@@ -620,10 +624,10 @@ void DXCore::UpdateTitleBarStats()
 	std::ostringstream output;
 	output.precision(6);
 	output << titleBarText <<
-		"    Width: "		<< width <<
-		"    Height: "		<< height <<
-		"    FPS: "			<< fpsFrameCount <<
-		"    Frame Time: "	<< mspf << "ms";
+		"    Width: " << width <<
+		"    Height: " << height <<
+		"    FPS: " << fpsFrameCount <<
+		"    Frame Time: " << mspf << "ms";
 
 	// Append the version of DirectX the app is using
 	switch (dxFeatureLevel)
@@ -673,7 +677,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	rect.Bottom = windowLines;
 	SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), TRUE, &rect);
 
-	FILE *stream;
+	FILE* stream;
 	freopen_s(&stream, "CONIN$", "r", stdin);
 	freopen_s(&stream, "CONOUT$", "w", stdout);
 	freopen_s(&stream, "CONOUT$", "w", stderr);
@@ -717,7 +721,7 @@ std::string DXCore::GetExePath()
 		// are null-terminated, so putting a "zero" character in 
 		// there simply denotes the end of the string.
 		*lastSlash = 0;
-		
+
 		// Set the remainder as the path
 		path = currentDir;
 	}
@@ -784,46 +788,46 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	// Check the incoming message and handle any we care about
 	switch (uMsg)
 	{
-	// This is the message that signifies the window closing
+		// This is the message that signifies the window closing
 	case WM_DESTROY:
 		PostQuitMessage(0); // Send a quit message to our own program
 		return 0;
 
-	// Prevent beeping when we "alt-enter" into fullscreen
-	case WM_MENUCHAR: 
+		// Prevent beeping when we "alt-enter" into fullscreen
+	case WM_MENUCHAR:
 		return MAKELRESULT(0, MNC_CLOSE);
 
-	// Prevent the overall window from becoming too small
+		// Prevent the overall window from becoming too small
 	case WM_GETMINMAXINFO:
 		((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
 		((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
 		return 0;
 
-	// Sent when the window size changes
+		// Sent when the window size changes
 	case WM_SIZE:
 		// Don't adjust anything when minimizing,
 		// since we end up with a width/height of zero
 		// and that doesn't play well with the GPU
 		if (wParam == SIZE_MINIMIZED)
 			return 0;
-		
+
 		// Save the new client area dimensions.
 		width = LOWORD(lParam);
 		height = HIWORD(lParam);
 
 		// If DX is initialized, resize 
 		// our required buffers
-		if (device) 
+		if (device)
 			OnResize();
 
 		return 0;
 
-	// Has the mouse wheel been scrolled?
+		// Has the mouse wheel been scrolled?
 	case WM_MOUSEWHEEL:
 		Input::GetInstance().SetWheelDelta(GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
 		return 0;
-	
-	// Is our focus state changing?
+
+		// Is our focus state changing?
 	case WM_SETFOCUS:	hasFocus = true;	return 0;
 	case WM_KILLFOCUS:	hasFocus = false;	return 0;
 	case WM_ACTIVATE:	hasFocus = (LOWORD(wParam) != WA_INACTIVE); return 0;
