@@ -111,15 +111,13 @@ void Renderer::Render(Camera* camera)
 	context->ClearRenderTargetView(backBufferRTV.Get(), color);
 	context->ClearDepthStencilView(depthBufferDSV.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	
-	// Clear shadow map
-	context->ClearDepthStencilView(shadowDSV.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-
 	// Clear render targets
 	for (auto& rt : renderTargetRTVs) context->ClearRenderTargetView(rt.Get(), color);
 	const float depth[4] = { 1,0,0,0 };
 	context->ClearRenderTargetView(renderTargetRTVs[SCENE_DEPTHS].Get(), depth);
 
 	// Render the shadow map for this frame before any other rendering
+	// This will also clear the shadow map depth buffer
 	RenderShadowMap();
 
 	// Now handle MRTs for the actual frame
