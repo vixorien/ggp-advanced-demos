@@ -105,20 +105,6 @@ protected:
 	std::string GetFullPathTo(std::string relativeFilePath);
 	std::wstring GetFullPathTo_Wide(std::wstring relativeFilePath);
 
-	// DX12:
-
-	// bool vsync (helper)
-	// Helpers for...
-	// - CreateStaticBuffer() for making things like index and vertex buffers?
-	// - CreateIndexBuffer()
-	// - CreateVertexBuffer()
-	// Potentially handle gpu sync frames
-	// - unsigned int gpuSyncFrames (about 3 or so)
-	// 	HANDLE			syncFenceEvent;
-	//  UINT64			syncFenceCounter;
-	//  ID3D12Fence* syncFence;
-	//
-
 
 private:
 	// Timing related data

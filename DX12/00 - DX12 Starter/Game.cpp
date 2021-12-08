@@ -25,8 +25,7 @@ Game::Game(HINSTANCE hInstance)
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
 		true),			   // Show extra stats (fps) in title bar?
-	vsync(false),
-	offset(0)
+	vsync(false)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -66,7 +65,6 @@ void Game::Init()
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
-	CreateConstantBuffer();
 	CreateBasicGeometry();
 }
 
@@ -211,62 +209,6 @@ void Game::CreateRootSigAndPipelineState()
 }
 
 
-// --------------------------------------------------------
-// Creates the constant buffer used to send data to the
-// vertex shader (and all associated memo
-// --------------------------------------------------------
-void Game::CreateConstantBuffer()
-{
-	// Create a descriptor heap to store constant buffer descriptors.  
-	// One big heap is good enough to hold all cbv/srv/uav descriptors.
-	D3D12_DESCRIPTOR_HEAP_DESC cbDesc = {};
-	cbDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	cbDesc.NodeMask = 0;
-	cbDesc.NumDescriptors = 1;
-	cbDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	device->CreateDescriptorHeap(&cbDesc, IID_PPV_ARGS(vsConstBufferDescriptorHeap.GetAddressOf()));
-
-	D3D12_HEAP_PROPERTIES heapProps = {};
-	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapProps.CreationNodeMask = 1;
-	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	heapProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Upload heap since we'll be copying often!
-	heapProps.VisibleNodeMask = 1;
-
-	// Buffers must be multiples of 256 bytes!
-	unsigned int bufferSize = sizeof(VertShaderExternalData);
-	bufferSize = (bufferSize + 255); // Add 255 so we can drop last few bits
-	bufferSize = bufferSize & ~255;  // Flip 255 and then use it to mask 
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Alignment = 0;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resDesc.Format = DXGI_FORMAT_UNKNOWN;
-	resDesc.Height = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-	resDesc.Width = bufferSize;
-
-	// Create a constant buffer resource heap
-	device->CreateCommittedResource(
-		&heapProps,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		0,
-		IID_PPV_ARGS(vsConstBufferUploadHeap.GetAddressOf()));
-
-	// Need to get a view to the constant buffer
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = vsConstBufferUploadHeap->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = bufferSize; // Must be 256-byte aligned!
-	device->CreateConstantBufferView(&cbvDesc, vsConstBufferDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
 
 // --------------------------------------------------------
 // Creates the geometry we're going to draw - a single triangle for now
@@ -326,7 +268,7 @@ HRESULT Game::CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount
 	// Potential result
 	HRESULT hr = 0;
 
-	// We first need to make an upload heap where we can copy data to the GPU
+	// Make the final heap for the buffer, though we can't upload directly to it
 	D3D12_HEAP_PROPERTIES props = {};
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.CreationNodeMask = 1;
@@ -422,22 +364,6 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	// Update triangle's offset
-	offset += deltaTime * 0.05f;
-
-	// Collect data
-	VertShaderExternalData data = {};
-	data.offset = XMFLOAT3(offset, 0, 0);
-
-	// Copy data to the constant buffer
-	// Note that this is a VERY poor way of actually handling
-	// constant buffers in DX12 and will really only work if
-	// you have a single object on the screen.  See the next
-	// demo for an example of a much more appropriate CB setup.
-	void* gpuAddress;
-	vsConstBufferUploadHeap->Map(0, 0, &gpuAddress);
-	memcpy(gpuAddress, &data, sizeof(VertShaderExternalData));
-	vsConstBufferUploadHeap->Unmap(0, 0);
 }
 
 // --------------------------------------------------------
@@ -485,12 +411,6 @@ void Game::Draw(float deltaTime, float totalTime)
 
 		// Root sig (must happen before root descriptor table)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
-
-		// Set constant buffer
-		commandList->SetDescriptorHeaps(1, vsConstBufferDescriptorHeap.GetAddressOf());
-		commandList->SetGraphicsRootDescriptorTable(
-			0,
-			vsConstBufferDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 		// Set up other commands for rendering
 		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
