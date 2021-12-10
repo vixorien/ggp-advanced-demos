@@ -52,7 +52,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DX12Helper::CreateStaticBuffer(unsigned i
 	// The overall buffer we'll be creating
 	Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
 
-	// We first need to make an upload heap where we can copy data to the GPU
+	// Describes the final heap
 	D3D12_HEAP_PROPERTIES props = {};
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.CreationNodeMask = 1;

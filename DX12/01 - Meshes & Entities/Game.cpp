@@ -346,7 +346,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->RSSetScissorRects(1, &scissorRect);
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		// Loop through the meshes
+		// Loop through the entities
 		for (auto& e : entities)
 		{
 			// Set up the data we intend to use for drawing this entity
