@@ -74,6 +74,9 @@ DXCore::~DXCore()
 	// we don't need to explicitly clean up those DirectX objects
 	// - If we weren't using smart pointers, we'd need
 	//   to call Release() on each DirectX object
+
+	// Delete singletons
+	delete& Input::GetInstance();
 }
 
 // --------------------------------------------------------
@@ -148,6 +151,10 @@ HRESULT DXCore::InitWindow()
 	// The window exists but is not visible yet
 	// We need to tell Windows to show it, and how to show it
 	ShowWindow(hWnd, SW_SHOW);
+
+	// Initialize the input manager now that we definitely have a window
+	Input::GetInstance().Initialize(hWnd);
+
 
 	// Return an "everything is ok" HRESULT value
 	return S_OK;

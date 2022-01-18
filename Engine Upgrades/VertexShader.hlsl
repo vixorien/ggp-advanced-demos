@@ -6,8 +6,6 @@ cbuffer externalData : register(b0)
 	matrix worldInverseTranspose;
 	matrix view;
 	matrix projection;
-
-	float2 uvScale;
 };
 
 // Struct representing a single vertex worth of data
@@ -45,12 +43,12 @@ VertexToPixel main(VertexShaderInput input)
 	// in the pixel shader when we do point/spot lights)
 	output.worldPos = mul(world, float4(input.position, 1.0f)).xyz;
 
-	// Make sure the normal is in WORLD space, not "local" space
+	// Make sure the other vectors are in WORLD space, not "local" space
 	output.normal = normalize(mul((float3x3)worldInverseTranspose, input.normal));
-	output.tangent = normalize(mul((float3x3)worldInverseTranspose, input.tangent));
+	output.tangent = normalize(mul((float3x3)world, input.tangent)); // Tangent doesn't need inverse transpose!
 
-	// Pass through the uv
-	output.uv = input.uv * uvScale;
+	// Pass the UV through
+	output.uv = input.uv;
 
 	return output;
 }

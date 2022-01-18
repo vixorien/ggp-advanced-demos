@@ -31,8 +31,9 @@ struct SimpleShaderVariable
 struct SimpleConstantBuffer
 {
 	std::string Name;
-	unsigned int Size;
-	unsigned int BindIndex;
+	D3D_CBUFFER_TYPE Type = D3D_CBUFFER_TYPE::D3D11_CT_CBUFFER;
+	unsigned int Size = 0;
+	unsigned int BindIndex = 0;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ConstantBuffer = 0;
 	unsigned char* LocalDataBuffer = 0;
 	std::vector<SimpleShaderVariable> Variables;

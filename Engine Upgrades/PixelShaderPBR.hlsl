@@ -8,20 +8,24 @@
 cbuffer perMaterial : register(b0)
 {
 	// Surface color
-	float4 Color;
+	float3 colorTint;
+
+	// UV adjustments
+	float2 uvScale;
+	float2 uvOffset;
 };
 
 // Data that only changes once per frame
 cbuffer perFrame : register(b1)
 {
 	// An array of light data
-	Light Lights[MAX_LIGHTS];
+	Light lights[MAX_LIGHTS];
 
 	// The amount of lights THIS FRAME
-	int LightCount;
+	int lightCount;
 
 	// Needed for specular (reflection) calculation
-	float3 CameraPosition;
+	float3 cameraPosition;
 };
 
 
@@ -38,11 +42,11 @@ struct VertexToPixel
 
 
 // Texture-related variables
-Texture2D AlbedoTexture			: register(t0);
-Texture2D NormalTexture			: register(t1);
-Texture2D RoughnessTexture		: register(t2);
-Texture2D MetalTexture			: register(t3);
-SamplerState BasicSampler		: register(s0);
+Texture2D Albedo			: register(t0);
+Texture2D NormalMap			: register(t1);
+Texture2D RoughnessMap		: register(t2);
+Texture2D MetalMap			: register(t3);
+SamplerState BasicSampler	: register(s0);
 
 
 // Entry point for this pixel shader
@@ -52,14 +56,17 @@ float4 main(VertexToPixel input) : SV_TARGET
 	input.normal = normalize(input.normal);
 	input.tangent = normalize(input.tangent);
 
+	// Apply the uv adjustments
+	input.uv = input.uv * uvScale + uvOffset;
+
 	// Sample various textures
-	input.normal = NormalMapping(NormalTexture, BasicSampler, input.uv, input.normal, input.tangent);
-	float roughness = RoughnessTexture.Sample(BasicSampler, input.uv).r;
-	float metal = MetalTexture.Sample(BasicSampler, input.uv).r;
+	input.normal = NormalMapping(NormalMap, BasicSampler, input.uv, input.normal, input.tangent);
+	float roughness = RoughnessMap.Sample(BasicSampler, input.uv).r;
+	float metal = MetalMap.Sample(BasicSampler, input.uv).r;
 
 	// Gamma correct the texture back to linear space and apply the color tint
-	float4 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
-	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * Color.rgb;
+	float4 surfaceColor = Albedo.Sample(BasicSampler, input.uv);
+	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * colorTint;
 
 	// Specular color - Assuming albedo texture is actually holding specular color if metal == 1
 	// Note the use of lerp here - metal is generally 0 or 1, but might be in between
@@ -70,21 +77,21 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 totalColor = float3(0,0,0);
 
 	// Loop through all lights this frame
-	for(int i = 0; i < LightCount; i++)
+	for (int i = 0; i < lightCount; i++)
 	{
 		// Which kind of light?
-		switch (Lights[i].Type)
+		switch (lights[i].Type)
 		{
 		case LIGHT_TYPE_DIRECTIONAL:
-			totalColor += DirLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalColor += DirLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 
 		case LIGHT_TYPE_POINT:
-			totalColor += PointLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalColor += PointLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 
 		case LIGHT_TYPE_SPOT:
-			totalColor += SpotLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalColor += SpotLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 		}
 	}

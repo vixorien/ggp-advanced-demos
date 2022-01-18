@@ -11,18 +11,18 @@
 class GameEntity
 {
 public:
-	GameEntity(Mesh* mesh, Material* material);
+	GameEntity(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
 
-	Mesh* GetMesh();
-	Material* GetMaterial();
+	std::shared_ptr<Mesh> GetMesh();
+	std::shared_ptr<Material> GetMaterial();
 	Transform* GetTransform();
 
-	void Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, Camera* camera);
+	void Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera);
 
 private:
 
-	Mesh* mesh;
-	Material* material;
+	std::shared_ptr<Mesh> mesh;
+	std::shared_ptr<Material> material;
 	Transform transform;
 };
 

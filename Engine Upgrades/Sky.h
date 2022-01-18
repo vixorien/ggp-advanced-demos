@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "Mesh.h"
 #include "SimpleShader.h"
 #include "Camera.h"
@@ -12,11 +14,11 @@ public:
 
 	// Constructor that loads a DDS cube map file
 	Sky(
-		const wchar_t* cubemapDDSFile, 
-		Mesh* mesh, 
-		SimpleVertexShader* skyVS,
-		SimplePixelShader* skyPS,
-		Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions, 	
+		const wchar_t* cubemapDDSFile,
+		std::shared_ptr<Mesh> mesh,
+		std::shared_ptr<SimpleVertexShader> skyVS,
+		std::shared_ptr<SimplePixelShader> skyPS,
+		Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions,
 		Microsoft::WRL::ComPtr<ID3D11Device> device,
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context
 	);
@@ -37,9 +39,9 @@ public:
 		const wchar_t* down,
 		const wchar_t* front,
 		const wchar_t* back,
-		Mesh* mesh,
-		SimpleVertexShader* skyVS,
-		SimplePixelShader* skyPS,
+		std::shared_ptr<Mesh> mesh,
+		std::shared_ptr<SimpleVertexShader> skyVS,
+		std::shared_ptr<SimplePixelShader> skyPS,
 		Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions,
 		Microsoft::WRL::ComPtr<ID3D11Device> device,
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context
@@ -53,9 +55,9 @@ public:
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> down,
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> front,
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back,
-		Mesh* mesh,
-		SimpleVertexShader* skyVS,
-		SimplePixelShader* skyPS,
+		std::shared_ptr<Mesh> mesh,
+		std::shared_ptr<SimpleVertexShader> skyVS,
+		std::shared_ptr<SimplePixelShader> skyPS,
 		Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions,
 		Microsoft::WRL::ComPtr<ID3D11Device> device,
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context
@@ -63,7 +65,7 @@ public:
 
 	~Sky();
 
-	void Draw(Camera* camera);
+	void Draw(std::shared_ptr<Camera> camera);
 
 private:
 
@@ -87,10 +89,10 @@ private:
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back);
 
 	// Skybox related resources
-	SimpleVertexShader* skyVS;
-	SimplePixelShader* skyPS;
-	
-	Mesh* skyMesh;
+	std::shared_ptr<SimpleVertexShader> skyVS;
+	std::shared_ptr<SimplePixelShader> skyPS;
+
+	std::shared_ptr<Mesh> skyMesh;
 
 	Microsoft::WRL::ComPtr<ID3D11RasterizerState> skyRasterState;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> skyDepthState;

@@ -5,12 +5,12 @@
 using namespace DirectX;
 
 Sky::Sky(
-	const wchar_t* cubemapDDSFile, 
-	Mesh* mesh, 
-	SimpleVertexShader* skyVS, 
-	SimplePixelShader* skyPS, 
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions, 
-	Microsoft::WRL::ComPtr<ID3D11Device> device, 
+	const wchar_t* cubemapDDSFile,
+	std::shared_ptr<Mesh> mesh,
+	std::shared_ptr<SimpleVertexShader> skyVS,
+	std::shared_ptr<SimplePixelShader> skyPS,
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions,
+	Microsoft::WRL::ComPtr<ID3D11Device> device,
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
 {
 	// Save params
@@ -43,15 +43,15 @@ Sky::Sky(
 }
 
 Sky::Sky(
-	const wchar_t* right, 
-	const wchar_t* left, 
-	const wchar_t* up, 
-	const wchar_t* down, 
-	const wchar_t* front, 
-	const wchar_t* back, 
-	Mesh* mesh,
-	SimpleVertexShader* skyVS,
-	SimplePixelShader* skyPS,
+	const wchar_t* right,
+	const wchar_t* left,
+	const wchar_t* up,
+	const wchar_t* down,
+	const wchar_t* front,
+	const wchar_t* back,
+	std::shared_ptr<Mesh> mesh,
+	std::shared_ptr<SimpleVertexShader> skyVS,
+	std::shared_ptr<SimplePixelShader> skyPS,
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions,
 	Microsoft::WRL::ComPtr<ID3D11Device> device,
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
@@ -71,7 +71,19 @@ Sky::Sky(
 	skySRV = CreateCubemap(right, left, up, down, front, back);
 }
 
-Sky::Sky(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> right, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> left, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> up, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> down, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> front, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back, Mesh* mesh, SimpleVertexShader* skyVS, SimplePixelShader* skyPS, Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions, Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
+Sky::Sky(
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> right, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> left, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> up, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> down, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> front, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back, 
+	std::shared_ptr<Mesh> mesh,
+	std::shared_ptr<SimpleVertexShader> skyVS,
+	std::shared_ptr<SimplePixelShader> skyPS,
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions, 
+	Microsoft::WRL::ComPtr<ID3D11Device> device, 
+	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
 {
 	// Save params
 	this->skyMesh = mesh;
@@ -92,7 +104,7 @@ Sky::~Sky()
 {
 }
 
-void Sky::Draw(Camera* camera)
+void Sky::Draw(std::shared_ptr<Camera> camera)
 {
 	// Change to the sky-specific rasterizer state
 	context->RSSetState(skyRasterState.Get());
@@ -137,11 +149,11 @@ void Sky::InitRenderStates()
 }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
-	const wchar_t* right, 
-	const wchar_t* left, 
-	const wchar_t* up, 
-	const wchar_t* down, 
-	const wchar_t* front, 
+	const wchar_t* right,
+	const wchar_t* left,
+	const wchar_t* up,
+	const wchar_t* down,
+	const wchar_t* front,
 	const wchar_t* back)
 {
 	// Load the 6 textures into an array.
@@ -161,11 +173,11 @@ Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
 }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> right, 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> left, 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> up, 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> down, 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> front, 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> right,
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> left,
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> up,
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> down,
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> front,
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> back)
 {
 	// Load the 6 textures into an array.

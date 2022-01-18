@@ -31,33 +31,35 @@ public:
 
 private:
 
-	// Keep track of "stuff" to clean up
-	std::vector<Material*> materials;
-	std::vector<GameEntity*> entities;
-	Camera* camera;
+	// Our scene
+	std::vector<std::shared_ptr<GameEntity>> entities;
+	std::shared_ptr<Camera> camera;
 
 	// Lights
 	std::vector<Light> lights;
 	int lightCount;
 
+	// These will be loaded along with other assets and
+	// saved to these variables for ease of access
+	std::shared_ptr<Mesh> lightMesh;
+	std::shared_ptr<SimpleVertexShader> lightVS;
+	std::shared_ptr<SimplePixelShader> lightPS;
+
 	// Texture related resources
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions;
 
 	// Skybox
-	Sky* sky;
-
-	// Text & ui
-	DirectX::SpriteFont* arial;
-	DirectX::SpriteBatch* spriteBatch;
+	std::shared_ptr<Sky> sky;
 
 	// IMGUI-related methods
 	void CreateUI(float dt);
 	void UILight(Light& light, int index);
 
-	// General helpers 
+	// General helpers for setup and drawing
 	void GenerateLights();
 	void DrawPointLights();
-	void DrawUI();
+
+	// Initialization helper method
 	void LoadAssetsAndCreateEntities();
 };
 

@@ -1,49 +1,60 @@
 #pragma once
 
 #include <d3d11.h>
-#include <DirectXMath.h>
 #include <wrl/client.h>
+#include <DirectXMath.h>
+#include <memory>
+#include <unordered_map>
 
 #include "SimpleShader.h"
 #include "Camera.h"
-#include "Lights.h"
+#include "Transform.h"
 
 class Material
 {
 public:
 	Material(
-		SimpleVertexShader* vs, 
-		SimplePixelShader* ps, 
-		DirectX::XMFLOAT4 color, 
-		float shininess, 
-		DirectX::XMFLOAT2 uvScale, 
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> albedo, 
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> normals, 
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> roughness, 
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> metal, 
-		Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler);
-	~Material();
+		std::shared_ptr<SimplePixelShader> ps,
+		std::shared_ptr<SimpleVertexShader> vs,
+		DirectX::XMFLOAT3 tint = DirectX::XMFLOAT3(1, 1, 1),
+		DirectX::XMFLOAT2 uvScale = DirectX::XMFLOAT2(1, 1),
+		DirectX::XMFLOAT2 uvOffset = DirectX::XMFLOAT2(0, 0));
 
-	void PrepareMaterial(Transform* transform, Camera* cam);
+	std::shared_ptr<SimplePixelShader> GetPixelShader();
+	std::shared_ptr<SimpleVertexShader> GetVertexShader();
+	DirectX::XMFLOAT2 GetUVScale();
+	DirectX::XMFLOAT2 GetUVOffset();
+	DirectX::XMFLOAT3 GetColorTint();
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetTextureSRV(std::string name);
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> GetSampler(std::string name);
 
-	SimpleVertexShader* GetVS() { return vs; }
-	SimplePixelShader* GetPS() { return ps; }
+	void SetPixelShader(std::shared_ptr<SimplePixelShader> ps);
+	void SetVertexShader(std::shared_ptr<SimpleVertexShader> ps);
+	void SetUVScale(DirectX::XMFLOAT2 scale);
+	void SetUVOffset(DirectX::XMFLOAT2 offset);
+	void SetColorTint(DirectX::XMFLOAT3 tint);
 
-	void SetVS(SimpleVertexShader* vs) { this->vs = vs; }
-	void SetPS(SimplePixelShader* ps) { this->ps = ps; }
+	void AddTextureSRV(std::string name, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv);
+	void AddSampler(std::string name, Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler);
+
+	void RemoveTextureSRV(std::string name);
+	void RemoveSampler(std::string name);
+
+	void PrepareMaterial(Transform* transform, std::shared_ptr<Camera> camera);
 
 private:
-	SimpleVertexShader* vs;
-	SimplePixelShader* ps;
 
+	// Shaders
+	std::shared_ptr<SimplePixelShader> ps;
+	std::shared_ptr<SimpleVertexShader> vs;
+
+	// Material properties
+	DirectX::XMFLOAT3 colorTint;
+
+	// Texture-related
+	DirectX::XMFLOAT2 uvOffset;
 	DirectX::XMFLOAT2 uvScale;
-	DirectX::XMFLOAT4 color;
-	float shininess;
-
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> albedoSRV;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> normalSRV;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> roughnessSRV;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> metalSRV;
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;
+	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textureSRVs;
+	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11SamplerState>> samplers;
 };
 
