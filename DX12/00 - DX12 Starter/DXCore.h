@@ -86,15 +86,6 @@ protected:
 	D3D12_VIEWPORT			viewport;
 	D3D12_RECT				scissorRect;
 
-	// Fence for CPU/GPU sync
-	Microsoft::WRL::ComPtr<ID3D12Fence> fence;
-	HANDLE fenceEvent;
-	unsigned long currentFence = 0;
-
-	// DX12 Helper Functions
-	void WaitForGPU();
-	void CloseExecuteAndResetCommandList();
-
 	// Helper function for allocating a console window
 	void CreateConsoleWindow(int bufferLines, int bufferColumns, int windowLines, int windowColumns);
 

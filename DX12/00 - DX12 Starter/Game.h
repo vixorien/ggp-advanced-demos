@@ -26,8 +26,6 @@ private:
 	// Initialization helper methods - feel free to customize, combine, etc.
 	void CreateRootSigAndPipelineState();
 	void CreateBasicGeometry();
-	HRESULT CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data, ID3D12Resource** buffer);
-
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;

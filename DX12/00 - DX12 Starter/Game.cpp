@@ -1,7 +1,7 @@
 #include "Game.h"
 #include "Vertex.h"
 #include "Input.h"
-#include "BufferStructs.h"
+#include "DX12Helper.h"
 
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
@@ -52,7 +52,7 @@ Game::~Game()
 
 	// However, we DO need to wait here until the GPU
 	// is actually done with its work
-	WaitForGPU();
+	DX12Helper::GetInstance().WaitForGPU();
 }
 
 // --------------------------------------------------------
@@ -248,8 +248,9 @@ void Game::CreateBasicGeometry()
 	unsigned int indices[] = { 0, 1, 2 };
 
 	// Create the two buffers
-	CreateStaticBuffer(sizeof(Vertex), ARRAYSIZE(vertices), vertices, vertexBuffer.GetAddressOf());
-	CreateStaticBuffer(sizeof(unsigned int), ARRAYSIZE(indices), indices, indexBuffer.GetAddressOf());
+	DX12Helper& dx12Helper = DX12Helper::GetInstance();
+	vertexBuffer = dx12Helper.CreateStaticBuffer(sizeof(Vertex), ARRAYSIZE(vertices), vertices);
+	indexBuffer = dx12Helper.CreateStaticBuffer(sizeof(unsigned int), ARRAYSIZE(indices), indices);
 
 	// Set up the views
 	vbView.StrideInBytes = sizeof(Vertex);
@@ -259,89 +260,6 @@ void Game::CreateBasicGeometry()
 	ibView.Format = DXGI_FORMAT_R32_UINT;
 	ibView.SizeInBytes = sizeof(unsigned int) * ARRAYSIZE(indices);
 	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
-}
-
-
-
-HRESULT Game::CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data, ID3D12Resource** buffer)
-{
-	// Potential result
-	HRESULT hr = 0;
-
-	// Make the final heap for the buffer, though we can't upload directly to it
-	D3D12_HEAP_PROPERTIES props = {};
-	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	props.CreationNodeMask = 1;
-	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	props.Type = D3D12_HEAP_TYPE_DEFAULT;
-	props.VisibleNodeMask = 1;
-
-	D3D12_RESOURCE_DESC desc = {};
-	desc.Alignment = 0;
-	desc.DepthOrArraySize = 1;
-	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	desc.Format = DXGI_FORMAT_UNKNOWN;
-	desc.Height = 1; // Assuming this is a regular buffer, not a texture
-	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	desc.Width = dataStride * dataCount; // Size of the buffer
-
-	hr = device->CreateCommittedResource(
-		&props,
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		D3D12_RESOURCE_STATE_COPY_DEST, // Will eventually be "common", but we're copying to it first!
-		0,
-		IID_PPV_ARGS(buffer));
-	if (FAILED(hr))
-		return hr;
-
-	// Now create an intermediate upload heap for copying initial data
-	D3D12_HEAP_PROPERTIES uploadProps = {};
-	uploadProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	uploadProps.CreationNodeMask = 1;
-	uploadProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	uploadProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Can only ever be Generic_Read state
-	uploadProps.VisibleNodeMask = 1;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap;
-	hr = device->CreateCommittedResource(
-		&uploadProps,
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		0,
-		IID_PPV_ARGS(uploadHeap.GetAddressOf()));
-	if (FAILED(hr))
-		return hr;
-
-	// Do a straight map/memcpy/unmap
-	void* gpuAddress = 0;
-	hr = uploadHeap->Map(0, 0, &gpuAddress);
-	if (FAILED(hr))
-		return hr;
-	memcpy(gpuAddress, data, dataStride * dataCount);
-	uploadHeap->Unmap(0, 0);
-
-	// Copy the whole buffer from uploadheap to vert buffer
-	commandList->CopyResource(*buffer, uploadHeap.Get());
-
-	// Transition the buffer to generic read for the rest of the app lifetime (presumable)
-	D3D12_RESOURCE_BARRIER rb = {};
-	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	rb.Transition.pResource = *buffer;
-	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	commandList->ResourceBarrier(1, &rb);
-
-	// Execute the command list and report success
-	CloseExecuteAndResetCommandList();
-	return S_OK;
 }
 
 
@@ -437,7 +355,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->ResourceBarrier(1, &rb);
 
 		// Must occur BEFORE present
-		CloseExecuteAndResetCommandList();
+		DX12Helper::GetInstance().CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
 		swapChain->Present(vsync ? 1 : 0, 0);

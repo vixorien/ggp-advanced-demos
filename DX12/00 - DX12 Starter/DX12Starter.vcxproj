@@ -136,13 +136,14 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DX12Helper.cpp" />
     <ClCompile Include="DXCore.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BufferStructs.h" />
+    <ClInclude Include="DX12Helper.h" />
     <ClInclude Include="DXCore.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Input.h" />
