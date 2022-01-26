@@ -12,9 +12,7 @@ DX12Helper::~DX12Helper() { }
 
 
 // --------------------------------------------------------
-// Sets up the helper with required DX12 objects.  This
-// also reserves the necessary GPU memory for handling
-// constant buffers and their views.
+// Sets up the helper with required DX12 objects
 // --------------------------------------------------------
 void DX12Helper::Initialize(
 	Microsoft::WRL::ComPtr<ID3D12Device> device,
