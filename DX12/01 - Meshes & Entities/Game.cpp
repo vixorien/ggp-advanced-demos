@@ -337,7 +337,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
 		// Set constant buffer
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetConstantBufferDescriptorHeap();
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetCBVSRVDescriptorHeap();
 		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
 		// Set up other commands for rendering

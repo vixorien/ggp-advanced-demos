@@ -33,9 +33,9 @@ void DX12Helper::Initialize(
 	waitFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
 	waitFenceCounter = 0;
 
-	// Create the constant buffer upload heap
+	// Create the constant buffer upload heap and descriptor heap
 	CreateConstantBufferUploadHeap();
-	CreateConstantBufferViewDescriptorHeap();
+	CreateCBVSRVDescriptorHeap();
 }
 
 
@@ -127,7 +127,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DX12Helper::CreateStaticBuffer(unsigned i
 // --------------------------------------------------------
 // Gets the overall CBV heap for use when drawing
 // --------------------------------------------------------
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetConstantBufferDescriptorHeap() { return cbvDescriptorHeap; }
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetCBVSRVDescriptorHeap() { return cbvDescriptorHeap; }
 
 
 
@@ -312,19 +312,15 @@ void DX12Helper::CreateConstantBufferUploadHeap()
 
 // --------------------------------------------------------
 // Creates a single CBV descriptor heap which will store all
-// CBVs for the entire program.  Like the CBV upload heap,
+// CBVs and SRVs for the entire program.  Like the CBV upload heap,
 // this heap is treated as a ring buffer, allowing the program
 // to continually re-use the memory as frames progress.
 // --------------------------------------------------------
-void DX12Helper::CreateConstantBufferViewDescriptorHeap()
+void DX12Helper::CreateCBVSRVDescriptorHeap()
 {
 	// Ask the device for the increment size for CBV descriptor heaps
 	// This can vary by GPU so we need to query for it
 	cbvDescriptorHeapIncrementSize = (SIZE_T)device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	// Assume the first CBV will be at the beginning of the heap
-	// This will increase as we use more CBVs and will wrap back to 0
-	cbvDescriptorOffset = 0;
 
 	// Describe the descriptor heap we want to make
 	D3D12_DESCRIPTOR_HEAP_DESC dhDesc = {};
@@ -332,5 +328,10 @@ void DX12Helper::CreateConstantBufferViewDescriptorHeap()
 	dhDesc.NodeMask = 0; // Node here means physical GPU - we only have 1 so its index is 0
 	dhDesc.NumDescriptors = maxConstantBuffers; // How many descriptors will we need?
 	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV; // This heap can store CBVs, SRVs and UAVs
+	
 	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(cbvDescriptorHeap.GetAddressOf()));
+
+	// Assume the first CBV will be at the beginning of the heap
+	// This will increase as we use more CBVs and will wrap back to 0
+	cbvDescriptorOffset = 0;
 }
