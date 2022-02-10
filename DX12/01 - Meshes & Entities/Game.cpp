@@ -135,7 +135,7 @@ void Game::CreateRootSigAndPipelineState()
 		// Create the root parameter
 		D3D12_ROOT_PARAMETER rootParam = {};
 		rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 		rootParam.DescriptorTable.NumDescriptorRanges = 1;
 		rootParam.DescriptorTable.pDescriptorRanges = &cbvTable;
 

@@ -330,7 +330,7 @@ void DX12Helper::CreateCBVSRVDescriptorHeap()
 	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV; // This heap can store CBVs, SRVs and UAVs
 	
 	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(cbvDescriptorHeap.GetAddressOf()));
-
+	
 	// Assume the first CBV will be at the beginning of the heap
 	// This will increase as we use more CBVs and will wrap back to 0
 	cbvDescriptorOffset = 0;
