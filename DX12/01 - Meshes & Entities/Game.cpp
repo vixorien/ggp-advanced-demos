@@ -124,7 +124,7 @@ void Game::CreateRootSigAndPipelineState()
 
 	// Root Signature
 	{
-		// Create a table of CBV's (constant buffer views)
+		// Define a table of CBV's (constant buffer views)
 		D3D12_DESCRIPTOR_RANGE cbvTable = {};
 		cbvTable.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		cbvTable.NumDescriptors = 1;
@@ -132,7 +132,7 @@ void Game::CreateRootSigAndPipelineState()
 		cbvTable.RegisterSpace = 0;
 		cbvTable.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		// Create the root parameter
+		// Define the root parameter
 		D3D12_ROOT_PARAMETER rootParam = {};
 		rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
