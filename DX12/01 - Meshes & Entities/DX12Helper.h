@@ -30,8 +30,8 @@ private:
 		cbUploadHeapOffsetInBytes(0),
 		cbUploadHeapSizeInBytes(0),
 		cbUploadHeapStartAddress(0),
-		cbvDescriptorHeap(0),
-		cbvDescriptorHeapIncrementSize(0),
+		cbvSrvDescriptorHeap(0),
+		cbvSrvDescriptorHeapIncrementSize(0),
 		cbvDescriptorOffset(0),
 		waitFenceCounter(0),
 		waitFenceEvent(0),
@@ -96,8 +96,8 @@ private:
 	void* cbUploadHeapStartAddress;
 
 	// GPU-side CBV/SRV descriptor heap
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvDescriptorHeap;
-	SIZE_T cbvDescriptorHeapIncrementSize;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvSrvDescriptorHeap;
+	SIZE_T cbvSrvDescriptorHeapIncrementSize;
 	unsigned int cbvDescriptorOffset;
 
 	void CreateConstantBufferUploadHeap();

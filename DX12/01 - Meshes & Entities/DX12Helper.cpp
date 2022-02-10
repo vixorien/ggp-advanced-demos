@@ -127,7 +127,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DX12Helper::CreateStaticBuffer(unsigned i
 // --------------------------------------------------------
 // Gets the overall CBV heap for use when drawing
 // --------------------------------------------------------
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetCBVSRVDescriptorHeap() { return cbvDescriptorHeap; }
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetCBVSRVDescriptorHeap() { return cbvSrvDescriptorHeap; }
 
 
 
@@ -174,14 +174,14 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12Helper::FillNextConstantBufferAndGetGPUDescripto
 	// Create a CBV for this section of the heap
 	{
 		// Calculate the CPU and GPU side handles for this descriptor
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = cbvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = cbvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = cbvSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = cbvSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
 		// Offset each by based on how many descriptors we've used
 		// Note: cbvDescriptorOffset is a COUNT of descriptors, not bytes
 		//       so we need to calculate the size
-		cpuHandle.ptr += (SIZE_T)cbvDescriptorOffset * cbvDescriptorHeapIncrementSize;
-		gpuHandle.ptr += (SIZE_T)cbvDescriptorOffset * cbvDescriptorHeapIncrementSize;
+		cpuHandle.ptr += (SIZE_T)cbvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+		gpuHandle.ptr += (SIZE_T)cbvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
 
 		// Describe the constant buffer view that points to
 		// our latest chunk of the CB upload heap
@@ -320,7 +320,7 @@ void DX12Helper::CreateCBVSRVDescriptorHeap()
 {
 	// Ask the device for the increment size for CBV descriptor heaps
 	// This can vary by GPU so we need to query for it
-	cbvDescriptorHeapIncrementSize = (SIZE_T)device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	cbvSrvDescriptorHeapIncrementSize = (SIZE_T)device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// Describe the descriptor heap we want to make
 	D3D12_DESCRIPTOR_HEAP_DESC dhDesc = {};
@@ -329,7 +329,7 @@ void DX12Helper::CreateCBVSRVDescriptorHeap()
 	dhDesc.NumDescriptors = maxConstantBuffers; // How many descriptors will we need?
 	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV; // This heap can store CBVs, SRVs and UAVs
 	
-	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(cbvDescriptorHeap.GetAddressOf()));
+	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(cbvSrvDescriptorHeap.GetAddressOf()));
 	
 	// Assume the first CBV will be at the beginning of the heap
 	// This will increase as we use more CBVs and will wrap back to 0
