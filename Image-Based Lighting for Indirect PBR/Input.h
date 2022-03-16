@@ -70,23 +70,23 @@ public:
 
 private:
 	// Arrays for the current and previous key states
-	unsigned char* kbState;
-	unsigned char* prevKbState;
+	unsigned char* kbState {0};
+	unsigned char* prevKbState {0};
 
 	// Mouse position and wheel data
-	int mouseX;
-	int mouseY;
-	int prevMouseX;
-	int prevMouseY;
-	int mouseXDelta;
-	int mouseYDelta;
-	float wheelDelta;
+	int mouseX {0};
+	int mouseY {0};
+	int prevMouseX {0};
+	int prevMouseY {0};
+	int mouseXDelta {0};
+	int mouseYDelta {0};
+	float wheelDelta {0};
 
 	// The window's handle (id) from the OS, so
 	// we can get the cursor's position
-	HWND windowHandle;
+	HWND windowHandle {0};
 
-	bool guiWantsKeyboard;
-	bool guiWantsMouse;
+	bool guiWantsKeyboard {false};
+	bool guiWantsMouse {false};
 };
 

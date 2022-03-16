@@ -38,7 +38,9 @@ Game::Game(HINSTANCE hInstance)
 		"DirectX Game",	   // Text for the window's title bar
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
-		true)			   // Show extra stats (fps) in title bar?
+		true),			   // Show extra stats (fps) in title bar?
+	renderer(0),
+	sky(0)
 {
 	camera = 0;
 
