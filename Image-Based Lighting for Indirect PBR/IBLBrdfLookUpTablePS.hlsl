@@ -74,8 +74,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 {
 	// Treat the uv range (0-1) as a grid of 
 	// roughness and nDotV permutations
-	float roughness = input.uv.x;
-	float nDotV = input.uv.y;
+	// Note: ROUGHNESS is Y
+	//       nDotV is X
+	float roughness = input.uv.y;
+	float nDotV = input.uv.x;
 
 	// Handle this pixel and save
 	float2 brdf = IntegrateBRDF(roughness, nDotV);

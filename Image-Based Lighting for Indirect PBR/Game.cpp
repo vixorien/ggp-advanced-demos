@@ -680,6 +680,13 @@ void Game::CreateUI(float dt)
 		}
 	}
 
+	if (ImGui::CollapsingHeader("IBL Textures"))
+	{
+		ImVec2 size = ImGui::GetItemRectSize();
+
+		ImageWithHover(sky->GetBRDFLookUpTexture().Get(), ImVec2(size.x, size.x));
+	}
+
 	ImGui::End();
 }
 
@@ -815,6 +822,43 @@ void Game::UILight(Light& light, int index)
 		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
 
 		ImGui::TreePop();
+	}
+}
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
+{
+	// Draw the image
+	ImGui::Image(user_texture_id, size);
+
+	// Check for hover
+	if (ImGui::IsItemHovered())
+	{
+		// Zoom amount and aspect of the image
+		float zoom = 0.03f;
+		float aspect = (float)size.x / size.y;
+
+		// Get the coords of the image
+		ImVec2 topLeft = ImGui::GetItemRectMin();
+		ImVec2 bottomRight = ImGui::GetItemRectMax();
+
+		// Get the mouse pos as a percent across the image, clamping near the edge
+		ImVec2 mousePosGlobal = ImGui::GetMousePos();
+		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
+		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
+
+		uvPercent.x = max(uvPercent.x, zoom / 2);
+		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
+		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
+		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
+
+		// Figure out the uv coords for the zoomed image
+		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
+		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
+
+		// Draw a floating box with a zoomed view of the image
+		ImGui::BeginTooltip();
+		ImGui::Image(user_texture_id, ImVec2(256, 256), uvTL, uvBR);
+		ImGui::EndTooltip();
 	}
 }
 
