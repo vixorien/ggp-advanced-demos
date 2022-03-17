@@ -37,6 +37,7 @@ struct PSPerFrameData
 	DirectX::XMFLOAT3 CameraPosition;
 	int TotalSpecIBLMipLevels;
 	DirectX::XMFLOAT3 AmbientNonPBR;
+	float IBLIntensity;
 };
 
 class Renderer
@@ -83,6 +84,9 @@ public:
 	void SetSSAOOutputOnly(bool ssaoOnly);
 	bool GetSSAOOutputOnly();
 
+	void SetIBLIntensity(float intensity);
+	float GetIBLIntensity();
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
 private:
@@ -108,6 +112,7 @@ private:
 
 	// Overall ambient for non-pbr shaders
 	DirectX::XMFLOAT3 ambientNonPBR;
+	float iblIntensity;
 
 	// Window-related
 	unsigned int windowWidth;

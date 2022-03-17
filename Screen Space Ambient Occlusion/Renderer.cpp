@@ -40,7 +40,8 @@ using namespace DirectX;
 		ssaoSamples(64),
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
-		ambientNonPBR(0.1f, 0.1f, 0.25f)
+		ambientNonPBR(0.1f, 0.1f, 0.25f),
+	    iblIntensity(1.0f)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -134,6 +135,7 @@ void Renderer::Render(Camera* camera)
 		psPerFrameData.CameraPosition = camera->GetTransform()->GetPosition();
 		psPerFrameData.TotalSpecIBLMipLevels = sky->GetTotalSpecularIBLMipLevels();
 		psPerFrameData.AmbientNonPBR = ambientNonPBR;
+		psPerFrameData.IBLIntensity = iblIntensity;
 		context->UpdateSubresource(psPerFrameConstantBuffer.Get(), 0, 0, &psPerFrameData, 0, 0);
 	}
 
@@ -367,6 +369,9 @@ int Renderer::GetSSAOSamples() { return ssaoSamples; }
 
 void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; }
 bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
+
+void Renderer::SetIBLIntensity(float intensity) { iblIntensity = intensity; }
+float Renderer::GetIBLIntensity() { return iblIntensity; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 { 
