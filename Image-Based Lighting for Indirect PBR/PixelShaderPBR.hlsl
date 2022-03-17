@@ -113,7 +113,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 		roughness, specColor);
 
 	// Balance indirect diff/spec
-	float3 balancedDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal);
+	float3 balancedDiff = DiffuseEnergyConserve(indirectDiffuse, specColor, metal);
 	float3 fullIndirect = indirectSpecular + balancedDiff * surfaceColor.rgb;
 	
 	// Add the indirect to the direct
