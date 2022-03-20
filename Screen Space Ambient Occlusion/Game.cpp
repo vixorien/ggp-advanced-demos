@@ -673,8 +673,15 @@ void Game::CreateUI(float dt)
 	}
 
 	// All entity transforms
-	if (ImGui::CollapsingHeader("Lights"))
+	if (ImGui::CollapsingHeader("Lighting"))
 	{
+		// IBL Intensity
+		{
+			float intensity = renderer->GetIBLIntensity();
+			if (ImGui::SliderFloat("IBL Intensity", &intensity, 0.0f, 10.0f))
+				renderer->SetIBLIntensity(intensity);
+		}
+
 		int lightCount = (int)renderer->GetActiveLightCount();
 		if (ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS))
 			renderer->SetActiveLightCount((unsigned int)lightCount);

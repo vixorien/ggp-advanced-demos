@@ -19,8 +19,11 @@ cbuffer perFrame : register(b0)
 	// The number of mip levels in the specular IBL map (only used for PBR)
 	int SpecIBLTotalMipLevels;
 
-	// Ambient color for the environment
+	// Ambient color for the environment (non-PBR)
 	float3 AmbientNonPBR;
+
+	// Intensity factor for IBL (PBR only)
+	float IBLIntensity;
 };
 
 // Data that can change per material

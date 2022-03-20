@@ -18,6 +18,12 @@ cbuffer perFrame : register(b0)
 
 	// The number of mip levels in the specular IBL map
 	int SpecIBLTotalMipLevels;
+
+	// Ambient color for the environment (non-PBR)
+	float3 AmbientNonPBR;
+
+	// Intensity factor for IBL (PBR only)
+	float IBLIntensity;
 };
 
 // Data that can change per material
@@ -113,15 +119,15 @@ PS_Output main(VertexToPixel input)
 	float NdotV = saturate(dot(input.normal, viewToCam));
 
 	// Indirect lighting
-	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal);
+	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal) * IBLIntensity;
 	float3 indirectSpecular = IndirectSpecular(
 		SpecularIBLMap, SpecIBLTotalMipLevels,
 		BrdfLookUpMap, ClampSampler, // MUST use the clamp sampler here!
 		viewRefl, NdotV,
-		roughness, specColor);
+		roughness, specColor) * IBLIntensity;
 
 	// Balance indirect diff/spec
-	float3 balancedIndirectDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal) * surfaceColor.rgb;
+	float3 balancedIndirectDiff = DiffuseEnergyConserve(indirectDiffuse, specColor, metal) * surfaceColor.rgb;
 
 	// Multiple render target output
 	PS_Output output;

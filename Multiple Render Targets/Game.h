@@ -10,6 +10,7 @@
 #include "Lights.h"
 #include "Sky.h"
 #include "Renderer.h"
+#include "ImGui/imgui.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
@@ -54,6 +55,7 @@ private:
 	void CreateUI(float dt);
 	void UIEntity(GameEntity* entity, int index);
 	void UILight(Light& light, int index);
+	void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size);
 
 	// General helpers
 	void GenerateLights();

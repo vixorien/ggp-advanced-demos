@@ -1,16 +1,12 @@
 
 #include "Lighting.hlsli"
 
-#define MAX_SAMPLES 4096
-
 
 struct VertexToPixel
 {
 	float4 position		: SV_POSITION;
 	float2 uv           : TEXCOORD0;
 };
-
-
 
 // Specular G
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
@@ -47,10 +43,10 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 	// Run the calculation MANY times
 	//  - 4096 would be an ideal number of times 
 	//  - Fewer is faster, but is less accurate
-	for (uint i = 0; i < MAX_SAMPLES; i++)
+	for (uint i = 0; i < MAX_IBL_SAMPLES; i++)
 	{
 		// Grab this sample
-		float2 Xi = Hammersley2d(i, MAX_SAMPLES);
+		float2 Xi = Hammersley2d(i, MAX_IBL_SAMPLES);
 		float3 H = ImportanceSampleGGX(Xi, roughnessValue, N);
 		float3 L = 2 * dot(V, H) * H - V;
 
@@ -70,7 +66,7 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 	}
 
 	// Divide and return result
-	return float2(A, B) / MAX_SAMPLES;
+	return float2(A, B) / MAX_IBL_SAMPLES;
 }
 
 // All from http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
@@ -78,8 +74,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 {
 	// Treat the uv range (0-1) as a grid of 
 	// roughness and nDotV permutations
-	float roughness = input.uv.x;
-	float nDotV = input.uv.y;
+	// Note: ROUGHNESS is Y
+	//       nDotV is X
+	float roughness = input.uv.y;
+	float nDotV = input.uv.x;
 
 	// Handle this pixel and save
 	float2 brdf = IntegrateBRDF(roughness, nDotV);

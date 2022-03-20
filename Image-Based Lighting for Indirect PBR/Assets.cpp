@@ -281,7 +281,8 @@ void Assets::CreateSolidColorTexture(std::string textureName, int width, int hei
 		return;
 
 	// Create an array of the color
-	unsigned char* pixels = new unsigned char[width * height * 4];
+	unsigned int dataSize = width * height * 4;
+	unsigned char* pixels = new unsigned char[dataSize];
 	for (int i = 0; i < width * height * 4;)
 	{
 		pixels[i++] = (unsigned char)(color.x * 255);

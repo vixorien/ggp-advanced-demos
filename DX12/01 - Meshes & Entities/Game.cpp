@@ -124,7 +124,7 @@ void Game::CreateRootSigAndPipelineState()
 
 	// Root Signature
 	{
-		// Create a table of CBV's (constant buffer views)
+		// Define a table of CBV's (constant buffer views)
 		D3D12_DESCRIPTOR_RANGE cbvTable = {};
 		cbvTable.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		cbvTable.NumDescriptors = 1;
@@ -132,10 +132,10 @@ void Game::CreateRootSigAndPipelineState()
 		cbvTable.RegisterSpace = 0;
 		cbvTable.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		// Create the root parameter
+		// Define the root parameter
 		D3D12_ROOT_PARAMETER rootParam = {};
 		rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 		rootParam.DescriptorTable.NumDescriptorRanges = 1;
 		rootParam.DescriptorTable.pDescriptorRanges = &cbvTable;
 
@@ -336,8 +336,9 @@ void Game::Draw(float deltaTime, float totalTime)
 		// Root sig (must happen before root descriptor table)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
+
 		// Set constant buffer descriptor heap
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetConstantBufferDescriptorHeap();
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetCBVSRVDescriptorHeap();
 		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
 		// Set up other commands for rendering

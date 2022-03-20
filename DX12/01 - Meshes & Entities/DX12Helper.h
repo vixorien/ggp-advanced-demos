@@ -30,8 +30,8 @@ private:
 		cbUploadHeapOffsetInBytes(0),
 		cbUploadHeapSizeInBytes(0),
 		cbUploadHeapStartAddress(0),
-		cbvDescriptorHeap(0),
-		cbvDescriptorHeapIncrementSize(0),
+		cbvSrvDescriptorHeap(0),
+		cbvSrvDescriptorHeapIncrementSize(0),
 		cbvDescriptorOffset(0),
 		waitFenceCounter(0),
 		waitFenceEvent(0),
@@ -50,11 +50,13 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator
 	);
 
+	// Getters
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetCBVSRVDescriptorHeap();
+
 	// Resource creation
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateStaticBuffer(unsigned int dataStride, unsigned int dataCount, void* data);
 	
-	// Dynamic resources
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetConstantBufferDescriptorHeap();
+	// Resource usage
 	D3D12_GPU_DESCRIPTOR_HANDLE FillNextConstantBufferAndGetGPUDescriptorHandle(
 		void* data,
 		unsigned int dataSizeInBytes);
@@ -94,11 +96,11 @@ private:
 	void* cbUploadHeapStartAddress;
 
 	// GPU-side CBV/SRV descriptor heap
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvDescriptorHeap;
-	SIZE_T cbvDescriptorHeapIncrementSize;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvSrvDescriptorHeap;
+	SIZE_T cbvSrvDescriptorHeapIncrementSize;
 	unsigned int cbvDescriptorOffset;
 
 	void CreateConstantBufferUploadHeap();
-	void CreateConstantBufferViewDescriptorHeap();
+	void CreateCBVSRVDescriptorHeap();
 };
 
