@@ -336,7 +336,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		// Root sig (must happen before root descriptor table)
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
-		// Set constant buffer
+		// Set constant buffer descriptor heap
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetConstantBufferDescriptorHeap();
 		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
