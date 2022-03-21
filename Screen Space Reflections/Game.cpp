@@ -352,13 +352,13 @@ void Game::LoadAssetsAndCreateEntities()
 	woodSpherePBR->GetTransform()->SetScale(2, 2, 2);
 	woodSpherePBR->GetTransform()->SetPosition(6, 2, 0);
 
-	entities.push_back(cobSpherePBR);
-	entities.push_back(floorSpherePBR);
-	entities.push_back(paintSpherePBR);
-	entities.push_back(scratchSpherePBR);
-	entities.push_back(bronzeSpherePBR);
-	entities.push_back(roughSpherePBR);
-	entities.push_back(woodSpherePBR);
+	//entities.push_back(cobSpherePBR);
+	//entities.push_back(floorSpherePBR);
+	//entities.push_back(paintSpherePBR);
+	//entities.push_back(scratchSpherePBR);
+	//entities.push_back(bronzeSpherePBR);
+	//entities.push_back(roughSpherePBR);
+	//entities.push_back(woodSpherePBR);
 
 	// Create the non-PBR entities ==============================
 	GameEntity* cobSphere = new GameEntity(sphereMesh, cobbleMat2x);
@@ -389,13 +389,13 @@ void Game::LoadAssetsAndCreateEntities()
 	woodSphere->GetTransform()->SetScale(2, 2, 2);
 	woodSphere->GetTransform()->SetPosition(6, -2, 0);
 
-	entities.push_back(cobSphere);
-	entities.push_back(floorSphere);
-	entities.push_back(paintSphere);
-	entities.push_back(scratchSphere);
-	entities.push_back(bronzeSphere);
-	entities.push_back(roughSphere);
-	entities.push_back(woodSphere);
+	//entities.push_back(cobSphere);
+	//entities.push_back(floorSphere);
+	//entities.push_back(paintSphere);
+	//entities.push_back(scratchSphere);
+	//entities.push_back(bronzeSphere);
+	//entities.push_back(roughSphere);
+	//entities.push_back(woodSphere);
 
 
 	// Create simple PBR materials & entities (mostly for IBL testing)
@@ -459,57 +459,93 @@ void Game::LoadAssetsAndCreateEntities()
 	solidHalfRoughPlastic->AddPSSampler("ClampSampler", clampSampler);
 	materials.push_back(solidHalfRoughPlastic);
 
+	Material* whiteRough = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
+	whiteRough->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
+	whiteRough->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
+	whiteRough->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
+	whiteRough->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
+	whiteRough->AddPSSampler("BasicSampler", samplerOptions);
+	whiteRough->AddPSSampler("ClampSampler", clampSampler);
+	materials.push_back(whiteRough);
+
+	Material* redRough = new Material(vs, psPBR, XMFLOAT4(1, 0, 0, 1), 0.0f, XMFLOAT2(1, 1));
+	redRough->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
+	redRough->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
+	redRough->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
+	redRough->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
+	redRough->AddPSSampler("BasicSampler", samplerOptions);
+	redRough->AddPSSampler("ClampSampler", clampSampler);
+	materials.push_back(redRough);
+
+	Material* greenRough = new Material(vs, psPBR, XMFLOAT4(0, 1, 0, 1), 0.0f, XMFLOAT2(1, 1));
+	greenRough->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
+	greenRough->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
+	greenRough->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
+	greenRough->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
+	greenRough->AddPSSampler("BasicSampler", samplerOptions);
+	greenRough->AddPSSampler("ClampSampler", clampSampler);
+	materials.push_back(greenRough);
 
 
-	GameEntity* shinyMetal = new GameEntity(sphereMesh, solidShinyMetal);
-	shinyMetal->GetTransform()->SetPosition(-5, 0, 0);
-	entities.push_back(shinyMetal);
+	//GameEntity* shinyMetal = new GameEntity(sphereMesh, solidShinyMetal);
+	//shinyMetal->GetTransform()->SetPosition(-5, 0, 0);
+	//entities.push_back(shinyMetal);
+	//
+	//GameEntity* quarterRoughMetal = new GameEntity(sphereMesh, solidQuarterRoughMetal);
+	//quarterRoughMetal->GetTransform()->SetPosition(-3.5f, 0, 0);
+	//entities.push_back(quarterRoughMetal);
+	//
+	//GameEntity* roughMetal = new GameEntity(sphereMesh, solidHalfRoughMetal);
+	//roughMetal->GetTransform()->SetPosition(-2, 0, 0);
+	//entities.push_back(roughMetal);
+	//
+	//GameEntity* shinyPlastic = new GameEntity(sphereMesh, solidShinyPlastic);
+	//shinyPlastic->GetTransform()->SetPosition(2, 0, 0);
+	//entities.push_back(shinyPlastic);
+	//
+	//GameEntity* quarterRoughPlastic = new GameEntity(sphereMesh, solidQuarterRoughPlastic);
+	//quarterRoughPlastic->GetTransform()->SetPosition(3.5f, 0, 0);
+	//entities.push_back(quarterRoughPlastic);
+	//
+	//GameEntity* roughPlastic = new GameEntity(sphereMesh, solidHalfRoughPlastic);
+	//roughPlastic->GetTransform()->SetPosition(5, 0, 0);
+	//entities.push_back(roughPlastic);
 
-	GameEntity* quarterRoughMetal = new GameEntity(sphereMesh, solidQuarterRoughMetal);
-	quarterRoughMetal->GetTransform()->SetPosition(-3.5f, 0, 0);
-	entities.push_back(quarterRoughMetal);
 
-	GameEntity* roughMetal = new GameEntity(sphereMesh, solidHalfRoughMetal);
-	roughMetal->GetTransform()->SetPosition(-2, 0, 0);
-	entities.push_back(roughMetal);
+	//// Create a low poly tree
+	//Material* treeMat = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
+	//treeMat->AddPSSampler("BasicSampler", samplerOptions);
+	//treeMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\lowpoly tree.png"));
+	//treeMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
+	//treeMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
+	//treeMat->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
+	//materials.push_back(treeMat);
 
-	GameEntity* shinyPlastic = new GameEntity(sphereMesh, solidShinyPlastic);
-	shinyPlastic->GetTransform()->SetPosition(2, 0, 0);
-	entities.push_back(shinyPlastic);
-
-	GameEntity* quarterRoughPlastic = new GameEntity(sphereMesh, solidQuarterRoughPlastic);
-	quarterRoughPlastic->GetTransform()->SetPosition(3.5f, 0, 0);
-	entities.push_back(quarterRoughPlastic);
-
-	GameEntity* roughPlastic = new GameEntity(sphereMesh, solidHalfRoughPlastic);
-	roughPlastic->GetTransform()->SetPosition(5, 0, 0);
-	entities.push_back(roughPlastic);
-
-
-	// Create a low poly tree
-	Material* treeMat = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	treeMat->AddPSSampler("BasicSampler", samplerOptions);
-	treeMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\lowpoly tree.png"));
-	treeMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	treeMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
-	treeMat->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
-	materials.push_back(treeMat);
-
-	GameEntity* tree = new GameEntity(assets.GetMesh("Models\\lowpoly tree.obj"), treeMat);
-	entities.push_back(tree);
-	tree->GetTransform()->MoveAbsolute(12, -5, 0);
-	tree->GetTransform()->Scale(0.25f, 0.25f, 0.25f);
+	//GameEntity* tree = new GameEntity(assets.GetMesh("Models\\lowpoly tree.obj"), treeMat);
+	//entities.push_back(tree);
+	//tree->GetTransform()->MoveAbsolute(12, -5, 0);
+	//tree->GetTransform()->Scale(0.25f, 0.25f, 0.25f);
 
 
 	// Create a flat surface in the center
-	GameEntity* box = new GameEntity(assets.GetMesh("Models\\cube.obj"), solidShinyPlastic);
-	entities.push_back(box);
-	box->GetTransform()->MoveAbsolute(0, 0, 0);
-	box->GetTransform()->Scale(15, 0.1f, 3);
+	GameEntity* floor = new GameEntity(assets.GetMesh("Models\\cube.obj"), solidShinyMetal);
+	entities.push_back(floor);
+	floor->GetTransform()->MoveAbsolute(0, -5, 0);
+	floor->GetTransform()->Scale(15, 0.1f, 10);
+
+	GameEntity* back = new GameEntity(assets.GetMesh("Models\\cube.obj"), woodMatPBR);
+	entities.push_back(back);
+	back->GetTransform()->MoveAbsolute(0, 0, 5);
+	back->GetTransform()->Scale(15, 10, 0.1f);
+
+	GameEntity* obj = new GameEntity(assets.GetMesh("Models\\cylinder.obj"), cobbleMat2xPBR);
+	entities.push_back(obj);
+	obj->GetTransform()->MoveAbsolute(-2, -4, 0);
+	obj->GetTransform()->Scale(2, 2, 2);
 
 
 	// Transform test =====================================
-	entities[0]->GetTransform()->AddChild(entities[1]->GetTransform(), true);
+	//entities[0]->GetTransform()->AddChild(entities[1]->GetTransform(), true);
 }
 
 
@@ -598,9 +634,9 @@ void Game::Update(float deltaTime, float totalTime)
 	camera->Update(deltaTime);
 
 	// Move an object
-	entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
-	float scale = 2.0f + sin(totalTime) / 2.0f;
-	entities[0]->GetTransform()->SetScale(scale, scale, scale);
+	//entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
+	//float scale = 2.0f + sin(totalTime) / 2.0f;
+	//entities[0]->GetTransform()->SetScale(scale, scale, scale);
 
 	// Parent/unparent for testing
 	if (input.KeyPress('P')) entities[0]->GetTransform()->AddChild(entities[1]->GetTransform());
@@ -759,10 +795,15 @@ void Game::CreateUI(float dt)
 			bool ssrOnly = renderer->GetSSROutputOnly();
 			if (ImGui::Button("SSR Output Only"))
 				renderer->SetSSROutputOnly(!ssrOnly);
+
+			ImGui::SameLine();
+			bool ssrLinearDepth = renderer->GetSSRLinearDepth();
+			if (ImGui::Button(ssrLinearDepth ? "SSR Linear Depth" : "SSR Logarithmic Depth"))
+				renderer->SetSSRLinearDepth(!ssrLinearDepth);
 		}
 
 		float dist = renderer->GetSSRMaxSearchDistance();
-		if (ImGui::SliderFloat("SSR Max Search Distance", &dist, 0.0f, 10.0f))
+		if (ImGui::SliderFloat("SSR Max Search Distance", &dist, 0.0f, 50.0f))
 			renderer->SetSSRMaxSearchDistance(dist);
 
 		float rough = renderer->GetSSRRoughnessThreshold();

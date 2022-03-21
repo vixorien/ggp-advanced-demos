@@ -78,7 +78,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	colorIndirect.rgb = ssrEnabled ? lerp(colorIndirect.rgb, ssr.rgb, ssr.a) : colorIndirect.rgb;
 
 	// Total everything up
-	float3 indirectTotal = colorIndirect + DiffuseEnergyConserve(colorAmbient, colorIndirect, metal);
+	float3 indirectTotal = colorIndirect + DiffuseEnergyConserve(colorAmbient, specColor, metal);
 	float3 totalColor = colorAmbient * ao + colorDirect + colorIndirect;
 	return float4(pow(totalColor, 1.0f / 2.2f), 1);
 	

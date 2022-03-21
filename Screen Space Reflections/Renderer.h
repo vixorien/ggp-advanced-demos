@@ -94,6 +94,7 @@ public:
 	float GetSSREdgeFadeThreshold();
 	int GetSSRMaxMajorSteps();
 	int GetSSRMaxRefinementSteps();
+	bool GetSSRLinearDepth();
 	bool GetSSREnabled();
 	bool GetSSROutputOnly();
 
@@ -103,6 +104,7 @@ public:
 	void SetSSREdgeFadeThreshold(float threshold);
 	void SetSSRMaxMajorSteps(int steps);
 	void SetSSRMaxRefinementSteps(int steps);
+	void SetSSRLinearDepth(bool linearDepth);
 	void SetSSREnabled(bool enabled);
 	void SetSSROutputOnly(bool ssrOnly);
 
@@ -136,6 +138,7 @@ private:
 	float ssrEdgeFadeThreshold;
 	int ssrMaxMajorSteps;
 	int ssrMaxRefinementSteps;
+	bool ssrLinearDepth;
 	bool ssrEnabled;
 	bool ssrOutputOnly;
 

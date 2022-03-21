@@ -14,6 +14,7 @@ cbuffer externalData : register(b0)
 	float roughnessThreshold;
 	int maxMajorSteps;
 	int maxRefinementSteps;
+	int linearDepth;
 	float nearClip;
 	float farClip;
 };
@@ -71,9 +72,6 @@ float3 ApplyPBRToReflection(float roughness, float3 normal, float3 view, float3 
 	return reflectionColor * indSpecFresnel;
 }
 
-
-
-
 // Might need: https://www.comp.nus.edu.sg/~lowkl/publications/lowk_persp_interp_techrep.pdf
 float PerspectiveInterpolation(float depthStart, float depthEnd, float t)
 {
@@ -93,6 +91,13 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 	// The origin is just this UV and its depth
 	float3 originUVSpace = float3(thisUV, thisDepth);
 	float3 endUVSpace = UVandDepthFromViewSpacePosition(pixelPositionViewSpace + reflViewSpace * maxSearchDistance);
+
+	if (linearDepth)
+	{
+		originUVSpace.z = LinearDepth(originUVSpace.z, nearClip, farClip);
+		endUVSpace.z = LinearDepth(endUVSpace.z, nearClip, farClip);
+	}
+
 	float3 rayUVSpace = endUVSpace - originUVSpace;
 
 	// Prepare to loop
@@ -106,6 +111,12 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 
 		// Check depth here and compare
 		float sampleDepth = Depths.SampleLevel(ClampSampler, posUVSpace.xy, 0).r;
+
+		if (linearDepth)
+		{
+			sampleDepth = LinearDepth(sampleDepth, nearClip, farClip);
+		}
+
 		float depthDiff = posUVSpace.z - sampleDepth;
 		if (depthDiff > 0)
 		{
@@ -117,10 +128,18 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 				// Check mid-way between the last two spots
 				midPosUVSpace = lerp(lastFailedPos, posUVSpace, 0.5f);
 				sampleDepth = Depths.SampleLevel(ClampSampler, midPosUVSpace.xy, 0).r;
+
+				if (linearDepth)
+				{
+					sampleDepth = LinearDepth(sampleDepth, nearClip, farClip);
+				}
+
 				depthDiff = midPosUVSpace.z - sampleDepth;
 
 				// What's our relationship to the surface here?
-				if (depthDiff == 0) // Found the surface!
+				if (
+					(linearDepth && depthDiff >= 0 && depthDiff < depthThickness) || // Found the surface!
+					(!linearDepth && depthDiff == 0)) // Found the surface!
 				{
 					// Found it
 					validHit = true;
@@ -184,7 +203,7 @@ float FadeReflections(bool validHit, float3 hitPos, float3 reflViewSpace, float3
 	float3 hitPosViewSpace = ViewSpaceFromDepth(hitPos.xy, hitPos.z);
 	float distance = length(scenePosViewSpace - hitPosViewSpace);
 	float depthFade = 1.0f - smoothstep(0, depthThickness, distance);//1.0f - saturate(distance / depthThickness);
-	fade *= depthFade;
+	//fade *= depthFade;
 
 	// Fade as we approach max distance
 	float maxDistFade = 1.0f - smoothstep(0, maxSearchDistance, length(pixelPositionViewSpace - hitPosViewSpace));// length(pixelPositionViewSpace - hitPosViewSpace) / maxSearchDistance;
@@ -196,7 +215,7 @@ float FadeReflections(bool validHit, float3 hitPos, float3 reflViewSpace, float3
 	float2 topLeft = smoothstep(0, fadeThreshold, hitPos.xy); // Smooth fade between 0 coord and top/left fade edge
 	float2 bottomRight = (1 - smoothstep(1 - fadeThreshold, 1, hitPos.xy)); // Smooth fade between bottom/right fade edge and 1 coord
 	float2 screenEdgeFade = topLeft * bottomRight;
-	fade *= screenEdgeFade.x * screenEdgeFade.y;
+	//fade *= screenEdgeFade.x * screenEdgeFade.y;
 
 	// Return the final fade amount
 	return fade;
@@ -244,7 +263,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 colorAmbient = SceneAmbient.Sample(ClampSampler, hitPos.xy);
 	float isPBR = colorAmbient.a;
 
-	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient.rgb, colorIndirect.rgb, colorIndirect.a);
+	float3 indirectTotal = colorIndirect.rgb + DiffuseEnergyConserve(colorAmbient.rgb, specColorRough.rgb, colorIndirect.a);
 	float3 reflectedColor = colorDirect + indirectTotal;
 
 	// Handle tinting the reflection
@@ -252,6 +271,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	reflectedColor = isPBR ? ApplyPBRToReflection(specColorRough.a, normal, viewWorldSpace, specColorRough.rgb, reflectedColor) : reflectedColor;
 	
 	// Combine colors
-	float3 finalColor = reflectedColor * fade;
+	float3 finalColor = reflectedColor;// *fade;
 	return float4(finalColor, fade);
 }

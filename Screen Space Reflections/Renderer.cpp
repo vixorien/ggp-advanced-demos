@@ -36,16 +36,17 @@ using namespace DirectX;
 		depthBufferDSV(depthBufferDSV),
 		vsPerFrameConstantBuffer(0),
 		psPerFrameConstantBuffer(0),
-		pointLightsVisible(true),
+		pointLightsVisible(false),
 		ssaoSamples(64),
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
-		ssrMaxSearchDistance(5.0f),
+		ssrMaxSearchDistance(10.0f),
 		ssrDepthThickness(0.015f),
 		ssrRoughnessThreshold(1.0f),
 		ssrEdgeFadeThreshold(0.05f),
 		ssrMaxMajorSteps(64),
 		ssrMaxRefinementSteps(32),
+		ssrLinearDepth(true),
 		ssrOutputOnly(false),
 		ssrEnabled(true),
 		ambientNonPBR(0.1f, 0.1f, 0.25f)
@@ -270,6 +271,7 @@ void Renderer::Render(Camera* camera)
 		ssrPS->SetFloat("depthThickness", ssrDepthThickness);
 		ssrPS->SetFloat("roughnessThreshold", ssrRoughnessThreshold);
 		ssrPS->SetFloat("edgeFadeThreshold", ssrEdgeFadeThreshold);
+		ssrPS->SetInt("linearDepth", ssrLinearDepth);
 		ssrPS->SetInt("maxMajorSteps", ssrMaxMajorSteps);
 		ssrPS->SetInt("maxRefinementSteps", ssrMaxRefinementSteps);
 		ssrPS->SetFloat("nearClip", camera->GetNearClip());
@@ -481,6 +483,7 @@ float Renderer::GetSSRRoughnessThreshold() { return ssrRoughnessThreshold; }
 float Renderer::GetSSREdgeFadeThreshold() { return ssrEdgeFadeThreshold; }
 int Renderer::GetSSRMaxMajorSteps() { return ssrMaxMajorSteps; }
 int Renderer::GetSSRMaxRefinementSteps() { return ssrMaxRefinementSteps; }
+bool Renderer::GetSSRLinearDepth() { return ssrLinearDepth; }
 bool Renderer::GetSSREnabled() { return ssrEnabled; }
 bool Renderer::GetSSROutputOnly() { return ssrOutputOnly; }
 
@@ -490,6 +493,7 @@ void Renderer::SetSSRRoughnessThreshold(float threshold) { ssrRoughnessThreshold
 void Renderer::SetSSREdgeFadeThreshold(float threshold) { ssrEdgeFadeThreshold = threshold; }
 void Renderer::SetSSRMaxMajorSteps(int steps) { ssrMaxMajorSteps = steps; }
 void Renderer::SetSSRMaxRefinementSteps(int steps) { ssrMaxRefinementSteps = steps; }
+void Renderer::SetSSRLinearDepth(bool linearDepth) { ssrLinearDepth = linearDepth; }
 void Renderer::SetSSREnabled(bool enabled) { ssrEnabled = enabled; }
 void Renderer::SetSSROutputOnly(bool ssrOnly) { ssrOutputOnly = ssrOnly; if (ssrOnly) ssaoOutputOnly = false; }
 
