@@ -233,7 +233,7 @@ HRESULT DXCore::InitDirectX()
 			IID_PPV_ARGS(commandList.GetAddressOf()));
 	}
 
-	// Now that we have a device and a command list stuff,
+	// Now that we have a device and a command list,
 	// we can initialize the DX12 helper singleton, which will
 	// also create a fence for synchronization
 	{
