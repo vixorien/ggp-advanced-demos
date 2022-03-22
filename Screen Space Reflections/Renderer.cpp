@@ -40,7 +40,7 @@ using namespace DirectX;
 		ssaoSamples(64),
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
-		ssrMaxSearchDistance(10.0f),
+		ssrMaxSearchDistance(25.0f),
 		ssrDepthThickness(0.015f),
 		ssrRoughnessThreshold(1.0f),
 		ssrEdgeFadeThreshold(0.05f),

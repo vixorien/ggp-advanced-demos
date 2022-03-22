@@ -121,7 +121,7 @@ void Game::Init()
 
 	// Make our camera
 	camera = new Camera(
-		0, 0, -10,	// Position
+		0, 0, -20,	// Position
 		3.0f,		// Move speed
 		1.0f,		// Mouse look
 		this->width / (float)this->height); // Aspect ratio
@@ -538,10 +538,20 @@ void Game::LoadAssetsAndCreateEntities()
 	back->GetTransform()->MoveAbsolute(0, 0, 5);
 	back->GetTransform()->Scale(15, 10, 0.1f);
 
-	GameEntity* obj = new GameEntity(assets.GetMesh("Models\\cylinder.obj"), cobbleMat2xPBR);
-	entities.push_back(obj);
-	obj->GetTransform()->MoveAbsolute(-2, -4, 0);
-	obj->GetTransform()->Scale(2, 2, 2);
+	GameEntity* cyl = new GameEntity(assets.GetMesh("Models\\cylinder.obj"), cobbleMat2xPBR);
+	entities.push_back(cyl);
+	cyl->GetTransform()->MoveAbsolute(-3, -4, 0);
+	cyl->GetTransform()->Scale(2, 2, 2);
+
+	GameEntity* mover = new GameEntity(assets.GetMesh("Models\\sphere.obj"), bronzeMatPBR);
+	entities.push_back(mover);
+	mover->GetTransform()->MoveAbsolute(0, -5, 3);
+	mover->GetTransform()->Scale(2,2,2);
+
+	GameEntity* sphere = new GameEntity(assets.GetMesh("Models\\sphere.obj"), floorMatPBR);
+	entities.push_back(sphere);
+	sphere->GetTransform()->MoveAbsolute(10, -1, 0);
+	sphere->GetTransform()->Scale(5,5,5);
 
 
 	// Transform test =====================================
@@ -634,9 +644,10 @@ void Game::Update(float deltaTime, float totalTime)
 	camera->Update(deltaTime);
 
 	// Move an object
-	//entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
-	//float scale = 2.0f + sin(totalTime) / 2.0f;
-	//entities[0]->GetTransform()->SetScale(scale, scale, scale);
+	entities[2]->GetTransform()->Rotate(0, deltaTime, 0);
+	XMFLOAT3 pos = entities[3]->GetTransform()->GetPosition();
+	entities[3]->GetTransform()->SetPosition(sin(totalTime * 0.5f) * 4, pos.y, pos.z);
+
 
 	// Parent/unparent for testing
 	if (input.KeyPress('P')) entities[0]->GetTransform()->AddChild(entities[1]->GetTransform());

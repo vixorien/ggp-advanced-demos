@@ -78,15 +78,21 @@ float PerspectiveInterpolation(float depthStart, float depthEnd, float t)
 	return 1.0f / lerp(1.0f / depthStart, 1.0f / depthEnd, t);
 }
 
+bool OutsideScreen(float2 uv)
+{
+	return any(uv < 0) || any(uv > 1);
+}
+
 // Not needed currently
 static const float FLOAT32_MAX = 3.402823466e+38f;
 
 
-float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositionViewSpace, float3 reflViewSpace, float2 windowSize, out bool validHit, out float sceneDepthAtHit)
+float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositionViewSpace, float3 reflViewSpace, float2 windowSize, out bool validHit, out float sceneDepthAtHit, out float4 debug)
 {
 	// Assume no hit yet
 	validHit = false;
 	sceneDepthAtHit = 0.0f;
+	debug = float4(1,1,1,1);
 
 	// The origin is just this UV and its depth
 	float3 originUVSpace = float3(thisUV, thisDepth);
@@ -103,30 +109,40 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 	// Prepare to loop
 	float t = 0;
 	float3 lastFailedPos = originUVSpace;
-	for (int i = 0; i < maxMajorSteps; i++)
+	for (int i = 1; i <= maxMajorSteps; i++)
 	{
 		// Calculate how much to advance and adjust
 		t = (float)i / maxMajorSteps;
 		float3 posUVSpace = originUVSpace + rayUVSpace * t;
+		posUVSpace.z = PerspectiveInterpolation(originUVSpace.z, endUVSpace.z, t);
 
 		// Check depth here and compare
 		float sampleDepth = Depths.SampleLevel(ClampSampler, posUVSpace.xy, 0).r;
-
 		if (linearDepth)
 		{
 			sampleDepth = LinearDepth(sampleDepth, nearClip, farClip);
 		}
 
 		float depthDiff = posUVSpace.z - sampleDepth;
-		if (depthDiff > 0)
+		if (depthDiff >= 0 && depthDiff < depthThickness)
 		{
-			// Successful hit, but we may be too deep into the depth buffer,
+			// Hit, no need for refinement
+			validHit = true;
+			sceneDepthAtHit = sampleDepth;
+			debug.rgb = float3(t, 0, 0);
+			return posUVSpace;
+		}
+		else if (depthDiff > 0)
+		{
+			// Successful hit, but we're too deep into the depth buffer,
 			// so binary search our way back towards the surface
-			float3 midPosUVSpace = posUVSpace; // In case we never end loop
+			float3 midPosUVSpace = posUVSpace; // Set to something in case we never end loop
 			for (int r = 0; r < maxRefinementSteps; r++)
 			{
 				// Check mid-way between the last two spots
 				midPosUVSpace = lerp(lastFailedPos, posUVSpace, 0.5f);
+				midPosUVSpace.z = PerspectiveInterpolation(lastFailedPos.z, posUVSpace.z, 0.5f);
+
 				sampleDepth = Depths.SampleLevel(ClampSampler, midPosUVSpace.xy, 0).r;
 
 				if (linearDepth)
@@ -137,20 +153,19 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 				depthDiff = midPosUVSpace.z - sampleDepth;
 
 				// What's our relationship to the surface here?
-				if (
-					(linearDepth && depthDiff >= 0 && depthDiff < depthThickness) || // Found the surface!
-					(!linearDepth && depthDiff == 0)) // Found the surface!
+				if (depthDiff >= 0 && depthDiff < depthThickness)
 				{
 					// Found it
 					validHit = true;
 					sceneDepthAtHit = sampleDepth;
+					debug.rgb = float3(t, 0, 0);
 					return midPosUVSpace;
 				}
-				else if (depthDiff < 0) // We're in front
+				else if (depthDiff < 0) // We're in front of the surface
 				{
 					lastFailedPos = midPosUVSpace;
 				}
-				else // We're behind
+				else // We're behind the surface
 				{
 					posUVSpace = midPosUVSpace;
 				}
@@ -158,7 +173,8 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 
 			// The refinement failed, so we call it quits
 			validHit = false;
-			return midPosUVSpace;
+			debug.rgb = float3(0, 1, 0);
+			return originUVSpace;
 		}
 
 		// If we're here, we had a failed hit
@@ -167,6 +183,7 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 
 	// Nothing useful found
 	validHit = false;
+	debug.rgb = float3(0, 0, 1);
 	return originUVSpace;
 }
 
@@ -177,7 +194,7 @@ float FadeReflections(bool validHit, float3 hitPos, float3 reflViewSpace, float3
 	float fade = 1.0f;
 	
 	// Are we within the screen?
-	if (!validHit || any(hitPos.xy < 0) || any(hitPos.xy > 1))
+	if (!validHit || OutsideScreen(hitPos.xy))
 	{
 		fade = 0.0f;
 		// Should return here, but getting a warning if I do
@@ -185,29 +202,25 @@ float FadeReflections(bool validHit, float3 hitPos, float3 reflViewSpace, float3
 	}
 
 	// Check normal of hit to ensure we ignore backsides
-	float3 hitNormal = Normals.Sample(ClampSampler, hitPos.xy).xyz;
-	hitNormal = normalize(mul((float3x3)viewMatrix, hitNormal));
-	if (dot(hitNormal, reflViewSpace) > 0)
-	{
-		fade = 0.0f;
-		// Should return here, but getting a warning if I do
-		// Probably safe to ignore, but should look into it
-	}
+	//float3 hitNormal = Normals.Sample(ClampSampler, hitPos.xy).xyz;
+	//hitNormal = normalize(mul((float3x3)viewMatrix, hitNormal));
+	//if (dot(hitNormal, reflViewSpace) > 0)
+	//{
+	//	fade = 0.0f;
+	//	// Should return here, but getting a warning if I do
+	//	// Probably safe to ignore, but should look into it
+	//}
 	
 	// Fade as the ray comes back towards the camera
 	float backTowardsCamera = 1.0f - saturate(dot(reflViewSpace, -normalize(pixelPositionViewSpace)));
-	//fade *= backTowardsCamera;
+	fade *= backTowardsCamera;
 
 	// Fade as we get further from intersection point
-	float3 scenePosViewSpace = ViewSpaceFromDepth(hitPos.xy, sceneDepthAtHit);
-	float3 hitPosViewSpace = ViewSpaceFromDepth(hitPos.xy, hitPos.z);
-	float distance = length(scenePosViewSpace - hitPosViewSpace);
-	float depthFade = 1.0f - smoothstep(0, depthThickness, distance);//1.0f - saturate(distance / depthThickness);
+	//float3 scenePosViewSpace = ViewSpaceFromDepth(hitPos.xy, sceneDepthAtHit); // Broken if we're using linear depth!
+	//float3 hitPosViewSpace = ViewSpaceFromDepth(hitPos.xy, hitPos.z);
+	//float distance = length(scenePosViewSpace - hitPosViewSpace);
+	//float depthFade = 1.0f - smoothstep(0, depthThickness, distance);//1.0f - saturate(distance / depthThickness);
 	//fade *= depthFade;
-
-	// Fade as we approach max distance
-	float maxDistFade = 1.0f - smoothstep(0, maxSearchDistance, length(pixelPositionViewSpace - hitPosViewSpace));// length(pixelPositionViewSpace - hitPosViewSpace) / maxSearchDistance;
-	//fade *= maxDistFade;
 
 	// Fade on screen edges
 	float2 aspectRatio = float2(windowSize.y / windowSize.x, 1);
@@ -215,7 +228,7 @@ float FadeReflections(bool validHit, float3 hitPos, float3 reflViewSpace, float3
 	float2 topLeft = smoothstep(0, fadeThreshold, hitPos.xy); // Smooth fade between 0 coord and top/left fade edge
 	float2 bottomRight = (1 - smoothstep(1 - fadeThreshold, 1, hitPos.xy)); // Smooth fade between bottom/right fade edge and 1 coord
 	float2 screenEdgeFade = topLeft * bottomRight;
-	//fade *= screenEdgeFade.x * screenEdgeFade.y;
+	fade *= screenEdgeFade.x * screenEdgeFade.y;
 
 	// Return the final fade amount
 	return fade;
@@ -252,8 +265,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Run the reflection to get the UV coord (and depth) of the hit
 	bool validHit = false;
 	float sceneDepthAtHit = 0;
-	float3 hitPos = ScreenSpaceReflection(input.uv, pixelDepth, pixelPositionViewSpace, reflViewSpace, windowSize, validHit, sceneDepthAtHit);
-
+	float4 debug = float4(0,0,0,1);
+	float3 hitPos = ScreenSpaceReflection(input.uv, pixelDepth, pixelPositionViewSpace, reflViewSpace, windowSize, validHit, sceneDepthAtHit, debug);
+	//return debug;
+	
 	// Determine how much to fade (or completely cut) the reflections
 	float fade = FadeReflections(validHit, hitPos, reflViewSpace, pixelPositionViewSpace, sceneDepthAtHit, windowSize);
 
@@ -271,6 +286,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	reflectedColor = isPBR ? ApplyPBRToReflection(specColorRough.a, normal, viewWorldSpace, specColorRough.rgb, reflectedColor) : reflectedColor;
 	
 	// Combine colors
-	float3 finalColor = reflectedColor;// *fade;
+	float3 finalColor = reflectedColor;
 	return float4(finalColor, fade);
 }

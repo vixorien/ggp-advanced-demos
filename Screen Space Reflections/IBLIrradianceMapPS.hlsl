@@ -5,8 +5,6 @@
 cbuffer externalData : register(b0)
 {
 	int faceIndex;
-	float sampleStepPhi;
-	float sampleStepTheta;
 };
 
 
@@ -55,13 +53,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 
 	// Loop around the hemisphere (360 degrees)
-	for (float phi = 0.0f; phi < TWO_PI; phi += sampleStepPhi)
+	for (float phi = 0.0f; phi < TWO_PI; phi += IRRADIANCE_SAMPLE_STEP_PHI)
 	{
 		// Grab the sin and cos of phi
 		sincos(phi, sinP, cosP);
 
 		// Loop down the hemisphere (90 degrees)
-		for (float theta = 0.0f; theta < PI_OVER_2; theta += sampleStepTheta)
+		for (float theta = 0.0f; theta < PI_OVER_2; theta += IRRADIANCE_SAMPLE_STEP_THETA)
 		{
 			// Get the sin and cos of theta
 			sincos(theta, sinT, cosT);
