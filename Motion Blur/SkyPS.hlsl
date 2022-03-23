@@ -1,4 +1,13 @@
 
+// Data that only changes once per frame
+cbuffer perFrame : register(b0)
+{
+	// Motion blur data
+	int MotionBlurMax;
+	float2 ScreenSize;
+
+	float pad;
+};
 
 // Texture-related resources
 TextureCube skyTexture		: register(t0);
@@ -42,6 +51,14 @@ PS_Output main(VertexToPixel input)
 	float2 prevPos = input.screenPosPrev.xy / input.screenPosPrev.w;
 	float2 velocity = thisPos - prevPos;
 	velocity.y *= -1;
+
+	// Scale to pixels and clamp to max
+	velocity *= ScreenSize;
+	float magnitude = length(velocity);
+	if (magnitude > MotionBlurMax)
+	{
+		velocity = normalize(velocity) * MotionBlurMax;
+	}
 
 	// When we sample a TextureCube (like "skyTexture"), we need
 	// to provide a direction in 3D space (a float3) instead of a uv coord

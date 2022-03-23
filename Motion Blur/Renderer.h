@@ -16,6 +16,8 @@ enum RenderTargetType
 	SCENE_NORMALS,
 	SCENE_DEPTHS,
 	SCENE_VELOCITIES,
+	MOTION_BLUR_TILE_MAX,
+	MOTION_BLUR_NEIGHBORHOOD_MAX,
 	SSAO_RESULTS,
 	SSAO_BLUR,
 	FINAL_COMBINE,
@@ -41,6 +43,9 @@ struct PSPerFrameData
 	DirectX::XMFLOAT3 CameraPosition;
 	int TotalSpecIBLMipLevels;
 	DirectX::XMFLOAT3 AmbientNonPBR;
+	int MotionBlurMax;
+	DirectX::XMFLOAT2 ScreenSize;
+	float pad;
 };
 
 class Renderer
@@ -90,6 +95,8 @@ public:
 	void SetMotionBlurEnabled(bool enabled);
 	bool GetMotionBlurEnabled();
 
+	int GetMotionBlurMax();
+
 	void SetMotionBlurScale(float scale);
 	float GetMotionBlurScale();
 
@@ -120,6 +127,7 @@ private:
 	bool ssaoOutputOnly;
 
 	// Motion blur vars
+	int motionBlurMax;
 	bool motionBlurEnabled;
 	float motionBlurScale;
 	float motionBlurTargetFramerate;

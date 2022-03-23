@@ -774,6 +774,8 @@ void Game::CreateUI(float dt)
 			renderer->SetMotionBlurScale(scale);
 
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SCENE_VELOCITIES).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::MOTION_BLUR_TILE_MAX).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX).Get(), ImVec2(size.x, rtHeight));
 	}
 
 	if (ImGui::CollapsingHeader("All Render Targets"))

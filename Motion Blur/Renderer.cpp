@@ -42,6 +42,7 @@ Renderer::Renderer(
 	ssaoEnabled(true),
 	ambientNonPBR(0.1f, 0.1f, 0.25f),
 	motionBlurEnabled(true),
+	motionBlurMax(16),
 	motionBlurScale(5.0f),
 	motionBlurTargetFramerate(60.0f)
 {
@@ -140,6 +141,8 @@ void Renderer::Render(Camera* camera)
 		psPerFrameData.CameraPosition = camera->GetTransform()->GetPosition();
 		psPerFrameData.TotalSpecIBLMipLevels = sky->GetTotalSpecularIBLMipLevels();
 		psPerFrameData.AmbientNonPBR = ambientNonPBR;
+		psPerFrameData.MotionBlurMax = motionBlurMax;
+		psPerFrameData.ScreenSize = XMFLOAT2(windowWidth, windowHeight);
 		context->UpdateSubresource(psPerFrameConstantBuffer.Get(), 0, 0, &psPerFrameData, 0, 0);
 	}
 
@@ -229,6 +232,8 @@ void Renderer::Render(Camera* camera)
 		}
 	}
 
+	// Grab asset manager
+	Assets& assets = Assets::GetInstance();
 
 	// Draw the sky after all solid objects,
 	// but before transparent ones
@@ -238,13 +243,55 @@ void Renderer::Render(Camera* camera)
 	targets[3] = 0;
 	targets[4] = 0;
 	context->OMSetRenderTargets(numTargets, targets, depthBufferDSV.Get());
+	SimplePixelShader* skyPS = assets.GetPixelShader("SkyPS.cso");
+	skyPS->SetInt("MotionBlurMax", motionBlurMax);
+	skyPS->SetFloat2("ScreenSize", XMFLOAT2(windowWidth, windowHeight));
+	skyPS->CopyAllBufferData();
 	sky->Draw(camera, prevFrameView, prevFrameProj);
 
 
 	// Assets for following steps
-	Assets& assets = Assets::GetInstance();
 	SimpleVertexShader* vs = assets.GetVertexShader("FullscreenVS.cso");
 	vs->SetShader();
+
+	// Handle motion blur NxN tile downsample
+	{
+		// Set up downsample tile pass
+		targets[0] = renderTargetRTVs[RenderTargetType::MOTION_BLUR_TILE_MAX].Get();
+		targets[1] = 0;
+		targets[2] = 0;
+		targets[3] = 0;
+		targets[4] = 0;
+		context->OMSetRenderTargets(numTargets, targets, 0);
+
+		SimplePixelShader* tileMaxPS = assets.GetPixelShader("MotionBlurTileMaxPS.cso");
+		tileMaxPS->SetShader();
+
+		tileMaxPS->SetInt("motionBlurMax", motionBlurMax);
+		tileMaxPS->CopyAllBufferData();
+
+		tileMaxPS->SetShaderResourceView("Velocities", renderTargetSRVs[RenderTargetType::SCENE_VELOCITIES]);
+
+		context->Draw(3, 0);
+	}
+
+	// Motion blur 3x3 neighborhood maximum velocity
+	{
+		// Set up neighborhood pass
+		targets[0] = renderTargetRTVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX].Get();
+		targets[1] = 0;
+		targets[2] = 0;
+		targets[3] = 0;
+		targets[4] = 0;
+		context->OMSetRenderTargets(numTargets, targets, 0);
+
+		SimplePixelShader* neighborhoodPS = assets.GetPixelShader("MotionBlurNeighborhoodMaxPS.cso");
+		neighborhoodPS->SetShader();
+
+		neighborhoodPS->SetShaderResourceView("VelocityTileMax", renderTargetSRVs[RenderTargetType::MOTION_BLUR_TILE_MAX]);
+
+		context->Draw(3, 0);
+	}
 
 	// Render the SSAO results
 	{
@@ -322,11 +369,16 @@ void Renderer::Render(Camera* camera)
 		SimplePixelShader* ps = assets.GetPixelShader("MotionBlur.cso");
 		ps->SetShader();
 		ps->SetShaderResourceView("Pixels", renderTargetSRVs[RenderTargetType::FINAL_COMBINE]);
+		ps->SetShaderResourceView("Depths", renderTargetSRVs[RenderTargetType::SCENE_DEPTHS]);
 		ps->SetShaderResourceView("Velocities", renderTargetSRVs[RenderTargetType::SCENE_VELOCITIES]);
-		ps->SetFloat2("pixelSize", XMFLOAT2(1.0f / windowWidth, 1.0f / windowHeight));
+		ps->SetShaderResourceView("VelocityNeighborhoodMax", renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX]);
+		//ps->SetFloat2("pixelSize", XMFLOAT2(1.0f / windowWidth, 1.0f / windowHeight));
 		ps->SetInt("motionBlurEnabled", (int)motionBlurEnabled);
-		ps->SetFloat("motionBlurScale", motionBlurScale);
-		ps->SetFloat("frameRateFix", ImGui::GetIO().Framerate / motionBlurTargetFramerate);
+		ps->SetInt("motionBlurMax", motionBlurMax);
+		ps->SetInt("motionBlurSamples", 5);
+		ps->SetFloat2("screenSize", XMFLOAT2(windowWidth, windowHeight));
+		//ps->SetFloat("motionBlurScale", motionBlurScale);
+		//ps->SetFloat("frameRateFix", ImGui::GetIO().Framerate / motionBlurTargetFramerate);
 		ps->CopyAllBufferData();
 		context->Draw(3, 0);
 	}
@@ -383,6 +435,8 @@ void Renderer::PostResize(
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_NORMALS], renderTargetSRVs[RenderTargetType::SCENE_NORMALS]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_DEPTHS], renderTargetSRVs[RenderTargetType::SCENE_DEPTHS], DXGI_FORMAT_R32_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_VELOCITIES], renderTargetSRVs[RenderTargetType::SCENE_VELOCITIES], DXGI_FORMAT_R16G16_FLOAT);
+	CreateRenderTarget(windowWidth / motionBlurMax, windowHeight / motionBlurMax, renderTargetRTVs[RenderTargetType::MOTION_BLUR_TILE_MAX], renderTargetSRVs[RenderTargetType::MOTION_BLUR_TILE_MAX], DXGI_FORMAT_R16G16_FLOAT);
+	CreateRenderTarget(windowWidth / motionBlurMax, windowHeight / motionBlurMax, renderTargetRTVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX], renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX], DXGI_FORMAT_R16G16_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_RESULTS], renderTargetSRVs[RenderTargetType::SSAO_RESULTS]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_BLUR], renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FINAL_COMBINE], renderTargetSRVs[RenderTargetType::FINAL_COMBINE]);
@@ -408,6 +462,8 @@ bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 
 void Renderer::SetMotionBlurEnabled(bool enabled) { motionBlurEnabled = enabled; }
 bool Renderer::GetMotionBlurEnabled() { return motionBlurEnabled; }
+
+int Renderer::GetMotionBlurMax() { return motionBlurMax; }
 
 void Renderer::SetMotionBlurScale(float scale) { motionBlurScale = scale; }
 float Renderer::GetMotionBlurScale() { return motionBlurScale; }

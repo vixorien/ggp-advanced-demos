@@ -205,5 +205,11 @@
     <FxCompile Include="MotionBlur.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="MotionBlurTileMaxPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="MotionBlurNeighborhoodMaxPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

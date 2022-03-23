@@ -18,6 +18,15 @@ cbuffer perFrame : register(b0)
 
 	// The number of mip levels in the specular IBL map
 	int SpecIBLTotalMipLevels;
+
+	// Ambient color for the environment
+	float3 AmbientNonPBR;
+
+	// Motion blur data
+	int MotionBlurMax;
+	float2 ScreenSize;
+
+	float pad;
 };
 
 // Data that can change per material
@@ -131,6 +140,14 @@ PS_Output main(VertexToPixel input)
 	float2 prevPos = input.screenPosPrev.xy / input.screenPosPrev.w;
 	float2 velocity = thisPos - prevPos;
 	velocity.y *= -1;
+	
+	// Scale to pixels and clamp to max
+	velocity *= ScreenSize;
+	float magnitude = length(velocity);
+	if (magnitude > MotionBlurMax)
+	{
+		velocity = normalize(velocity) * MotionBlurMax;
+	}
 
 	// Multiple render target output
 	PS_Output output;

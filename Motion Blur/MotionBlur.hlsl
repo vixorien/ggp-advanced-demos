@@ -1,11 +1,15 @@
 
+// Based on: https://casual-effects.com/research/McGuire2012Blur/McGuire12Blur.pdf
+
 cbuffer externalData : register(b0)
 {
 	float2 pixelSize;
 	float motionBlurScale;
 	float frameRateFix;
 	int motionBlurEnabled;
-
+	int motionBlurMax;
+	int motionBlurSamples;
+	float2 screenSize;
 };
 
 struct VertexToPixel
@@ -16,41 +20,93 @@ struct VertexToPixel
 
 
 Texture2D Pixels				: register(t0);
-Texture2D Velocities			: register(t1);
+Texture2D Depths				: register(t1);
+Texture2D Velocities			: register(t2);
+Texture2D VelocityNeighborhoodMax : register(t3);
 SamplerState BasicSampler		: register(s0);
 SamplerState ClampSampler		: register(s1);
 
 
+// Determines if B is closer than A, with a falloff
+float SoftDepthCompare(float depthA, float depthB)
+{
+	const float SOFT_Z_EXTENT = 0.1f; // Test other values?
+	return saturate(1.0f - (depthA - depthB) / SOFT_Z_EXTENT);
+}
+
+
+float Cone(float2 X, float2 Y, float2 velocity)
+{
+	return saturate(1.0f - length(X - Y) / length(velocity));
+}
+
+float Cylinder(float2 X, float2 Y, float2 velocity)
+{
+	return saturate(1.0f - smoothstep(0.95f * length(velocity), 1.05f * length(velocity), length(X - Y)));
+}
+
 float4 main(VertexToPixel input) : SV_TARGET
 {
+	int2 pixelCenter = (int2)input.position.xy;
+
 	// Early out for no blur
 	if (!motionBlurEnabled)
 	{
-		return Pixels.Sample(ClampSampler, input.uv);
+		return Pixels.Load(int3(pixelCenter, 0));
 	}
 
-	// Gaussian weights and associated offsets (in pixels)
-	// Weight values from: http://dev.theomader.com/gaussian-kernel-calculator/
-	//  using a Sigma of 4 and 15 for the kernel size
-	#define NUM_SAMPLES 15
-	const float weights[NUM_SAMPLES] = { 0.023089, 0.034587, 0.048689, 0.064408, 0.080066, 0.093531, 0.102673, 0.105915, 0.102673, 0.093531, 0.080066, 0.064408, 0.048689, 0.034587, 0.023089 };
-	const float offsets[NUM_SAMPLES] = { -13.5f, -11.5f, -9.5f, -7.5f, -5.5f, -3.5f, -1.5f, 0, 1.5f, 3.5f, 5.5f, 7.5f, 9.5f, 11.5f, 13.5f};
+	// Sample initial data to determine if there is blur here
+	float3 colorCenter = Pixels.Load(int3(pixelCenter, 0)).rgb;
+	float2 velocityNeighborhood = VelocityNeighborhoodMax.Sample(ClampSampler, input.uv).rg;
+	if (length(velocityNeighborhood) <= 0.5f)
+		return float4(colorCenter, 1);
 
-	// Sample the velocity buffer to get the screen space blur direction
-	float2 velocity = Velocities.Sample(ClampSampler, input.uv).rg;
+	// Yes there is blur, so sample other textures
+	float depthCenter = Depths.Load(int3(pixelCenter, 0)).r;
+	float2 velocityCenter = Velocities.Load(int3(pixelCenter, 0)).rg;
+	
+	// Need weights and overall samples
+	float weight = 1.0f / length(velocityCenter);
+	float3 sum = colorCenter * weight;
 
-	// What is the offset of a single pixel in the desired direction in UV space
-	float2 uvOffset = velocity * pixelSize * motionBlurScale * frameRateFix;
+	// Step size for loop
+	float2 stepSizeUV = (velocityNeighborhood / screenSize) / motionBlurSamples;
 
-	// Loop through offsets and sample
-	float4 colorTotal = float4(0, 0, 0, 0);
-	for (int i = 0; i < NUM_SAMPLES; i++)
+	// Loop in both directions
+	[loop] // Force compiler to loop instead of unroll
+	for (int i = -motionBlurSamples; i <= motionBlurSamples; i++)
 	{
-		// The UV of the neighboring pixel we want to sample
-		float2 uv = input.uv + (uvOffset * offsets[i]);
-		colorTotal += Pixels.Sample(ClampSampler, uv) * weights[i];
+		// Skip center
+		if (i == 0) continue;
+
+		// Calculate UV here
+		float2 uvSample = input.uv + stepSizeUV * i;
+		int2 pixelSample = (int2)(uvSample * screenSize);
+
+		// Sample data here
+		float depthSample = Depths.Sample(ClampSampler, uvSample).r; // BORDER SAMPLER instead?
+		float3 colorSample = Pixels.Sample(ClampSampler, uvSample).rgb;
+		float2 velocitySample = Velocities.Sample(ClampSampler, uvSample).rg;
+
+		// Determine foreground/background ramp values
+		float fore = SoftDepthCompare(depthCenter, depthSample);
+		float back = SoftDepthCompare(depthSample, depthCenter);
+
+		// Weight this sample
+		float weightSample = 
+			// Case 1: Blurry sample in front
+			fore * Cone(pixelSample, pixelCenter, velocitySample) +
+		
+			// Case 2: Behind blurry center
+			back * Cone(pixelCenter, pixelSample, velocityCenter) +
+		
+			// Case 3: Blurry fore and background
+			Cylinder(pixelSample, pixelCenter, velocitySample) * Cylinder(pixelCenter, pixelSample, velocityCenter) * 2;
+
+		// Accumulate
+		weight += weightSample;
+		sum += weightSample * colorSample;
 	}
 
-	// Final color
-	return float4(colorTotal.rgb, 1);
+	return float4(sum / weight, 1);
 }
