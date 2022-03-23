@@ -61,12 +61,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 	if (length(velocityNeighborhood) <= 0.5f)
 		return float4(colorCenter, 1);
 
-	// Yes there is blur, so sample other textures
+	// Yes there is blur, so sample remaining textures
 	float depthCenter = Depths.Load(int3(pixelCenter, 0)).r;
 	float2 velocityCenter = Velocities.Load(int3(pixelCenter, 0)).rg;
-	
+	float velMag = length(velocityCenter);
+
 	// Need weights and overall samples
-	float weight = 1.0f / length(velocityCenter);
+	float weight = velMag == 0 ? 1.0f : 1.0f / length(velocityCenter);
 	float3 sum = colorCenter * weight;
 
 	// Step size for loop
@@ -89,8 +90,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 		float2 velocitySample = Velocities.Sample(ClampSampler, uvSample).rg;
 
 		// Determine foreground/background ramp values
-		float fore = SoftDepthCompare(depthCenter, depthSample);
-		float back = SoftDepthCompare(depthSample, depthCenter);
+		float fore = SoftDepthCompare(depthCenter, depthSample);  // NOTE: Wants linear depth!
+		float back = SoftDepthCompare(depthSample, depthCenter);  // NOTE: Wants linear depth!
 
 		// Weight this sample
 		float weightSample = 

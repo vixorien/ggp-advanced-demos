@@ -2,6 +2,12 @@
 // Data that only changes once per frame
 cbuffer perFrame : register(b0)
 {
+	// Matrices for projection in pixel shader
+	matrix view;
+	matrix projection;
+	matrix prevView;
+	matrix prevProjection;
+
 	// Motion blur data
 	int MotionBlurMax;
 	float2 ScreenSize;
@@ -33,6 +39,14 @@ struct PS_Output
 	float2 velocity		: SV_TARGET1;
 };
 
+matrix RemoveTranslation(matrix m)
+{
+	m._14 = 0;
+	m._24 = 0;
+	m._34 = 0;
+	return m;
+}
+
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
 // 
@@ -46,18 +60,32 @@ PS_Output main(VertexToPixel input)
 {
 	PS_Output output;
 
+	// Calculate current and previous projections
+
+	// Multiply the view (without translation) and the projection
+	matrix vp = mul(projection, RemoveTranslation(view));
+	float4 currentScreenPos = mul(vp, float4(input.sampleDir, 1.0f));
+
+	// Calculate prev frame's position
+	matrix prevVP = mul(prevProjection, RemoveTranslation(prevView));
+	float4 prevScreenPos = mul(prevVP, float4(input.sampleDir, 1.0f));
+
 	// Calculate velocity
-	float2 thisPos = input.screenPosCurrent.xy / input.screenPosCurrent.w;
-	float2 prevPos = input.screenPosPrev.xy / input.screenPosPrev.w;
+	float2 thisPos = currentScreenPos.xy / currentScreenPos.w;
+	float2 prevPos = prevScreenPos.xy / prevScreenPos.w;
 	float2 velocity = thisPos - prevPos;
 	velocity.y *= -1;
 
 	// Scale to pixels and clamp to max
-	velocity *= ScreenSize;
+	velocity *= ScreenSize / 2;
 	float magnitude = length(velocity);
 	if (magnitude > MotionBlurMax)
 	{
 		velocity = normalize(velocity) * MotionBlurMax;
+	}
+	else if (magnitude < 0.0001f)
+	{
+		velocity = float2(0, 0);
 	}
 
 	// When we sample a TextureCube (like "skyTexture"), we need

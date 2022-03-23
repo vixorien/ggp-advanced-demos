@@ -130,7 +130,7 @@ void Game::Init()
 	renderer = new Renderer(
 		entities,
 		lights,
-		MAX_LIGHTS / 2, // Half the maximum lights are active to start with
+		5,
 		sky,
 		width,
 		height,
@@ -765,13 +765,9 @@ void Game::CreateUI(float dt)
 		if (ImGui::Button(blur ? "Motion Blur Enabled" : "Motion Blur Disabled"))
 			renderer->SetMotionBlurEnabled(!blur);
 
-		float framerate = renderer->GetMotionBlurTargetFramerate();
-		if (ImGui::SliderFloat("Motion Blur Target Framerate", &framerate, 24.0f, 120.0f))
-			renderer->SetMotionBlurTargetFramerate(framerate);
-
-		float scale = renderer->GetMotionBlurScale();
-		if (ImGui::SliderFloat("Motion Blur Scale", &scale, 0.0f, 100.0f))
-			renderer->SetMotionBlurScale(scale);
+		int samples = renderer->GetMotionBlurSamples();
+		if (ImGui::SliderInt("Motion Blur Samples", &samples, 0, 32))
+			renderer->SetMotionBlurSamples(samples);
 
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SCENE_VELOCITIES).Get(), ImVec2(size.x, rtHeight));
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::MOTION_BLUR_TILE_MAX).Get(), ImVec2(size.x, rtHeight));

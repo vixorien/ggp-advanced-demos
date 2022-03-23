@@ -121,7 +121,7 @@ PS_Output main(VertexToPixel input)
 	velocity.y *= -1;
 
 	// Scale to pixels and clamp to max
-	velocity *= ScreenSize;
+	velocity *= ScreenSize / 2;
 	float magnitude = length(velocity);
 	if (magnitude > MotionBlurMax)
 	{

@@ -97,11 +97,8 @@ public:
 
 	int GetMotionBlurMax();
 
-	void SetMotionBlurScale(float scale);
-	float GetMotionBlurScale();
-
-	void SetMotionBlurTargetFramerate(float framerate);
-	float GetMotionBlurTargetFramerate();
+	void SetMotionBlurSamples(int samples);
+	int GetMotionBlurSamples();
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
@@ -128,9 +125,8 @@ private:
 
 	// Motion blur vars
 	int motionBlurMax;
+	int motionBlurSamples;
 	bool motionBlurEnabled;
-	float motionBlurScale;
-	float motionBlurTargetFramerate;
 	DirectX::XMFLOAT4X4 prevFrameView;
 	DirectX::XMFLOAT4X4 prevFrameProj;
 

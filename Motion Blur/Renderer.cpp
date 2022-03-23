@@ -42,9 +42,8 @@ Renderer::Renderer(
 	ssaoEnabled(true),
 	ambientNonPBR(0.1f, 0.1f, 0.25f),
 	motionBlurEnabled(true),
-	motionBlurMax(16),
-	motionBlurScale(5.0f),
-	motionBlurTargetFramerate(60.0f)
+	motionBlurMax(10),
+	motionBlurSamples(5)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -246,6 +245,10 @@ void Renderer::Render(Camera* camera)
 	SimplePixelShader* skyPS = assets.GetPixelShader("SkyPS.cso");
 	skyPS->SetInt("MotionBlurMax", motionBlurMax);
 	skyPS->SetFloat2("ScreenSize", XMFLOAT2(windowWidth, windowHeight));
+	skyPS->SetMatrix4x4("view", camera->GetView());
+	skyPS->SetMatrix4x4("projection", camera->GetProjection());
+	skyPS->SetMatrix4x4("prevView", prevFrameView);
+	skyPS->SetMatrix4x4("prevProjection", prevFrameProj);
 	skyPS->CopyAllBufferData();
 	sky->Draw(camera, prevFrameView, prevFrameProj);
 
@@ -372,13 +375,10 @@ void Renderer::Render(Camera* camera)
 		ps->SetShaderResourceView("Depths", renderTargetSRVs[RenderTargetType::SCENE_DEPTHS]);
 		ps->SetShaderResourceView("Velocities", renderTargetSRVs[RenderTargetType::SCENE_VELOCITIES]);
 		ps->SetShaderResourceView("VelocityNeighborhoodMax", renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX]);
-		//ps->SetFloat2("pixelSize", XMFLOAT2(1.0f / windowWidth, 1.0f / windowHeight));
 		ps->SetInt("motionBlurEnabled", (int)motionBlurEnabled);
 		ps->SetInt("motionBlurMax", motionBlurMax);
-		ps->SetInt("motionBlurSamples", 5);
+		ps->SetInt("motionBlurSamples", motionBlurSamples);
 		ps->SetFloat2("screenSize", XMFLOAT2(windowWidth, windowHeight));
-		//ps->SetFloat("motionBlurScale", motionBlurScale);
-		//ps->SetFloat("frameRateFix", ImGui::GetIO().Framerate / motionBlurTargetFramerate);
 		ps->CopyAllBufferData();
 		context->Draw(3, 0);
 	}
@@ -465,11 +465,9 @@ bool Renderer::GetMotionBlurEnabled() { return motionBlurEnabled; }
 
 int Renderer::GetMotionBlurMax() { return motionBlurMax; }
 
-void Renderer::SetMotionBlurScale(float scale) { motionBlurScale = scale; }
-float Renderer::GetMotionBlurScale() { return motionBlurScale; }
+void Renderer::SetMotionBlurSamples(int samples) { motionBlurSamples = samples; }
+int Renderer::GetMotionBlurSamples() { return motionBlurSamples; }
 
-void Renderer::SetMotionBlurTargetFramerate(float frameRate) { motionBlurTargetFramerate = frameRate; }
-float Renderer::GetMotionBlurTargetFramerate() { return motionBlurTargetFramerate; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 {
