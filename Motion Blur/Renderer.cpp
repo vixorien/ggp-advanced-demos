@@ -42,7 +42,7 @@ Renderer::Renderer(
 	ssaoEnabled(true),
 	ambientNonPBR(0.1f, 0.1f, 0.25f),
 	motionBlurEnabled(true),
-	motionBlurMax(10),
+	motionBlurMax(16),
 	motionBlurSamples(5)
 {
 	// Validate active light count
@@ -243,8 +243,8 @@ void Renderer::Render(Camera* camera)
 	targets[4] = 0;
 	context->OMSetRenderTargets(numTargets, targets, depthBufferDSV.Get());
 	SimplePixelShader* skyPS = assets.GetPixelShader("SkyPS.cso");
-	skyPS->SetInt("MotionBlurMax", motionBlurMax);
-	skyPS->SetFloat2("ScreenSize", XMFLOAT2(windowWidth, windowHeight));
+	skyPS->SetInt("motionBlurMax", motionBlurMax);
+	skyPS->SetFloat2("screenSize", XMFLOAT2(windowWidth, windowHeight));
 	skyPS->SetMatrix4x4("view", camera->GetView());
 	skyPS->SetMatrix4x4("projection", camera->GetProjection());
 	skyPS->SetMatrix4x4("prevView", prevFrameView);
@@ -375,6 +375,8 @@ void Renderer::Render(Camera* camera)
 		ps->SetShaderResourceView("Depths", renderTargetSRVs[RenderTargetType::SCENE_DEPTHS]);
 		ps->SetShaderResourceView("Velocities", renderTargetSRVs[RenderTargetType::SCENE_VELOCITIES]);
 		ps->SetShaderResourceView("VelocityNeighborhoodMax", renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX]);
+		ps->SetFloat("nearClip", 0.01f);
+		ps->SetFloat("farClip", 100.f);
 		ps->SetInt("motionBlurEnabled", (int)motionBlurEnabled);
 		ps->SetInt("motionBlurMax", motionBlurMax);
 		ps->SetInt("motionBlurSamples", motionBlurSamples);
@@ -395,7 +397,7 @@ void Renderer::Render(Camera* camera)
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	// Present and re-bind the RTV
-	swapChain->Present(0, 0);
+	swapChain->Present(1, 0);
 	context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 
 	// Unbind all SRVs at the end of the frame so they're not still bound for input
@@ -463,11 +465,24 @@ bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 void Renderer::SetMotionBlurEnabled(bool enabled) { motionBlurEnabled = enabled; }
 bool Renderer::GetMotionBlurEnabled() { return motionBlurEnabled; }
 
-int Renderer::GetMotionBlurMax() { return motionBlurMax; }
-
 void Renderer::SetMotionBlurSamples(int samples) { motionBlurSamples = samples; }
 int Renderer::GetMotionBlurSamples() { return motionBlurSamples; }
 
+int Renderer::GetMotionBlurMax() { return motionBlurMax; }
+void Renderer::SetMotionBlurMax(int max)
+{
+	motionBlurMax = max;
+
+	// Release the render targets and recreate them
+	renderTargetRTVs[RenderTargetType::MOTION_BLUR_TILE_MAX].Reset();
+	renderTargetRTVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX].Reset();
+	renderTargetSRVs[RenderTargetType::MOTION_BLUR_TILE_MAX].Reset();
+	renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX].Reset();
+
+	CreateRenderTarget(windowWidth / motionBlurMax, windowHeight / motionBlurMax, renderTargetRTVs[RenderTargetType::MOTION_BLUR_TILE_MAX], renderTargetSRVs[RenderTargetType::MOTION_BLUR_TILE_MAX], DXGI_FORMAT_R16G16_FLOAT);
+	CreateRenderTarget(windowWidth / motionBlurMax, windowHeight / motionBlurMax, renderTargetRTVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX], renderTargetSRVs[RenderTargetType::MOTION_BLUR_NEIGHBORHOOD_MAX], DXGI_FORMAT_R16G16_FLOAT);
+
+}
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)
 {

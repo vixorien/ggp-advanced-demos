@@ -3,9 +3,8 @@
 
 cbuffer externalData : register(b0)
 {
-	float2 pixelSize;
-	float motionBlurScale;
-	float frameRateFix;
+	float nearClip;
+	float farClip;
 	int motionBlurEnabled;
 	int motionBlurMax;
 	int motionBlurSamples;
@@ -25,15 +24,25 @@ Texture2D Velocities			: register(t2);
 Texture2D VelocityNeighborhoodMax : register(t3);
 SamplerState BasicSampler		: register(s0);
 SamplerState ClampSampler		: register(s1);
+SamplerState PointSampler		: register(s2);
 
+
+float LinearDepth(float d, float zNear, float zFar)
+{
+	return zNear * zFar / (zFar + d * (zNear - zFar));
+}
+
+float LinearDepth01(float d, float zNear, float zFar)
+{
+	return LinearDepth(d, zNear, zFar) / zFar;
+}
 
 // Determines if B is closer than A, with a falloff
 float SoftDepthCompare(float depthA, float depthB)
 {
-	const float SOFT_Z_EXTENT = 0.1f; // Test other values?
+	const float SOFT_Z_EXTENT = 10.0f; // Test other values?
 	return saturate(1.0f - (depthA - depthB) / SOFT_Z_EXTENT);
 }
-
 
 float Cone(float2 X, float2 Y, float2 velocity)
 {
@@ -42,7 +51,8 @@ float Cone(float2 X, float2 Y, float2 velocity)
 
 float Cylinder(float2 X, float2 Y, float2 velocity)
 {
-	return saturate(1.0f - smoothstep(0.95f * length(velocity), 1.05f * length(velocity), length(X - Y)));
+	float magnitude = length(velocity);
+	return saturate(1.0f - smoothstep(0.95f * magnitude, 1.05f * magnitude, length(X - Y)));
 }
 
 float4 main(VertexToPixel input) : SV_TARGET
@@ -54,25 +64,25 @@ float4 main(VertexToPixel input) : SV_TARGET
 	{
 		return Pixels.Load(int3(pixelCenter, 0));
 	}
-
+	
 	// Sample initial data to determine if there is blur here
 	float3 colorCenter = Pixels.Load(int3(pixelCenter, 0)).rgb;
-	float2 velocityNeighborhood = VelocityNeighborhoodMax.Sample(ClampSampler, input.uv).rg;
+	float2 velocityNeighborhood = VelocityNeighborhoodMax.Sample(PointSampler, input.uv).rg;
 	if (length(velocityNeighborhood) <= 0.5f)
 		return float4(colorCenter, 1);
 
 	// Yes there is blur, so sample remaining textures
-	float depthCenter = Depths.Load(int3(pixelCenter, 0)).r;
+	float depthCenter = LinearDepth01(Depths.Load(int3(pixelCenter, 0)).r, nearClip, farClip);
 	float2 velocityCenter = Velocities.Load(int3(pixelCenter, 0)).rg;
 	float velMag = length(velocityCenter);
 
 	// Need weights and overall samples
-	float weight = velMag == 0 ? 1.0f : 1.0f / length(velocityCenter);
+	float weight = velMag == 0 ? 1.0f : 1.0f / velMag;
 	float3 sum = colorCenter * weight;
 
 	// Step size for loop
 	float2 stepSizeUV = (velocityNeighborhood / screenSize) / motionBlurSamples;
-
+	
 	// Loop in both directions
 	[loop] // Force compiler to loop instead of unroll
 	for (int i = -motionBlurSamples; i <= motionBlurSamples; i++)
@@ -85,13 +95,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 		int2 pixelSample = (int2)(uvSample * screenSize);
 
 		// Sample data here
-		float depthSample = Depths.Sample(ClampSampler, uvSample).r; // BORDER SAMPLER instead?
-		float3 colorSample = Pixels.Sample(ClampSampler, uvSample).rgb;
-		float2 velocitySample = Velocities.Sample(ClampSampler, uvSample).rg;
+		float depthSample = LinearDepth01(Depths.Sample(PointSampler, uvSample).r, nearClip, farClip);
+		float3 colorSample = Pixels.Sample(PointSampler, uvSample).rgb;
+		float2 velocitySample = Velocities.Sample(PointSampler, uvSample).rg;
 
 		// Determine foreground/background ramp values
-		float fore = SoftDepthCompare(depthCenter, depthSample);  // NOTE: Wants linear depth!
-		float back = SoftDepthCompare(depthSample, depthCenter);  // NOTE: Wants linear depth!
+		float fore = SoftDepthCompare(depthCenter, depthSample);  // NOTE: Wants linear depth?
+		float back = SoftDepthCompare(depthSample, depthCenter);  // NOTE: Wants linear depth?
 
 		// Weight this sample
 		float weightSample = 

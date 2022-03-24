@@ -28,6 +28,15 @@ struct VertexToPixel
 	float4 screenPosPrev	: SCREEN_POS1;
 };
 
+// Modify the view matrix and remove the translation portion
+matrix RemoveTranslation(matrix m)
+{
+	m._14 = 0;
+	m._24 = 0;
+	m._34 = 0;
+	return m;
+}
+
 // --------------------------------------------------------
 // The entry point (main method) for our vertex shader
 // --------------------------------------------------------
@@ -36,23 +45,13 @@ VertexToPixel main(VertexShaderInput input)
 	// Set up output struct
 	VertexToPixel output;
 
-	// Modify the view matrix and remove the translation portion
-	matrix viewNoTranslation = view;
-	viewNoTranslation._14 = 0;
-	viewNoTranslation._24 = 0;
-	viewNoTranslation._34 = 0;
-
 	// Multiply the view (without translation) and the projection
-	matrix vp = mul(projection, viewNoTranslation);
+	matrix vp = mul(projection, RemoveTranslation(view));
 	output.position = mul(vp, float4(input.position, 1.0f));
 	output.screenPosCurrent = output.position;
 
 	// Calculate prev frame's position
-	matrix prevViewNoTranslation = prevView;
-	prevViewNoTranslation._14 = 0;
-	prevViewNoTranslation._24 = 0;
-	prevViewNoTranslation._34 = 0;
-	matrix prevWVP = mul(prevProjection, prevViewNoTranslation);
+	matrix prevWVP = mul(prevProjection, RemoveTranslation(prevView));
 	output.screenPosPrev = mul(prevWVP, float4(input.position, 1.0f));
 
 	// For the sky vertex to be ON the far clip plane

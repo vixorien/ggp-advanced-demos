@@ -184,6 +184,14 @@ void Game::LoadAssetsAndCreateEntities()
 	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 	device->CreateSamplerState(&sampDesc, clampSampler.GetAddressOf());
 
+	// Also create a point sampler
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.Filter = D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+	sampDesc.MaxAnisotropy = 0;
+	device->CreateSamplerState(&sampDesc, pointSampler.GetAddressOf());
+	context->PSSetSamplers(2, 1, pointSampler.GetAddressOf());
 
 	// Create the sky
 	sky = new Sky(
@@ -764,6 +772,10 @@ void Game::CreateUI(float dt)
 		bool blur = renderer->GetMotionBlurEnabled();
 		if (ImGui::Button(blur ? "Motion Blur Enabled" : "Motion Blur Disabled"))
 			renderer->SetMotionBlurEnabled(!blur);
+
+		int max = renderer->GetMotionBlurMax();
+		if (ImGui::SliderInt("Motion Blur Max Radius", &max, 2, 32))
+			renderer->SetMotionBlurMax(max);
 
 		int samples = renderer->GetMotionBlurSamples();
 		if (ImGui::SliderInt("Motion Blur Samples", &samples, 0, 32))

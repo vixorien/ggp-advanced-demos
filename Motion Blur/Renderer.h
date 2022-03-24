@@ -95,6 +95,7 @@ public:
 	void SetMotionBlurEnabled(bool enabled);
 	bool GetMotionBlurEnabled();
 
+	void SetMotionBlurMax(int max);
 	int GetMotionBlurMax();
 
 	void SetMotionBlurSamples(int samples);
