@@ -468,6 +468,9 @@ bool Renderer::GetMotionBlurEnabled() { return motionBlurEnabled; }
 void Renderer::SetMotionBlurSamples(int samples) { motionBlurSamples = samples; }
 int Renderer::GetMotionBlurSamples() { return motionBlurSamples; }
 
+void Renderer::SetPauseMotion(bool pause) { pauseMotion = pause; }
+bool Renderer::GetPauseMotion() { return pauseMotion; }
+
 int Renderer::GetMotionBlurMax() { return motionBlurMax; }
 void Renderer::SetMotionBlurMax(int max)
 {

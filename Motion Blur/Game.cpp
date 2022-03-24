@@ -594,48 +594,51 @@ void Game::Update(float deltaTime, float totalTime)
 	// Get the input instance once
 	Input& input = Input::GetInstance();
 
-	// Loop through all entity transforms and notify of new frame
-	for (auto& e : entities) e->GetTransform()->NewFrame();
 
 	// Update the camera
 	camera->Update(deltaTime);
 
-	// Move an object
-	entities[0]->GetTransform()->Rotate(0, deltaTime * 10, 0);
-	float scale = 2.0f + sin(totalTime) / 2.0f;
-	entities[0]->GetTransform()->SetScale(scale, scale, scale);
-
-	// Bob the rest up and down
-	float offset = 0.0f;
-	for (int i = 2; i < 7; i++)
+	if (!renderer->GetPauseMotion())
 	{
-		entities[i]->GetTransform()->SetPosition(entities[i]->GetTransform()->GetPosition().x, sin((totalTime + offset) * 10) * 3, 0);
-		offset += 0.1f;
+		// Loop through all entity transforms and notify of new frame
+		for (auto& e : entities) e->GetTransform()->NewFrame();
+
+		// Move an object
+		entities[0]->GetTransform()->Rotate(0, deltaTime * 10, 0);
+		float scale = 2.0f + sin(totalTime) / 2.0f;
+		entities[0]->GetTransform()->SetScale(scale, scale, scale);
+
+		// Bob the rest up and down
+		float offset = 0.0f;
+		for (int i = 2; i < 7; i++)
+		{
+			entities[i]->GetTransform()->SetPosition(entities[i]->GetTransform()->GetPosition().x, sin((totalTime + offset) * 10) * 3, 0);
+			offset += 0.1f;
+		}
+
+		// Spin real fast
+		entities[7]->GetTransform()->Rotate(0, deltaTime * 15, 0);
+
+		// Swing these side to side
+		for (int i = 8; i < 14; i++)
+		{
+			entities[i]->GetTransform()->SetPosition(
+				sin((totalTime + offset) * 10) * 5,
+				(4 - i) * 2,
+				0);
+			offset += 0.1f;
+		}
+
+		// Parent/unparent for testing
+		if (input.KeyPress('P')) entities[0]->GetTransform()->AddChild(entities[1]->GetTransform());
+		if (input.KeyPress('U')) entities[0]->GetTransform()->RemoveChild(entities[1]->GetTransform());
 	}
-
-	// Spin real fast
-	entities[7]->GetTransform()->Rotate(0, deltaTime * 15, 0);
-
-	// Swing these side to side
-	for (int i = 8; i < 14; i++)
-	{
-		entities[i]->GetTransform()->SetPosition(
-			sin((totalTime + offset) * 10) * 5,
-			(4 - i) * 2,
-			0);
-		offset += 0.1f;
-	}
-
-	// Parent/unparent for testing
-	if (input.KeyPress('P')) entities[0]->GetTransform()->AddChild(entities[1]->GetTransform());
-	if (input.KeyPress('U')) entities[0]->GetTransform()->RemoveChild(entities[1]->GetTransform());
 
 	// Create the UI during update!
 	CreateUI(deltaTime);
 
-	// Check various keys
+	// Check for quit
 	if (input.KeyDown(VK_ESCAPE)) Quit();
-	if (input.KeyPress(VK_TAB)) GenerateLights();
 }
 
 
@@ -768,6 +771,12 @@ void Game::CreateUI(float dt)
 	{
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
+
+		bool pause = renderer->GetPauseMotion();
+		if (ImGui::Button(pause ? "Motion Paused" : "Pause Motion"))
+			renderer->SetPauseMotion(!pause);
+
+		ImGui::SameLine();
 
 		bool blur = renderer->GetMotionBlurEnabled();
 		if (ImGui::Button(blur ? "Motion Blur Enabled" : "Motion Blur Disabled"))

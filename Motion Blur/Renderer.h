@@ -101,6 +101,9 @@ public:
 	void SetMotionBlurSamples(int samples);
 	int GetMotionBlurSamples();
 
+	void SetPauseMotion(bool pause);
+	bool GetPauseMotion();
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
 
 private:
@@ -125,6 +128,7 @@ private:
 	bool ssaoOutputOnly;
 
 	// Motion blur vars
+	bool pauseMotion;
 	int motionBlurMax;
 	int motionBlurSamples;
 	bool motionBlurEnabled;
