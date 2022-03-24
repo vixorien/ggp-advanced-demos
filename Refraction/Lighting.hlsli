@@ -6,6 +6,10 @@ static const float PI = 3.14159265359f;
 static const float TWO_PI = PI * 2.0f;
 static const float PI_OVER_2 = PI / 2.0f;
 
+#define MAX_IBL_SAMPLES					1024	// 4096 // Or fewer as necessary for performance
+#define IRRADIANCE_SAMPLE_STEP_PHI		0.25f	// 0.025f // Or larger for performance
+#define IRRADIANCE_SAMPLE_STEP_THETA	0.25f	// 0.025f // Or larger for performance
+
 #define LIGHT_TYPE_DIRECTIONAL	0
 #define LIGHT_TYPE_POINT		1
 #define LIGHT_TYPE_SPOT			2
@@ -61,22 +65,6 @@ float Attenuate(Light light, float3 worldPos)
 
 	// Soft falloff
 	return att * att;
-}
-
-// Create world space position from a depth, uv and inverse matrices
-float3 WorldSpaceFromDepth(float depth, float2 uv, matrix invViewMatrix, matrix invProjMatrix)
-{
-	// Back to NDCs
-	uv = uv * 2.0f - 1.0f;
-	uv.y *= -1.0f; // Flip y due to UV <--> NDC 
-	float4 screenPos = float4(uv, depth, 1.0f);
-
-	// Back to view space first
-	float4 viewPos = mul(invProjMatrix, screenPos);
-	viewPos /= viewPos.w;
-
-	// Back to world space
-	return mul(invViewMatrix, viewPos).xyz;
 }
 
 

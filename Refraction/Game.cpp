@@ -753,11 +753,14 @@ void Game::CreateUI(float dt)
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
 
-		bool refrNormals = renderer->GetRefractionFromNormalMap();
-		if (ImGui::Button(refrNormals ? "Refraction from Normal Map" : "Refraction from IoR"))
-			renderer->SetRefractionFromNormalMap(!refrNormals);
+		bool refr = renderer->GetUseRefraction();
+		if (ImGui::Button(refr ? "Refraction Enabled" : "Refraction Disabled"))
+			renderer->SetUseRefraction(!refr);
 
-		ImGui::SameLine();
+		bool refrNormals = renderer->GetRefractionFromNormalMapOnly();
+		if (ImGui::Button(refrNormals ? "Refraction from Normal Map Only" : "Refraction from Final Surface Normal"))
+			renderer->SetRefractionFromNormalMapOnly(!refrNormals);
+
 		bool silh = renderer->GetUseRefractionSilhouette();
 		if (ImGui::Button(silh ? "Refraction Silhouette Enabled" : "Refraction Silhouette Disabled"))
 			renderer->SetUseRefractionSilhouette(!silh);
@@ -765,15 +768,6 @@ void Game::CreateUI(float dt)
 		float refrScale = renderer->GetRefractionScale();
 		if (ImGui::SliderFloat("Refraction Scale", &refrScale, -1.0f, 1.0f))
 			renderer->SetRefractionScale(refrScale);
-
-		if (!refrNormals)
-		{
-			float ior = renderer->GetIndexOfRefraction();
-			if (ImGui::SliderFloat("Index of Refraction", &ior, 0.0f, 2.0f))
-				renderer->SetIndexOfRefraction(ior);
-		}
-
-
 	}
 
 

@@ -85,14 +85,14 @@ public:
 	void SetSSAOOutputOnly(bool ssaoOnly);
 	bool GetSSAOOutputOnly();
 
+	bool GetUseRefraction();
 	bool GetUseRefractionSilhouette();
-	bool GetRefractionFromNormalMap();
-	float GetIndexOfRefraction();
+	bool GetRefractionFromNormalMapOnly();
 	float GetRefractionScale();
 
+	void SetUseRefraction(bool refract);
 	void SetUseRefractionSilhouette(bool silhouette);
-	void SetRefractionFromNormalMap(bool fromNormals);
-	void SetIndexOfRefraction(float index);
+	void SetRefractionFromNormalMapOnly(bool fromNormals);
 	void SetRefractionScale(float scale);
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRenderTargetSRV(RenderTargetType type);
@@ -120,9 +120,9 @@ private:
 
 	// Refraction related
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> refractionSilhouetteDepthState;
+	bool useRefraction;
 	bool useRefractionSilhouette;
 	bool refractionFromNormalMap;
-	float indexOfRefraction;
 	float refractionScale;
 
 	// Overall ambient for non-pbr shaders

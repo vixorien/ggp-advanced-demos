@@ -42,9 +42,9 @@ Renderer::Renderer(
 	ssaoEnabled(true),
 	ambientNonPBR(0.1f, 0.1f, 0.25f),
 	refractionScale(0.1f),
+	useRefraction(true),
 	useRefractionSilhouette(false),
-	refractionFromNormalMap(true),
-	indexOfRefraction(0.5f)
+	refractionFromNormalMap(true)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -401,9 +401,9 @@ void Renderer::Render(Camera* camera)
 				refractionPS->SetFloat2("screenSize", XMFLOAT2((float)windowWidth, (float)windowHeight));
 				refractionPS->SetMatrix4x4("viewMatrix", camera->GetView());
 				refractionPS->SetMatrix4x4("projMatrix", camera->GetProjection());
+				refractionPS->SetInt("useRefraction", useRefraction);
 				refractionPS->SetInt("useRefractionSilhouette", useRefractionSilhouette);
 				refractionPS->SetInt("refractionFromNormalMap", refractionFromNormalMap);
-				refractionPS->SetFloat("indexOfRefraction", indexOfRefraction);
 				refractionPS->SetFloat("refractionScale", refractionScale);
 				refractionPS->CopyBufferData("perObject");
 
@@ -499,14 +499,14 @@ int Renderer::GetSSAOSamples() { return ssaoSamples; }
 void Renderer::SetSSAOOutputOnly(bool ssaoOnly) { ssaoOutputOnly = ssaoOnly; }
 bool Renderer::GetSSAOOutputOnly() { return ssaoOutputOnly; }
 
+bool Renderer::GetUseRefraction() { return useRefraction; }
 bool Renderer::GetUseRefractionSilhouette() { return useRefractionSilhouette; }
-bool Renderer::GetRefractionFromNormalMap() { return refractionFromNormalMap; }
-float Renderer::GetIndexOfRefraction() { return indexOfRefraction; }
+bool Renderer::GetRefractionFromNormalMapOnly() { return refractionFromNormalMap; }
 float Renderer::GetRefractionScale() { return refractionScale; }
 
+void Renderer::SetUseRefraction(bool refract) { useRefraction = refract; }
 void Renderer::SetUseRefractionSilhouette(bool silhouette) { useRefractionSilhouette = silhouette; }
-void Renderer::SetRefractionFromNormalMap(bool fromNormals) { refractionFromNormalMap = fromNormals; }
-void Renderer::SetIndexOfRefraction(float index) { indexOfRefraction = index; }
+void Renderer::SetRefractionFromNormalMapOnly(bool fromNormals) { refractionFromNormalMap = fromNormals; }
 void Renderer::SetRefractionScale(float scale) { refractionScale = scale; }
 
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::GetRenderTargetSRV(RenderTargetType type)

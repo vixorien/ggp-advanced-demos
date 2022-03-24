@@ -1,7 +1,6 @@
 
 #include "Lighting.hlsli"
 
-#define MAX_SAMPLES 4096
 
 // External data
 cbuffer data : register(b0)
@@ -41,10 +40,10 @@ float3 ConvolveTextureCube(float roughness, float3 R)
 	// Sample the texture cube MANY times
 	//  - 4096 would be an ideal number of samples 
 	//  - Fewer is faster, but looks worse overall
-	for (uint i = 0; i < MAX_SAMPLES; i++)
+	for (uint i = 0; i < MAX_IBL_SAMPLES; i++)
 	{
 		// Grab this sample
-		float2 Xi = Hammersley2d(i, MAX_SAMPLES);
+		float2 Xi = Hammersley2d(i, MAX_IBL_SAMPLES);
 		float3 H = ImportanceSampleGGX(Xi, roughness, N);
 		float3 L = 2 * dot(V, H) * H - V;
 

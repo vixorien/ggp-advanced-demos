@@ -35,9 +35,9 @@ cbuffer perObject : register(b2)
 	matrix viewMatrix;
 	matrix projMatrix;
 	float2 screenSize;
+	int useRefraction;
 	int useRefractionSilhouette;
 	int refractionFromNormalMap;
-	float indexOfRefraction;
 	float refractionScale;
 };
 
@@ -87,10 +87,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	input.normal = normalize(input.normal);
 	input.tangent = normalize(input.tangent);
 	input.normal = NormalMapping(NormalTexture, BasicSampler, input.uv, input.normal, input.tangent);
-	
-	// Calculate requisite reflection vectors
-	float3 viewToCam = normalize(CameraPosition - input.worldPos);
-	float3 viewRefl = normalize(reflect(-viewToCam, input.normal));
 
 	// The actual screen UV and refraction offset UV
 	float2 screenUV = input.screenPosition.xy / screenSize;
@@ -99,22 +95,24 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Which kind of refraction?
 	if (refractionFromNormalMap)
 	{
+		// Use the normal map itself
 		offsetUV = NormalTexture.Sample(BasicSampler, input.uv).xy * 2 - 1;
-		offsetUV.y *= -1; // UV's are upside down compared to world space
 	}
 	else
 	{
+		// Convert the world space normal to view space
+		float3 normalViewSpace = mul((float3x3)viewMatrix, input.normal);
 
-		// Calculate the refraction amount in WORLD SPACE
-		float3 refrDir = refract(viewToCam, input.normal, indexOfRefraction);
-
-		// Get the refraction XY direction in VIEW SPACE (relative to the camera)
-		// We use this as a UV offset when sampling the texture
-		offsetUV = mul(viewMatrix, float4(refrDir, 0.0f)).xy;
-		offsetUV.x *= -1.0f; // Flip the X to point away from the edge (Y already does this due to view space <-> texture space diff)
+		// Use overall surface normal (with normal mapping applied)
+		offsetUV = normalViewSpace.xy;
 	}
 
-	float2 refractedUV = screenUV + offsetUV * refractionScale;
+	// Flip the offset's V upside down due to world <--> texture space difference
+	offsetUV.y *= -1;
+
+	// Final refracted UV (where to pull the pixel color)
+	// If not using refraction at all, just use the screen UV itself
+	float2 refractedUV = useRefraction ? screenUV + offsetUV * refractionScale : screenUV;
 
 	// Get the depth at the offset and verify its valid
 	float silhouette = RefractionSilhouette.Sample(ClampSampler, refractedUV).r;
@@ -128,6 +126,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 sceneColor = pow(ScreenPixels.Sample(ClampSampler, refractedUV).rgb, 2.2f); // Un-gamma correct
 
 	// Get reflections
+	float3 viewToCam = normalize(CameraPosition - input.worldPos);
+	float3 viewRefl = normalize(reflect(-viewToCam, input.normal));
 	float3 envSample = EnvironmentMap.Sample(BasicSampler, viewRefl).rgb;
 
 	// Determine the reflectivity based on viewing angle
