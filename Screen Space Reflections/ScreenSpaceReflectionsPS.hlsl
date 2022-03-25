@@ -123,8 +123,17 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 			sampleDepth = LinearDepth(sampleDepth, nearClip, farClip);
 		}
 
+		float minDepthHit = 0.01f;
+
 		float depthDiff = posUVSpace.z - sampleDepth;
-		if (depthDiff >= 0 && depthDiff < depthThickness)
+		if (depthDiff > depthThickness)
+		{
+			// No hit, too far
+			validHit = false;
+			debug.rgb = float3(0, 1, 1);
+			return originUVSpace;
+		}
+		else if (depthDiff >= 0 && depthDiff <= minDepthHit)
 		{
 			// Hit, no need for refinement
 			validHit = true;
@@ -132,7 +141,7 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 			debug.rgb = float3(t, 0, 0);
 			return posUVSpace;
 		}
-		else if (depthDiff > 0)
+		else if (depthDiff > minDepthHit)
 		{
 			// Successful hit, but we're too deep into the depth buffer,
 			// so binary search our way back towards the surface
@@ -153,7 +162,7 @@ float3 ScreenSpaceReflection(float2 thisUV, float thisDepth, float3 pixelPositio
 				depthDiff = midPosUVSpace.z - sampleDepth;
 
 				// What's our relationship to the surface here?
-				if (depthDiff >= 0 && depthDiff < depthThickness)
+				if (depthDiff >= 0 && depthDiff <= minDepthHit)
 				{
 					// Found it
 					validHit = true;

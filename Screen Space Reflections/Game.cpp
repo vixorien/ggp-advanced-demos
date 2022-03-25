@@ -821,20 +821,20 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderFloat("SSR Roughness Threshold", &rough, 0.0f, 1.0f))
 			renderer->SetSSRRoughnessThreshold(rough);
 
-		float thick = renderer->GetSSRDepthThickness();
-		if (ImGui::SliderFloat("SSR Depth Buffer Thickness (UNUSED)", &thick, 0.0f, 0.05f, "%.5f"))
-			renderer->SetSSRDepthThickness(thick);
-
 		float edge = renderer->GetSSREdgeFadeThreshold();
 		if (ImGui::SliderFloat("SSR Screen Edge Fade Threshold", &edge, 0.0f, 0.2f))
 			renderer->SetSSREdgeFadeThreshold(edge);
+
+		float thick = renderer->GetSSRDepthThickness();
+		if (ImGui::SliderFloat("SSR Depth Buffer Thickness", &thick, 0.0f, 5.0f, "%.5f"))
+			renderer->SetSSRDepthThickness(thick);
 
 		int major = renderer->GetSSRMaxMajorSteps();
 		if (ImGui::SliderInt("SSR Max Major Search Steps", &major, 0, 256))
 			renderer->SetSSRMaxMajorSteps(major);
 
 		int refine = renderer->GetSSRMaxRefinementSteps();
-		if (ImGui::SliderInt("SSR Max Refinement Steps", &refine, 0, 256))
+		if (ImGui::SliderInt("SSR Max Refinement Steps", &refine, 0, 32))
 			renderer->SetSSRMaxRefinementSteps(refine);
 
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSR_COLORS).Get(), ImVec2(size.x, rtHeight));
