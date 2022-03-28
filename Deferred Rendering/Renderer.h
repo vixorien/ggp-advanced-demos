@@ -20,7 +20,7 @@ enum RenderTargetType
 	GBUFFER_ALBEDO,
 	GBUFFER_NORMALS,
 	GBUFFER_DEPTH,
-	GBUFFER_ROUGH_METAL,
+	GBUFFER_METAL_ROUGH,
 	FORWARD_SCENE_NO_AMBIENT,
 	FORWARD_AMBIENT,
 	LIGHT_BUFFER,
@@ -47,6 +47,12 @@ struct PSPerFrameData
 	int TotalSpecIBLMipLevels;
 	DirectX::XMFLOAT3 AmbientNonPBR;
 	float IBLIntensity;
+};
+
+struct PSPerFrameDeferredData
+{
+	DirectX::XMFLOAT3 CameraPosition;
+	float pad;
 };
 
 class Renderer
@@ -115,8 +121,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetRTVs[RenderTargetType::RENDER_TARGET_TYPE_COUNT];
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> renderTargetSRVs[RenderTargetType::RENDER_TARGET_TYPE_COUNT];
 
-	// Current render path (and deferred requirements)
+	// Current render path (and other deferred requirements)
 	RenderPath renderPath;
+	Microsoft::WRL::ComPtr<ID3D11BlendState> deferredAdditiveBlendState;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> deferredCullFrontRasterState;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> deferredPointLightDepthState;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> deferredDirectionalLightDepthState;
 
 	// SSAO variables
 	DirectX::XMFLOAT4 ssaoOffsets[64];
@@ -141,13 +151,16 @@ private:
 
 	// Per-frame constant buffers and data
 	Microsoft::WRL::ComPtr<ID3D11Buffer> psPerFrameConstantBuffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> psPerFrameDeferredConstantBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> vsPerFrameConstantBuffer;
 	PSPerFrameData psPerFrameData;
+	PSPerFrameDeferredData psPerFrameDeferredData;
 	VSPerFrameData vsPerFrameData;
 
 	// Render helpers
 	void RenderSceneForward(Camera* camera);
 	void RenderSceneDeferred(Camera* camera);
+	void RenderLightsDeferred(Camera* camera);
 
 	// Note: Potentially replace this with an instanced "debug drawing" set of methods?
 	void DrawPointLights(Camera* camera);

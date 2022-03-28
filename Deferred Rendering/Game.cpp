@@ -586,6 +586,11 @@ void Game::CreateUI(float dt)
 	if (ImGui::CollapsingHeader("Lighting"))
 	{
 		ImGui::Indent(10.0f);
+
+		// Size for images
+		ImVec2 size = ImGui::GetItemRectSize();
+		float rtHeight = size.x * ((float)height / width);
+
 		// IBL Intensity
 		{
 			float intensity = renderer->GetIBLIntensity();
@@ -613,8 +618,7 @@ void Game::CreateUI(float dt)
 		}
 		ImGui::Spacing();
 
-		// Deferred options
-		ImGui::Text("Render Path:"); ImGui::SameLine();
+		// Deferred options ---------------
 		RenderPath path = renderer->GetRenderPath();
 		if (ImGui::Button(path == RenderPath::RENDER_PATH_FORWARD ? "Forward Rendering" : "Deferred Rendering"))
 			renderer->SetRenderPath(path == RenderPath::RENDER_PATH_FORWARD ? RenderPath::RENDER_PATH_DEFERRED : RenderPath::RENDER_PATH_FORWARD);
@@ -622,6 +626,11 @@ void Game::CreateUI(float dt)
 		if (renderer->GetRenderPath() == RenderPath::RENDER_PATH_DEFERRED)
 		{
 			// Show GBUFFER and other debug options
+			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_ALBEDO).Get(), ImVec2(size.x, rtHeight), "GBuffer Albedo");
+			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_NORMALS).Get(), ImVec2(size.x, rtHeight), "GBuffer Normals");
+			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_DEPTH).Get(), ImVec2(size.x, rtHeight), "GBuffer Depth");
+			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_METAL_ROUGH).Get(), ImVec2(size.x, rtHeight), "GBuffer Metal & Roughness");
+			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::LIGHT_BUFFER).Get(), ImVec2(size.x, rtHeight), "Light Buffer");
 		}
 
 		ImGui::Indent(-10.0f);
@@ -828,6 +837,11 @@ void Game::UILight(Light& light, int index)
 
 void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
 {
+	ImageWithHover(user_texture_id, size, "");
+}
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size, const char* name)
+{
 	// Draw the image
 	ImGui::Image(user_texture_id, size);
 	
@@ -858,6 +872,8 @@ void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
 
 		// Draw a floating box with a zoomed view of the image
 		ImGui::BeginTooltip();
+		if (strlen(name) > 0) 
+			ImGui::Text(name);
 		ImGui::Image(user_texture_id, ImVec2(256,256), uvTL, uvBR);
 		ImGui::EndTooltip();
 	}

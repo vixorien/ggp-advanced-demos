@@ -36,7 +36,7 @@ using namespace DirectX;
 		depthBufferDSV(depthBufferDSV),
 		vsPerFrameConstantBuffer(0),
 		psPerFrameConstantBuffer(0),
-		pointLightsVisible(true),
+		pointLightsVisible(false),
 		ssaoSamples(64),
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
@@ -55,6 +55,7 @@ using namespace DirectX;
 	//       And that they're all called "perFrame"
 	Assets& assets = Assets::GetInstance();
 	SimplePixelShader* ps = assets.GetPixelShader("PixelShaderPBR.cso");
+	SimplePixelShader* psDeferred = assets.GetPixelShader("GBufferRenderPS.cso");
 	SimpleVertexShader* vs = assets.GetVertexShader("VertexShader.cso");
 
 	// Struct to hold the descriptions from existing buffers
@@ -65,6 +66,11 @@ using namespace DirectX;
 	scb = ps->GetBufferInfo("perFrame");
 	scb->ConstantBuffer.Get()->GetDesc(&bufferDesc);
 	device->CreateBuffer(&bufferDesc, 0, psPerFrameConstantBuffer.GetAddressOf());
+
+	// Same for deferred
+	scb = psDeferred->GetBufferInfo("perFrame");
+	scb->ConstantBuffer.Get()->GetDesc(&bufferDesc);
+	device->CreateBuffer(&bufferDesc, 0, psPerFrameDeferredConstantBuffer.GetAddressOf());
 
 	// Make a new buffer that matches the existing PS per-frame buffer
 	scb = vs->GetBufferInfo("perFrame");
@@ -95,6 +101,49 @@ using namespace DirectX;
 		XMStoreFloat4(&ssaoOffsets[i], v * scaleVector);
 		
 	}
+
+	// Set up states for deferred rendering
+
+	// Additive blending state for acculumating deferred lights
+	{
+		D3D11_BLEND_DESC blendDesc = {};
+		blendDesc.AlphaToCoverageEnable = false;
+		blendDesc.IndependentBlendEnable = false;
+		blendDesc.RenderTarget[0].BlendEnable = true;
+		blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+		blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+		blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+		blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		device->CreateBlendState(&blendDesc, deferredAdditiveBlendState.GetAddressOf());
+	}
+
+	// Inside out rasterizer state
+	{
+		D3D11_RASTERIZER_DESC rDesc = {};
+		rDesc.DepthClipEnable = true;
+		rDesc.CullMode = D3D11_CULL_FRONT;
+		rDesc.FillMode = D3D11_FILL_SOLID;
+		device->CreateRasterizerState(&rDesc, deferredCullFrontRasterState.GetAddressOf());
+	}
+
+	// Depth states for deferred lights
+	{
+		D3D11_DEPTH_STENCIL_DESC dsDesc = {};
+
+		dsDesc.DepthEnable = true;
+		dsDesc.DepthFunc = D3D11_COMPARISON_GREATER;
+		dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		device->CreateDepthStencilState(&dsDesc, deferredDirectionalLightDepthState.GetAddressOf());
+
+		dsDesc.DepthEnable = true;
+		dsDesc.DepthFunc = D3D11_COMPARISON_GREATER;
+		dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		device->CreateDepthStencilState(&dsDesc, deferredPointLightDepthState.GetAddressOf());
+	}
+
 }
 
 Renderer::~Renderer()
@@ -104,6 +153,10 @@ Renderer::~Renderer()
 
 void Renderer::Render(Camera* camera)
 {
+	// Will need some assets throughout
+	Assets& assets = Assets::GetInstance();
+	SimpleVertexShader* fullscreenVS = assets.GetVertexShader("FullscreenVS.cso");
+
 	// Clear all targets and depth buffers
 	const float color[4] = { 0, 0, 0, 1 };
 	context->ClearRenderTargetView(backBufferRTV.Get(), color);
@@ -130,8 +183,9 @@ void Renderer::Render(Camera* camera)
 		targets[3] = renderTargetRTVs[RenderTargetType::GBUFFER_DEPTH].Get();	// we don't need both paths at once
 		context->OMSetRenderTargets(totalTargets, targets, depthBufferDSV.Get());
 
-		// Render the scene
-		RenderSceneForward(camera); 
+		// Render the scene followed by the sky
+		RenderSceneForward(camera);
+		sky->Draw(camera);
 		break;
 
 	case RenderPath::RENDER_PATH_DEFERRED: 
@@ -140,23 +194,38 @@ void Renderer::Render(Camera* camera)
 		targets[0] = renderTargetRTVs[RenderTargetType::GBUFFER_ALBEDO].Get();
 		targets[1] = renderTargetRTVs[RenderTargetType::GBUFFER_NORMALS].Get();
 		targets[2] = renderTargetRTVs[RenderTargetType::GBUFFER_DEPTH].Get();
-		targets[3] = renderTargetRTVs[RenderTargetType::GBUFFER_ROUGH_METAL].Get();
+		targets[3] = renderTargetRTVs[RenderTargetType::GBUFFER_METAL_ROUGH].Get();
 		context->OMSetRenderTargets(totalTargets, targets, depthBufferDSV.Get());
 
 		// Render the scene 
 		RenderSceneDeferred(camera); 
+
+		// Draw the lights into the light buffer
+		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::LIGHT_BUFFER].GetAddressOf(), 0);
+		RenderLightsDeferred(camera);
+
+		// Final combine before post processing
+		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT].GetAddressOf(), 0);
+		fullscreenVS->SetShader();
+		SimplePixelShader* combinePS = assets.GetPixelShader("DeferredCombinePS.cso");
+		combinePS->SetShader();
+		combinePS->SetShaderResourceView("Albedo", renderTargetSRVs[RenderTargetType::GBUFFER_ALBEDO]);
+		combinePS->SetShaderResourceView("LightBuffer", renderTargetSRVs[RenderTargetType::LIGHT_BUFFER]);
+		context->Draw(3, 0);
+
+		// Draw the sky
+		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT].GetAddressOf(), depthBufferDSV.Get());
+		sky->Draw(camera);
 		break;
 	}
-	
-	// Draw the sky after all solid objects,
-	// but before transparent ones
-	sky->Draw(camera);
 
+	// About to hit post processing, so wipe out all
+	// MRTs so each step below can set their own
+	ZeroMemory(targets, sizeof(ID3D11RenderTargetView*) * totalTargets);
+	context->OMSetRenderTargets(totalTargets, targets, 0);
 
-	// Assets for following steps
-	Assets& assets = Assets::GetInstance();
-	SimpleVertexShader* vs = assets.GetVertexShader("FullscreenVS.cso");
-	vs->SetShader();
+	// Set up vertex shader for post processing
+	fullscreenVS->SetShader();
 
 	// Render the SSAO results
 	{
@@ -364,17 +433,9 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, &vsPerFrameData, 0, 0);
 
 		// ps ----
-		// Deferred doesn't happen to need any per-frame data for GBuffer creation (right now)
-		if (renderPath == RenderPath::RENDER_PATH_FORWARD)
-		{
-			memcpy(&psPerFrameData.Lights, &lights[0], sizeof(Light) * activeLightCount);
-			psPerFrameData.LightCount = activeLightCount;
-			psPerFrameData.CameraPosition = camera->GetTransform()->GetPosition();
-			psPerFrameData.TotalSpecIBLMipLevels = sky->GetTotalSpecularIBLMipLevels();
-			psPerFrameData.AmbientNonPBR = ambientNonPBR;
-			psPerFrameData.IBLIntensity = iblIntensity;
-			context->UpdateSubresource(psPerFrameConstantBuffer.Get(), 0, 0, &psPerFrameData, 0, 0);
-		}
+		// Just the camera position
+		psPerFrameDeferredData.CameraPosition = camera->GetTransform()->GetPosition();
+		context->UpdateSubresource(psPerFrameDeferredConstantBuffer.Get(), 0, 0, &psPerFrameDeferredData, 0, 0);
 	}
 
 	// Make a copy of the renderable list so we can sort it
@@ -385,22 +446,19 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 			return e1->GetMaterial() < e2->GetMaterial();
 		});
 
+	// Assume we're using the same pixel shader for
+	// every single entity, since we're just creating
+	// the GBuffer for now
+	SimplePixelShader* gbufferPS = Assets::GetInstance().GetPixelShader("GBufferRenderPS.cso");
+	gbufferPS->SetShader();
+
+	// Set the per-frame constant buffer after the shader is set (due to simple shader auto set)
+	context->PSSetConstantBuffers(0, 1, psPerFrameDeferredConstantBuffer.GetAddressOf());
+
 	// Draw all of the entities
 	SimpleVertexShader* currentVS = 0;
-	SimplePixelShader* currentPS = 0;
 	Material* currentMaterial = 0;
 	Mesh* currentMesh = 0;
-
-	// Track the override pixel shader for gbuffer creation
-	SimplePixelShader* deferredPS = 0;
-	if (renderPath == RenderPath::RENDER_PATH_DEFERRED)
-	{
-		deferredPS = Assets::GetInstance().GetPixelShader("GBufferRenderPS.cso");
-		deferredPS->SetShader();
-
-		currentPS = deferredPS;
-	}
-
 	for (auto ge : toDraw)
 	{
 		// Track the current material and swap as necessary
@@ -423,26 +481,15 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 				context->VSSetConstantBuffers(0, 1, vsPerFrameConstantBuffer.GetAddressOf());
 			}
 
-			// If we're doing forward rendering, we swap pixel shaders here
-			// Deferred, however, will always use the same pixel shader during GBuffer creation
-			if (renderPath == RenderPath::RENDER_PATH_FORWARD && currentPS != currentMaterial->GetPS())
-			{
-				currentPS = currentMaterial->GetPS();
-				currentPS->SetShader();
-
-				// Must re-bind per-frame cbuffer as
-				// as we're using the renderer's now!
-				context->PSSetConstantBuffers(0, 1, psPerFrameConstantBuffer.GetAddressOf());
-
-				// Set IBL textures now, too
-				currentPS->SetShaderResourceView("IrradianceIBLMap", sky->GetIrradianceMap());
-				currentPS->SetShaderResourceView("SpecularIBLMap", sky->GetSpecularMap());
-				currentPS->SetShaderResourceView("BrdfLookUpMap", sky->GetBRDFLookUpTexture());
-			}
-
-			// Now that the material is set, we should
-			// copy per-material data to its cbuffers
+			// Swap out the material's pixel shader for the
+			// GBuffer creation shader temporarily, set all
+			// data and then swap it back.  Not necessarily
+			// the best way to do this, but it works fine!
+			SimplePixelShader* matPS = currentMaterial->GetPS();
+			currentMaterial->SetPS(gbufferPS);
 			currentMaterial->SetPerMaterialDataAndResources(true);
+			currentMaterial->SetPS(matPS);
+
 		}
 
 		// Also track current mesh
@@ -456,7 +503,6 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 			context->IASetVertexBuffers(0, 1, currentMesh->GetVertexBuffer().GetAddressOf(), &stride, &offset);
 			context->IASetIndexBuffer(currentMesh->GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
 		}
-
 
 		// Handle per-object data last (only VS at the moment)
 		if (currentVS != 0)
@@ -473,6 +519,136 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 			context->DrawIndexed(currentMesh->GetIndexCount(), 0, 0);
 		}
 	}
+}
+
+void Renderer::RenderLightsDeferred(Camera* camera)
+{
+	// Grab necessary assets
+	Assets& assets = Assets::GetInstance();
+	SimplePixelShader* dirPS = assets.GetPixelShader("DeferredDirectionalLightPS.cso");
+	SimpleVertexShader* dirVS = assets.GetVertexShader("DeferredDirectionalLightVS.cso");
+	SimplePixelShader* pointPS = assets.GetPixelShader("DeferredPointLightPS.cso");
+	SimpleVertexShader* pointVS = assets.GetVertexShader("DeferredPointLightVS.cso");
+	Mesh* sphereMesh = assets.GetMesh("Models\\sphere.obj");
+
+	// We'll need the inverse of the view/projection matrix below
+	XMFLOAT4X4 view = camera->GetView();
+	XMFLOAT4X4 proj = camera->GetProjection();
+	XMFLOAT4X4 invViewProj; 
+	XMStoreFloat4x4(&invViewProj, XMMatrixInverse(0, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj))));
+
+	// Set GBuffer SRVs once
+	// Note: Making the assumption that all deferred "light" shaders
+	// expect the same textures at the same place
+	ID3D11ShaderResourceView* gbuffer[4] = {};
+	gbuffer[0] = renderTargetSRVs[RenderTargetType::GBUFFER_ALBEDO].Get();
+	gbuffer[1] = renderTargetSRVs[RenderTargetType::GBUFFER_NORMALS].Get();
+	gbuffer[2] = renderTargetSRVs[RenderTargetType::GBUFFER_DEPTH].Get();
+	gbuffer[3] = renderTargetSRVs[RenderTargetType::GBUFFER_METAL_ROUGH].Get();
+	context->PSSetShaderResources(0, 4, gbuffer);
+
+	// Set the blend state so that light results add together
+	context->OMSetBlendState(deferredAdditiveBlendState.Get(), 0, 0xFFFFFFFF);
+
+	// Loop through active lights and render each
+	int currentLightType = -1;
+	for (unsigned int i = 0; i < activeLightCount; i++)
+	{
+		// Check the light type
+		Light light = lights[i];
+		switch (light.Type)
+		{
+		case LIGHT_TYPE_DIRECTIONAL:
+
+			// Minimize state swaps by checking the most recent light type
+			if (currentLightType != LIGHT_TYPE_DIRECTIONAL)
+			{
+				// Swap states
+				context->OMSetDepthStencilState(deferredDirectionalLightDepthState.Get(), 0);
+				context->RSSetState(0);
+
+				// Set up common shader data
+				dirVS->SetShader();
+				dirVS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+				dirVS->SetMatrix4x4("InverseViewProjection", invViewProj);
+				dirVS->CopyAllBufferData();
+
+				dirPS->SetShader();
+				dirPS->SetFloat("NearClip", camera->GetNearClip());
+				dirPS->SetFloat("FarClip", camera->GetFarClip());
+				dirPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+				dirPS->CopyBufferData("perFrame");
+
+				// Remember light type
+				currentLightType = light.Type;
+			}
+
+			// Per-light data
+			dirPS->SetData("ThisLight", (void*)(&light), sizeof(Light));
+			dirPS->CopyBufferData("perLight");
+
+			// Actually draw the light (fullscreen triangle for directional light)
+			context->Draw(3, 0);
+
+			break;
+
+		case LIGHT_TYPE_POINT:
+
+			// Minimize state swaps by checking the most recent light type
+			if (currentLightType != LIGHT_TYPE_POINT)
+			{
+				// Swap states
+				context->OMSetDepthStencilState(deferredPointLightDepthState.Get(), 0);
+				context->RSSetState(deferredCullFrontRasterState.Get());
+
+				// Set up common shader data
+				pointVS->SetShader();
+				pointVS->SetMatrix4x4("View", camera->GetView());
+				pointVS->SetMatrix4x4("Projection", camera->GetProjection());
+				pointVS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+				pointVS->CopyBufferData("perFrame");
+
+				pointPS->SetShader();
+				pointPS->SetFloat("NearClip", camera->GetNearClip());
+				pointPS->SetFloat("FarClip", camera->GetFarClip());
+				pointPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+				pointPS->CopyBufferData("perFrame");
+
+				// Remember light type
+				currentLightType = light.Type;
+			}
+
+			// Calculate a world matrix for the sphere based on the light's position and radius
+			{
+				float rad = light.Range * 2; // This sphere model has a radius of 0.5, so double the scale
+				XMFLOAT4X4 world;
+				XMMATRIX trans = XMMatrixTranslationFromVector(XMLoadFloat3(&light.Position));
+				XMMATRIX sc = XMMatrixScaling(rad, rad, rad);
+				XMStoreFloat4x4(&world, sc * trans);
+			
+				// Per-light data
+				pointVS->SetMatrix4x4("World", world);
+				pointVS->CopyBufferData("perLight");
+
+				pointPS->SetData("ThisLight", (void*)(&light), sizeof(Light));
+				pointPS->CopyBufferData("perLight");
+			}
+
+			// Draw the point light (sphere)
+			sphereMesh->SetBuffersAndDraw(context);
+
+			break;
+
+		case LIGHT_TYPE_SPOT: break; // Not implemented in this demo!
+		}
+
+	}
+
+	// Reset states
+	context->RSSetState(0); 
+	context->OMSetBlendState(0, 0, 0xFFFFFFFF);
+	context->OMSetDepthStencilState(0, 0); // Double check this one?
+	
 }
 
 void Renderer::PreResize()
@@ -498,10 +674,10 @@ void Renderer::PostResize(
 
 	// Recreate using the new window size
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_ALBEDO], renderTargetSRVs[RenderTargetType::GBUFFER_ALBEDO]);
-	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_NORMALS], renderTargetSRVs[RenderTargetType::GBUFFER_NORMALS]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_NORMALS], renderTargetSRVs[RenderTargetType::GBUFFER_NORMALS], DXGI_FORMAT_R16G16B16A16_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_DEPTH], renderTargetSRVs[RenderTargetType::GBUFFER_DEPTH], DXGI_FORMAT_R32_FLOAT);
-	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_ROUGH_METAL], renderTargetSRVs[RenderTargetType::GBUFFER_ROUGH_METAL]);
-	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::LIGHT_BUFFER], renderTargetSRVs[RenderTargetType::LIGHT_BUFFER]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_METAL_ROUGH], renderTargetSRVs[RenderTargetType::GBUFFER_METAL_ROUGH]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::LIGHT_BUFFER], renderTargetSRVs[RenderTargetType::LIGHT_BUFFER], DXGI_FORMAT_R16G16B16A16_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT], renderTargetSRVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FORWARD_AMBIENT], renderTargetSRVs[RenderTargetType::FORWARD_AMBIENT]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_RESULTS], renderTargetSRVs[RenderTargetType::SSAO_RESULTS]);

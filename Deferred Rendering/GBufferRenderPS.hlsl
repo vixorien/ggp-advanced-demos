@@ -4,7 +4,8 @@
 // Data that only changes once per frame
 cbuffer perFrame : register(b0)
 {
-	// Nothing necessary for GBuffer creation!
+	float3 CameraPosition;
+	float pad;
 };
 
 // Data that can change per material
@@ -28,10 +29,10 @@ struct VertexToPixel
 
 struct GBuffer
 {
-	float4 albedo			: SV_TARGET0;
-	float4 normals			: SV_TARGET2;
-	float  depth			: SV_TARGET3;
-	float4 metalRough		: SV_TARGET4;
+	float4 Albedo			: SV_TARGET0;
+	float4 Normals			: SV_TARGET1;
+	float  Depth			: SV_TARGET2;
+	float4 MetalRough		: SV_TARGET3;
 };
 
 // Texture-related variables
@@ -56,15 +57,15 @@ GBuffer main(VertexToPixel input)
 	float metal = MetalTexture.Sample(BasicSampler, input.uv).r;
 
 	// Gamma correct the texture back to linear space and apply the color tint
-	float4 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
-	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * Color.rgb;
+	float3 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
+	surfaceColor = pow(surfaceColor, 2.2) * Color.rgb;
 	
 	// Multiple render target output
 	GBuffer gbuffer;
-	gbuffer.albedo	= surfaceColor;
-	gbuffer.normals		= float4(input.normal * 0.5f + 0.5f, 1);
-	gbuffer.depth		= input.screenPosition.z;
-	gbuffer.metalRough	= float4(metal, roughness, 0, 1);
+	gbuffer.Albedo		= float4(surfaceColor, 1);
+	gbuffer.Normals		= float4(input.normal, 1);
+	gbuffer.Depth		= length(CameraPosition - input.worldPos); // Linear depth
+	gbuffer.MetalRough	= float4(metal, roughness, 0, 1);
 	return gbuffer;
 
 }

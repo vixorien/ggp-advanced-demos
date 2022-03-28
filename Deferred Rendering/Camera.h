@@ -7,7 +7,7 @@
 class Camera
 {
 public:
-	Camera(float x, float y, float z, float moveSpeed, float mouseLookSpeed, float aspectRatio);
+	Camera(float x, float y, float z, float moveSpeed, float mouseLookSpeed, float aspectRatio, float nearClip = 0.01f, float farClip = 100.0f);
 	~Camera();
 
 	// Updating
@@ -21,6 +21,11 @@ public:
 
 	Transform* GetTransform();
 
+	float GetNearClip();
+	float GetFarClip();
+	void SetNearClip(float nearClip);
+	void SetFarClip(float farClip);
+
 private:
 	// Camera matrices
 	DirectX::XMFLOAT4X4 viewMatrix;
@@ -30,5 +35,8 @@ private:
 
 	float movementSpeed;
 	float mouseLookSpeed;
+
+	float nearClip;
+	float farClip;
 };
 

@@ -24,7 +24,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 sceneColors = SceneColorsNoAmbient.Sample(BasicSampler, input.uv).rgb;
 	float3 ambient = Ambient.Sample(BasicSampler, input.uv).rgb;
 	float ao = SSAOBlur.Sample(BasicSampler, input.uv).r;
-
+	
 	// Early out for no SSAO
 	if (!ssaoEnabled)
 		ao = 1.0f;

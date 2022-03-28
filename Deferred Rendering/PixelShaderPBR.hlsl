@@ -132,7 +132,7 @@ PS_Output main(VertexToPixel input)
 	// Multiple render target output
 	PS_Output output;
 	output.colorNoAmbient	= float4(totalDirectLight + indirectSpecular, 1); // No gamma correction yet!
-	output.ambientColor		= float4(balancedIndirectDiff, 1); // Gamma correction
+	output.ambientColor		= float4(balancedIndirectDiff, 1); // No gamma correction
 	output.normals			= float4(input.normal * 0.5f + 0.5f, 1);
 	output.depths			= input.screenPosition.z;
 	return output;

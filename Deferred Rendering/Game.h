@@ -54,6 +54,7 @@ private:
 	void UIEntity(GameEntity* entity, int index);
 	void UILight(Light& light, int index);
 	void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size);
+	void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size, const char* name);
 
 	// General helpers
 	void GenerateLights();
