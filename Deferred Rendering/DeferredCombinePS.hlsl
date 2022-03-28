@@ -18,6 +18,6 @@ SamplerState Sampler	: register(s0);
 float4 main(VertexToPixel input) : SV_TARGET
 {
 	float3 pixelIndex = float3(input.position.xy, 0);
-	float3 totalColor = Albedo.Load(pixelIndex).rgb * LightBuffer.Load(pixelIndex).rgb;
+	float3 totalColor = /*Albedo.Load(pixelIndex).rgb **/ LightBuffer.Load(pixelIndex).rgb;
 	return float4(totalColor, 1);
 }
