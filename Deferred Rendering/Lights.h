@@ -4,7 +4,7 @@
 
 // This define should match your
 // MAX_LIGHTS definition in your shader(s)
-#define MAX_LIGHTS 128
+#define MAX_LIGHTS 512
 
 // Light types
 // Must match definitions in shader

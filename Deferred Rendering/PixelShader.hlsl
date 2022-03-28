@@ -1,9 +1,6 @@
 
 #include "Lighting.hlsli"
 
-// How many lights could we handle?
-#define MAX_LIGHTS 128
-
 // Data that only changes once per frame
 cbuffer perFrame : register(b0)
 {
