@@ -38,7 +38,11 @@ Game::Game(HINSTANCE hInstance)
 		"DirectX Game",	   // Text for the window's title bar
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
-		true)			   // Show extra stats (fps) in title bar?
+		true),			   // Show extra stats (fps) in title bar?
+	sky{},
+	renderer{},
+	freezeLights(false),
+	freezeEntities(false)
 {
 	camera = 0;
 
@@ -325,151 +329,6 @@ void Game::LoadAssetsAndCreateEntities()
 
 		entities.push_back(ge);
 	}
-
-	/*Mesh* sphereMesh = assets.GetMesh("Models\\sphere.obj");
-
-	GameEntity* cobSpherePBR = new GameEntity(sphereMesh, cobbleMat2xPBR);
-	cobSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	cobSpherePBR->GetTransform()->SetPosition(-6, 2, 0);
-
-	GameEntity* floorSpherePBR = new GameEntity(sphereMesh, floorMatPBR);
-	floorSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	floorSpherePBR->GetTransform()->SetPosition(-4, 2, 0);
-
-	GameEntity* paintSpherePBR = new GameEntity(sphereMesh, paintMatPBR);
-	paintSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	paintSpherePBR->GetTransform()->SetPosition(-2, 2, 0);
-
-	GameEntity* scratchSpherePBR = new GameEntity(sphereMesh, scratchedMatPBR);
-	scratchSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	scratchSpherePBR->GetTransform()->SetPosition(0, 2, 0);
-
-	GameEntity* bronzeSpherePBR = new GameEntity(sphereMesh, bronzeMatPBR);
-	bronzeSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	bronzeSpherePBR->GetTransform()->SetPosition(2, 2, 0);
-
-	GameEntity* roughSpherePBR = new GameEntity(sphereMesh, roughMatPBR);
-	roughSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	roughSpherePBR->GetTransform()->SetPosition(4, 2, 0);
-
-	GameEntity* woodSpherePBR = new GameEntity(sphereMesh, woodMatPBR);
-	woodSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	woodSpherePBR->GetTransform()->SetPosition(6, 2, 0);
-
-	entities.push_back(cobSpherePBR);
-	entities.push_back(floorSpherePBR);
-	entities.push_back(paintSpherePBR);
-	entities.push_back(scratchSpherePBR);
-	entities.push_back(bronzeSpherePBR);
-	entities.push_back(roughSpherePBR);
-	entities.push_back(woodSpherePBR);*/
-
-
-	//// Create simple PBR materials & entities (mostly for IBL testing)
-	//assets.CreateSolidColorTexture("white", 2, 2, XMFLOAT4(1, 1, 1, 1));
-	//assets.CreateSolidColorTexture("black", 2, 2, XMFLOAT4(0, 0, 0, 0));
-	//assets.CreateSolidColorTexture("grey", 2, 2, XMFLOAT4(0.5f, 0.5f, 0.5f, 1));
-	//assets.CreateSolidColorTexture("darkGrey", 2, 2, XMFLOAT4(0.25f, 0.25f, 0.25f, 1));
-	//assets.CreateSolidColorTexture("flatNormalMap", 2, 2, XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f));
-
-	//Material* solidShinyMetal = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidShinyMetal->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidShinyMetal->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidShinyMetal->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("black"));
-	//solidShinyMetal->AddPSTextureSRV("MetalTexture", assets.GetTexture("white"));
-	//solidShinyMetal->AddPSSampler("BasicSampler", samplerOptions);
-	//solidShinyMetal->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidShinyMetal);
-
-	//Material* solidQuarterRoughMetal = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidQuarterRoughMetal->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidQuarterRoughMetal->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidQuarterRoughMetal->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("darkGrey"));
-	//solidQuarterRoughMetal->AddPSTextureSRV("MetalTexture", assets.GetTexture("white"));
-	//solidQuarterRoughMetal->AddPSSampler("BasicSampler", samplerOptions);
-	//solidQuarterRoughMetal->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidQuarterRoughMetal);
-
-	//Material* solidHalfRoughMetal = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidHalfRoughMetal->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidHalfRoughMetal->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidHalfRoughMetal->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("grey"));
-	//solidHalfRoughMetal->AddPSTextureSRV("MetalTexture", assets.GetTexture("white"));
-	//solidHalfRoughMetal->AddPSSampler("BasicSampler", samplerOptions);
-	//solidHalfRoughMetal->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidHalfRoughMetal);
-
-	//Material* solidShinyPlastic = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidShinyPlastic->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidShinyPlastic->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidShinyPlastic->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("black"));
-	//solidShinyPlastic->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
-	//solidShinyPlastic->AddPSSampler("BasicSampler", samplerOptions);
-	//solidShinyPlastic->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidShinyPlastic);
-
-	//Material* solidQuarterRoughPlastic = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidQuarterRoughPlastic->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidQuarterRoughPlastic->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidQuarterRoughPlastic->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("darkGrey"));
-	//solidQuarterRoughPlastic->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
-	//solidQuarterRoughPlastic->AddPSSampler("BasicSampler", samplerOptions);
-	//solidQuarterRoughPlastic->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidQuarterRoughPlastic);
-
-	//Material* solidHalfRoughPlastic = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//solidHalfRoughPlastic->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("white"));
-	//solidHalfRoughPlastic->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//solidHalfRoughPlastic->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("grey"));
-	//solidHalfRoughPlastic->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
-	//solidHalfRoughPlastic->AddPSSampler("BasicSampler", samplerOptions);
-	//solidHalfRoughPlastic->AddPSSampler("ClampSampler", clampSampler);
-	//materials.push_back(solidHalfRoughPlastic);
-
-
-
-	//GameEntity* shinyMetal = new GameEntity(sphereMesh, solidShinyMetal);
-	//shinyMetal->GetTransform()->SetPosition(-5, 0, 0);
-	//entities.push_back(shinyMetal);
-
-	//GameEntity* quarterRoughMetal = new GameEntity(sphereMesh, solidQuarterRoughMetal);
-	//quarterRoughMetal->GetTransform()->SetPosition(-3.5f, 0, 0);
-	//entities.push_back(quarterRoughMetal);
-
-	//GameEntity* roughMetal = new GameEntity(sphereMesh, solidHalfRoughMetal);
-	//roughMetal->GetTransform()->SetPosition(-2, 0, 0);
-	//entities.push_back(roughMetal);
-
-	//GameEntity* shinyPlastic = new GameEntity(sphereMesh, solidShinyPlastic);
-	//shinyPlastic->GetTransform()->SetPosition(2, 0, 0);
-	//entities.push_back(shinyPlastic);
-
-	//GameEntity* quarterRoughPlastic = new GameEntity(sphereMesh, solidQuarterRoughPlastic);
-	//quarterRoughPlastic->GetTransform()->SetPosition(3.5f, 0, 0);
-	//entities.push_back(quarterRoughPlastic);
-
-	//GameEntity* roughPlastic = new GameEntity(sphereMesh, solidHalfRoughPlastic);
-	//roughPlastic->GetTransform()->SetPosition(5, 0, 0);
-	//entities.push_back(roughPlastic);
-
-
-	//// Create a low poly tree
-	//Material* treeMat = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 0.0f, XMFLOAT2(1, 1));
-	//treeMat->AddPSSampler("BasicSampler", samplerOptions);
-	//treeMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\lowpoly tree.png"));
-	//treeMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("flatNormalMap"));
-	//treeMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("white"));
-	//treeMat->AddPSTextureSRV("MetalTexture", assets.GetTexture("black"));
-	//materials.push_back(treeMat);
-
-	//GameEntity* tree = new GameEntity(assets.GetMesh("Models\\lowpoly tree.obj"), treeMat);
-	//entities.push_back(tree);
-	//tree->GetTransform()->MoveAbsolute(12, -5, 0);
-	//tree->GetTransform()->Scale(0.25f, 0.25f, 0.25f);
-
-
-	// Transform test =====================================
-	//entities[0]->GetTransform()->AddChild(entities[1]->GetTransform(), true);
 }
 
 
@@ -558,7 +417,7 @@ void Game::Update(float deltaTime, float totalTime)
 	camera->Update(deltaTime);
 
 	// Slowly rotate entities (aside from floor)
-	for (int i = 1; i < entities.size(); i++)
+	for (int i = 1; i < entities.size() && !freezeEntities; i++)
 	{
 		float rot = deltaTime * 0.1f;
 		switch (i % 4)
@@ -571,7 +430,7 @@ void Game::Update(float deltaTime, float totalTime)
 	}
 
 	// Move lights
-	for (int i = 0; i < lights.size() /*&& !freezeLightMovement*/; i++)
+	for (int i = 0; i < lights.size() && !freezeLights; i++)
 	{
 		// Only adjust point lights
 		if (lights[i].Type == LIGHT_TYPE_POINT)
@@ -632,23 +491,22 @@ void Game::CreateUI(float dt)
 	// Combined into a single window
 	ImGui::Begin("Debug");
 
+	// Toggle entity freeze
+	{
+		if (ImGui::Button(freezeEntities ? "Unfreeze Entities" : "Freeze Entities"))
+			freezeEntities = !freezeEntities;
+	}
+
 	// Showing the demo window?
 	{
+		ImGui::SameLine();
+
 		static bool showDemoWindow = false;
 		if (ImGui::Button("Show Demo Window"))
 			showDemoWindow = !showDemoWindow;
 
 		if (showDemoWindow)
 			ImGui::ShowDemoWindow();
-	}
-
-	// Toggle point lights
-	{
-		ImGui::SameLine();
-
-		bool visible = renderer->GetPointLightsVisible();
-		if (ImGui::Button(visible ? "Hide Lights" : "Show Lights"))
-			renderer->SetPointLightsVisible(!visible);
 	}
 
 	// All entity transforms
@@ -660,12 +518,35 @@ void Game::CreateUI(float dt)
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
 
+		// Warning for debug mode
+#ifdef _DEBUG
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+		ImGui::Text("(Run in RELEASE MODE for best forward/deferred performance)");
+		ImGui::PopStyleColor();
+#endif
+
+		// What's the render path?
+		RenderPath path = renderer->GetRenderPath();
+		if (ImGui::Button(path == RenderPath::RENDER_PATH_FORWARD ? "Forward Rendering" : "Deferred Rendering"))
+			renderer->SetRenderPath(path == RenderPath::RENDER_PATH_FORWARD ? RenderPath::RENDER_PATH_DEFERRED : RenderPath::RENDER_PATH_FORWARD);
+		
+		ImGui::SameLine();
+
+		// Should the lights be visible?
+		bool visible = renderer->GetPointLightsVisible();
+		if (ImGui::Button(visible ? "Hide Light Sources" : "Show Light Sources"))
+			renderer->SetPointLightsVisible(!visible);
+
+		ImGui::SameLine();
+
+		// Should lights move?
+		if (ImGui::Button(freezeLights ? "Unfreeze Lights" : "Freeze Lights"))
+			freezeLights = !freezeLights;
+
 		// IBL Intensity
-		{
-			float intensity = renderer->GetIBLIntensity();
-			if (ImGui::SliderFloat("IBL Intensity", &intensity, 0.0f, 10.0f))
-				renderer->SetIBLIntensity(intensity);
-		}
+		float intensity = renderer->GetIBLIntensity();
+		if (ImGui::SliderFloat("IBL Intensity", &intensity, 0.0f, 10.0f))
+			renderer->SetIBLIntensity(intensity);
 
 		int lightCount = (int)renderer->GetActiveLightCount();
 		if (ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS))
@@ -685,29 +566,23 @@ void Game::CreateUI(float dt)
 				UILight(lights[i], i);
 			}
 		}
-		ImGui::Spacing();
 
 		// Deferred options ---------------
-		RenderPath path = renderer->GetRenderPath();
-		if (ImGui::Button(path == RenderPath::RENDER_PATH_FORWARD ? "Forward Rendering" : "Deferred Rendering"))
-			renderer->SetRenderPath(path == RenderPath::RENDER_PATH_FORWARD ? RenderPath::RENDER_PATH_DEFERRED : RenderPath::RENDER_PATH_FORWARD);
-
-		// Warning for debug mode
-#ifdef _DEBUG
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::Text("(Run in RELEASE MODE for best performance)");
-		ImGui::PopStyleColor();
-#endif
-
-		if (renderer->GetRenderPath() == RenderPath::RENDER_PATH_DEFERRED)
+		if (ImGui::CollapsingHeader("GBuffer & Light Buffer"))
 		{
-			// Show GBUFFER and other debug options
-			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_ALBEDO).Get(), ImVec2(size.x, rtHeight), "GBuffer Albedo");
-			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_NORMALS).Get(), ImVec2(size.x, rtHeight), "GBuffer Normals");
-			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_DEPTH).Get(), ImVec2(size.x, rtHeight), "GBuffer Depth");
-			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_METAL_ROUGH).Get(), ImVec2(size.x, rtHeight), "GBuffer Metal & Roughness");
-			ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::LIGHT_BUFFER).Get(), ImVec2(size.x, rtHeight), "Light Buffer");
+			if (renderer->GetRenderPath() == RenderPath::RENDER_PATH_DEFERRED)
+			{
+				// Show GBUFFER and other debug options
+				ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_ALBEDO).Get(), ImVec2(size.x, rtHeight), "GBuffer Albedo");
+				ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_NORMALS).Get(), ImVec2(size.x, rtHeight), "GBuffer Normals");
+				ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_DEPTH).Get(), ImVec2(size.x, rtHeight), "GBuffer Depth");
+				ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_METAL_ROUGH).Get(), ImVec2(size.x, rtHeight), "GBuffer Metal & Roughness");
+				ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::LIGHT_BUFFER).Get(), ImVec2(size.x, rtHeight), "Light Buffer");
+			}
+			else
+			{
+				ImGui::Text("Switch to Deferred Rendering to see GBuffer");
+			}
 		}
 
 		ImGui::Indent(-10.0f);
@@ -716,6 +591,7 @@ void Game::CreateUI(float dt)
 	// All scene entities
 	if (ImGui::CollapsingHeader("Entities"))
 	{
+		ImGui::Indent(10.0f);
 		if (ImGui::CollapsingHeader("Set All Materials To..."))
 		{
 			for (int i = 0; i < materials.size(); i++)
@@ -732,11 +608,13 @@ void Game::CreateUI(float dt)
 		{
 			UIEntity(entities[i], i);
 		}
+		ImGui::Indent(-10.0f);
 	}
 
 	// SSAO Options
 	if (ImGui::CollapsingHeader("SSAO Options"))
 	{
+		ImGui::Indent(10.0f);
 		ImVec2 size = ImGui::GetItemRectSize();
 		float rtHeight = size.x * ((float)height / width);
 
@@ -757,8 +635,9 @@ void Game::CreateUI(float dt)
 		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
 			renderer->SetSSAORadius(ssaoRadius);
 
-		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight));
-		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight), "SSAO Results");
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight), "SSAO Blurred Results");
+		ImGui::Indent(-10.0f);
 	}
 
 	if (ImGui::CollapsingHeader("All Render Targets"))

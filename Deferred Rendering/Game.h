@@ -41,6 +41,8 @@ private:
 
 	// Lights
 	std::vector<Light> lights;
+	bool freezeLights;
+	bool freezeEntities;
 
 	// Texture related resources
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions;

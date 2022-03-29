@@ -56,7 +56,7 @@ GBuffer main(VertexToPixel input)
 	// Multiple render target output
 	GBuffer gbuffer;
 	gbuffer.Albedo		= float4(surfaceColor, 1);
-	gbuffer.Normals		= float4(input.normal, 1);
+	gbuffer.Normals		= float4(input.normal * 0.5f + 0.5f, 1);
 	gbuffer.Depth		= input.screenPosition.z;
 	gbuffer.MetalRough	= float4(metal, roughness, 0, 1);
 	return gbuffer;

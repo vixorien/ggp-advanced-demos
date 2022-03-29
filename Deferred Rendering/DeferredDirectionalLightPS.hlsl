@@ -31,7 +31,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 pixelIndex = float3(input.position.xy, 0);
 
 	float3 surfaceColor		= GBufferAlbedo.Load(pixelIndex).rgb; 
-	float3 normal			= normalize(GBufferNormals.Load(pixelIndex).rgb);
+	float3 normal			= normalize(GBufferNormals.Load(pixelIndex).rgb * 2 - 1);
 	float  depth			= GBufferDepth.Load(pixelIndex).r;
 	float3 metalRough		= GBufferMetalRough.Load(pixelIndex).rgb;
 

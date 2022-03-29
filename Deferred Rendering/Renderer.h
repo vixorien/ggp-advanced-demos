@@ -21,8 +21,8 @@ enum RenderTargetType
 	GBUFFER_NORMALS,
 	GBUFFER_DEPTH,
 	GBUFFER_METAL_ROUGH,
-	FORWARD_SCENE_NO_AMBIENT,
-	FORWARD_AMBIENT,
+	SCENE_NO_AMBIENT,
+	SCENE_AMBIENT, 
 	LIGHT_BUFFER,
 	SSAO_RESULTS,
 	SSAO_BLUR,
@@ -146,8 +146,8 @@ private:
 	// Per-frame constant buffers and data
 	Microsoft::WRL::ComPtr<ID3D11Buffer> psPerFrameConstantBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> vsPerFrameConstantBuffer;
-	PSPerFrameData psPerFrameData;
-	VSPerFrameData vsPerFrameData;
+	PSPerFrameData* psPerFrameData;
+	VSPerFrameData* vsPerFrameData;
 
 	// Render helpers
 	void RenderSceneForward(Camera* camera);

@@ -11,7 +11,7 @@
 
 using namespace DirectX;
 
- Renderer::Renderer(
+Renderer::Renderer(
 	const std::vector<GameEntity*>& entities,
 	const std::vector<Light>& lights,
 	unsigned int activeLightCount,
@@ -41,14 +41,12 @@ using namespace DirectX;
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
 		ambientNonPBR(0.1f, 0.1f, 0.25f),
-	    iblIntensity(1.0f)
+	    iblIntensity(1.0f),
+		vsPerFrameData(0),
+		psPerFrameData(0)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
-
-	// Initialize structs
-	vsPerFrameData = {};
-	psPerFrameData = {};
 
 	// Grab two shaders on which to base per-frame cbuffers
 	// Note: We're assuming ALL entity/material per-frame buffers are identical!
@@ -57,6 +55,12 @@ using namespace DirectX;
 	SimplePixelShader* ps = assets.GetPixelShader("PixelShaderPBR.cso");
 	SimplePixelShader* psDeferred = assets.GetPixelShader("GBufferRenderPS.cso");
 	SimpleVertexShader* vs = assets.GetVertexShader("VertexShader.cso");
+
+	// Create per frame data structs
+	// (On the heap because the PS one
+	// takes up WAY too much room for the stack)
+	vsPerFrameData = new VSPerFrameData();
+	psPerFrameData = new PSPerFrameData();
 
 	// Struct to hold the descriptions from existing buffers
 	D3D11_BUFFER_DESC bufferDesc = {};
@@ -143,7 +147,8 @@ using namespace DirectX;
 
 Renderer::~Renderer()
 {
-
+	delete vsPerFrameData;
+	delete psPerFrameData;
 }
 
 void Renderer::Render(Camera* camera)
@@ -172,8 +177,8 @@ void Renderer::Render(Camera* camera)
 	case RenderPath::RENDER_PATH_FORWARD: 
 		
 		// Set up forward rendering MRTs
-		targets[0] = renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT].Get();
-		targets[1] = renderTargetRTVs[RenderTargetType::FORWARD_AMBIENT].Get();
+		targets[0] = renderTargetRTVs[RenderTargetType::SCENE_NO_AMBIENT].Get();
+		targets[1] = renderTargetRTVs[RenderTargetType::SCENE_AMBIENT].Get();
 		targets[2] = renderTargetRTVs[RenderTargetType::GBUFFER_NORMALS].Get(); // Reusing these targets here since
 		targets[3] = renderTargetRTVs[RenderTargetType::GBUFFER_DEPTH].Get();	// we don't need both paths at once
 		context->OMSetRenderTargets(totalTargets, targets, depthBufferDSV.Get());
@@ -200,16 +205,29 @@ void Renderer::Render(Camera* camera)
 		RenderLightsDeferred(camera);
 
 		// Final combine before post processing
-		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT].GetAddressOf(), 0);
+		targets[0] = renderTargetRTVs[RenderTargetType::SCENE_NO_AMBIENT].Get();
+		targets[1] = renderTargetRTVs[RenderTargetType::SCENE_AMBIENT].Get();
+		context->OMSetRenderTargets(2, targets, 0);
 		fullscreenVS->SetShader();
 		SimplePixelShader* combinePS = assets.GetPixelShader("DeferredCombinePS.cso");
 		combinePS->SetShader();
-		combinePS->SetShaderResourceView("Albedo", renderTargetSRVs[RenderTargetType::GBUFFER_ALBEDO]);
+		combinePS->SetShaderResourceView("GBufferAlbedo", renderTargetSRVs[RenderTargetType::GBUFFER_ALBEDO]);
+		combinePS->SetShaderResourceView("GBufferNormals", renderTargetSRVs[RenderTargetType::GBUFFER_NORMALS]);
+		combinePS->SetShaderResourceView("GBufferDepth", renderTargetSRVs[RenderTargetType::GBUFFER_DEPTH]);
+		combinePS->SetShaderResourceView("GBufferMetalRough", renderTargetSRVs[RenderTargetType::GBUFFER_METAL_ROUGH]);
 		combinePS->SetShaderResourceView("LightBuffer", renderTargetSRVs[RenderTargetType::LIGHT_BUFFER]);
+		combinePS->SetShaderResourceView("BrdfLookUpMap", sky->GetBRDFLookUpTexture());
+		combinePS->SetShaderResourceView("IrradianceIBLMap", sky->GetIrradianceMap());
+		combinePS->SetShaderResourceView("SpecularIBLMap", sky->GetSpecularMap());
+		combinePS->SetMatrix4x4("InvViewProj", camera->GetInverseViewProjection());
+		combinePS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+		combinePS->SetInt("SpecIBLTotalMipLevels", sky->GetTotalSpecularIBLMipLevels());
+		combinePS->SetFloat("IBLIntensity", iblIntensity);
+		combinePS->CopyAllBufferData();
 		context->Draw(3, 0);
 
 		// Draw the sky
-		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT].GetAddressOf(), depthBufferDSV.Get());
+		context->OMSetRenderTargets(1, renderTargetRTVs[RenderTargetType::SCENE_NO_AMBIENT].GetAddressOf(), depthBufferDSV.Get());
 		sky->Draw(camera);
 		break;
 	}
@@ -277,8 +295,8 @@ void Renderer::Render(Camera* camera)
 
 		SimplePixelShader* ps = assets.GetPixelShader("SsaoCombinePS.cso");
 		ps->SetShader();
-		ps->SetShaderResourceView("SceneColorsNoAmbient", renderTargetSRVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT]);
-		ps->SetShaderResourceView("Ambient", renderTargetSRVs[RenderTargetType::FORWARD_AMBIENT]);
+		ps->SetShaderResourceView("SceneColorsNoAmbient", renderTargetSRVs[RenderTargetType::SCENE_NO_AMBIENT]);
+		ps->SetShaderResourceView("Ambient", renderTargetSRVs[RenderTargetType::SCENE_AMBIENT]);
 		ps->SetShaderResourceView("SSAOBlur", renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
 		ps->SetInt("ssaoEnabled", ssaoEnabled);
 		ps->SetInt("ssaoOutputOnly", ssaoOutputOnly);
@@ -315,18 +333,18 @@ void Renderer::RenderSceneForward(Camera* camera)
 	// Collect all per-frame data and copy to GPU
 	{
 		// vs ----
-		vsPerFrameData.ViewMatrix = camera->GetView();
-		vsPerFrameData.ProjectionMatrix = camera->GetProjection();
-		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, &vsPerFrameData, 0, 0);
+		vsPerFrameData->ViewMatrix = camera->GetView();
+		vsPerFrameData->ProjectionMatrix = camera->GetProjection();
+		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, vsPerFrameData, 0, 0);
 
 		// ps ----
-		memcpy(&psPerFrameData.Lights, &lights[0], sizeof(Light) * activeLightCount);
-		psPerFrameData.LightCount = activeLightCount;
-		psPerFrameData.CameraPosition = camera->GetTransform()->GetPosition();
-		psPerFrameData.TotalSpecIBLMipLevels = sky->GetTotalSpecularIBLMipLevels();
-		psPerFrameData.AmbientNonPBR = ambientNonPBR;
-		psPerFrameData.IBLIntensity = iblIntensity;
-		context->UpdateSubresource(psPerFrameConstantBuffer.Get(), 0, 0, &psPerFrameData, 0, 0);
+		memcpy(&psPerFrameData->Lights, &lights[0], sizeof(Light) * activeLightCount);
+		psPerFrameData->LightCount = activeLightCount;
+		psPerFrameData->CameraPosition = camera->GetTransform()->GetPosition();
+		psPerFrameData->TotalSpecIBLMipLevels = sky->GetTotalSpecularIBLMipLevels();
+		psPerFrameData->AmbientNonPBR = ambientNonPBR;
+		psPerFrameData->IBLIntensity = iblIntensity;
+		context->UpdateSubresource(psPerFrameConstantBuffer.Get(), 0, 0, psPerFrameData, 0, 0);
 		
 	}
 
@@ -423,9 +441,9 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 	// Collect all per-frame data and copy to GPU
 	{
 		// vs ----
-		vsPerFrameData.ViewMatrix = camera->GetView();
-		vsPerFrameData.ProjectionMatrix = camera->GetProjection();
-		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, &vsPerFrameData, 0, 0);
+		vsPerFrameData->ViewMatrix = camera->GetView();
+		vsPerFrameData->ProjectionMatrix = camera->GetProjection();
+		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, vsPerFrameData, 0, 0);
 
 		// ps ----
 		// None (for now)
@@ -522,14 +540,6 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 	SimpleVertexShader* pointVS = assets.GetVertexShader("DeferredPointLightVS.cso");
 	Mesh* sphereMesh = assets.GetMesh("Models\\sphere.obj");
 
-	// We'll need the inverse of the view/projection matrix below
-	XMFLOAT4X4 view = camera->GetView();
-	XMFLOAT4X4 proj = camera->GetProjection();
-	XMFLOAT4X4 invViewProj;
-	XMMATRIX v = XMLoadFloat4x4(&view);
-	XMMATRIX p = XMLoadFloat4x4(&proj);
-	XMStoreFloat4x4(&invViewProj, XMMatrixInverse(0, XMMatrixMultiply(v, p)));
-
 	// Set GBuffer SRVs once
 	// Note: Making the assumption that all deferred "light" shaders
 	// expect the same textures at the same place
@@ -564,7 +574,7 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 				dirVS->SetShader();
 
 				dirPS->SetShader();
-				dirPS->SetMatrix4x4("InvViewProj", invViewProj);
+				dirPS->SetMatrix4x4("InvViewProj", camera->GetInverseViewProjection());
 				dirPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
 				dirPS->CopyBufferData("perFrame");
 
@@ -598,7 +608,7 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 				pointVS->CopyBufferData("perFrame");
 
 				pointPS->SetShader();
-				pointPS->SetMatrix4x4("InvViewProj", invViewProj);
+				pointPS->SetMatrix4x4("InvViewProj", camera->GetInverseViewProjection());
 				pointPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
 				pointPS->SetFloat("WindowWidth", windowWidth);
 				pointPS->SetFloat("WindowHeight", windowHeight);
@@ -668,8 +678,8 @@ void Renderer::PostResize(
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_DEPTH], renderTargetSRVs[RenderTargetType::GBUFFER_DEPTH], DXGI_FORMAT_R32_FLOAT);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::GBUFFER_METAL_ROUGH], renderTargetSRVs[RenderTargetType::GBUFFER_METAL_ROUGH]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::LIGHT_BUFFER], renderTargetSRVs[RenderTargetType::LIGHT_BUFFER], DXGI_FORMAT_R16G16B16A16_FLOAT);
-	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT], renderTargetSRVs[RenderTargetType::FORWARD_SCENE_NO_AMBIENT]);
-	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::FORWARD_AMBIENT], renderTargetSRVs[RenderTargetType::FORWARD_AMBIENT]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_NO_AMBIENT], renderTargetSRVs[RenderTargetType::SCENE_NO_AMBIENT]);
+	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SCENE_AMBIENT], renderTargetSRVs[RenderTargetType::SCENE_AMBIENT]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_RESULTS], renderTargetSRVs[RenderTargetType::SSAO_RESULTS]);
 	CreateRenderTarget(windowWidth, windowHeight, renderTargetRTVs[RenderTargetType::SSAO_BLUR], renderTargetSRVs[RenderTargetType::SSAO_BLUR]);
 }

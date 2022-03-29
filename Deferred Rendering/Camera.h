@@ -14,10 +14,12 @@ public:
 	void Update(float dt);
 	void UpdateViewMatrix();
 	void UpdateProjectionMatrix(float aspectRatio);
+	void UpdateInverseViewProjection();
 
 	// Getters
 	DirectX::XMFLOAT4X4 GetView() { return viewMatrix; }
 	DirectX::XMFLOAT4X4 GetProjection() { return projMatrix; }
+	DirectX::XMFLOAT4X4 GetInverseViewProjection() { return invViewProj; }
 
 	Transform* GetTransform();
 
@@ -30,6 +32,7 @@ private:
 	// Camera matrices
 	DirectX::XMFLOAT4X4 viewMatrix;
 	DirectX::XMFLOAT4X4 projMatrix;
+	DirectX::XMFLOAT4X4 invViewProj;
 
 	Transform transform;
 
