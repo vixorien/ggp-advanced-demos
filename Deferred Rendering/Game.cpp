@@ -532,16 +532,27 @@ void Game::CreateUI(float dt)
 		
 		ImGui::SameLine();
 
-		// Should the lights be visible?
-		bool visible = renderer->GetPointLightsVisible();
-		if (ImGui::Button(visible ? "Hide Light Sources" : "Show Light Sources"))
-			renderer->SetPointLightsVisible(!visible);
-
-		ImGui::SameLine();
-
 		// Should lights move?
 		if (ImGui::Button(freezeLights ? "Unfreeze Lights" : "Freeze Lights"))
 			freezeLights = !freezeLights;
+
+		// Should the lights be visible?
+		bool visible = renderer->GetPointLightsVisible();
+		if (ImGui::Button(visible ? "Light Sources: On" : "Light Sources: Off"))
+			renderer->SetPointLightsVisible(!visible);
+
+		// Show silhouettes?
+		if (visible && path == RenderPath::RENDER_PATH_DEFERRED)
+		{
+			ImGui::SameLine();
+
+			bool sil = renderer->GetDeferredSilhouettes();
+			if (ImGui::Button(sil ? "Silhouettes: On" : "Silhouettes: Off"))
+				renderer->SetDeferredSilhouettes(!sil);
+
+		}
+
+		
 
 		// IBL Intensity
 		float intensity = renderer->GetIBLIntensity();

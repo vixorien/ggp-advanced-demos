@@ -81,6 +81,9 @@ public:
 	void SetPointLightsVisible(bool visible);
 	bool GetPointLightsVisible();
 
+	void SetDeferredSilhouettes(bool visible);
+	bool GetDeferredSilhouettes();
+
 	void SetRenderPath(RenderPath path);
 	RenderPath GetRenderPath();
 
@@ -117,6 +120,7 @@ private:
 
 	// Current render path (and other deferred requirements)
 	RenderPath renderPath;
+	bool drawDeferredLightSilhouettes;
 	Microsoft::WRL::ComPtr<ID3D11BlendState> deferredAdditiveBlendState;
 	Microsoft::WRL::ComPtr<ID3D11RasterizerState> deferredCullFrontRasterState;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> deferredPointLightDepthState;

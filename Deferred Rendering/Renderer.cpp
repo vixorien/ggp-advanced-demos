@@ -37,6 +37,7 @@ Renderer::Renderer(
 		vsPerFrameConstantBuffer(0),
 		psPerFrameConstantBuffer(0),
 		pointLightsVisible(false),
+		drawDeferredLightSilhouettes(false),
 		ssaoSamples(64),
 		ssaoRadius(0.25f),
 		ssaoEnabled(true),
@@ -306,7 +307,7 @@ void Renderer::Render(Camera* camera)
 	}
 
 	// Draw the lights if necessary
-	if (pointLightsVisible)
+	if (pointLightsVisible || drawDeferredLightSilhouettes)
 	{
 		context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 		DrawPointLights(camera);
@@ -690,6 +691,9 @@ void Renderer::SetActiveLightCount(unsigned int count){	activeLightCount = min(c
 void Renderer::SetPointLightsVisible(bool visible) { pointLightsVisible = visible; }
 bool Renderer::GetPointLightsVisible() { return pointLightsVisible; }
 
+void Renderer::SetDeferredSilhouettes(bool visible) { drawDeferredLightSilhouettes = visible; }
+bool Renderer::GetDeferredSilhouettes() { return drawDeferredLightSilhouettes; }
+
 void Renderer::SetRenderPath(RenderPath path) { renderPath = path; }
 RenderPath Renderer::GetRenderPath() { return renderPath; }
 
@@ -743,8 +747,9 @@ void Renderer::DrawPointLights(Camera* camera)
 			continue;
 
 		// Calc quick scale based on range
-		// (assuming range is between 5 - 10)
-		float scale = light.Range / 10.0f;
+		float scale = light.Range;
+		if(!drawDeferredLightSilhouettes ) 
+			scale /= 10.0f; // Scale down unless we're drawing silhouettes
 
 		// Make the transform for this light
 		XMMATRIX rotMat = XMMatrixIdentity();
