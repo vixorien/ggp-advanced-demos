@@ -545,14 +545,22 @@ void Game::CreateUI(float dt)
 		if (visible && path == RenderPath::RENDER_PATH_DEFERRED)
 		{
 			ImGui::SameLine();
-
+			
 			bool sil = renderer->GetDeferredSilhouettes();
 			if (ImGui::Button(sil ? "Silhouettes: On" : "Silhouettes: Off"))
 				renderer->SetDeferredSilhouettes(!sil);
-
 		}
-
-		
+		else
+		{
+			ImGui::SameLine();
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::Button("Silhouettes Disabled");
+			ImGui::PopStyleColor();
+			ImGui::PopStyleColor();
+			ImGui::PopStyleColor();
+		}
 
 		// IBL Intensity
 		float intensity = renderer->GetIBLIntensity();
@@ -665,6 +673,23 @@ void Game::CreateUI(float dt)
 	}
 
 	ImGui::End();
+
+	// Deferred window
+	if (renderer->GetRenderPath() == RenderPath::RENDER_PATH_DEFERRED)
+	{
+		ImGui::Begin("GBuffer & Light Buffer", 0, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+
+		float imgHeight = ImGui::GetWindowContentRegionMax().y - ImGui::GetWindowContentRegionMin().y;
+		float imgWidth = imgHeight * ((float)width / height);
+
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_ALBEDO).Get(), ImVec2(imgWidth, imgHeight), "GBuffer Albedo"); ImGui::SameLine();
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_NORMALS).Get(), ImVec2(imgWidth, imgHeight), "GBuffer Normals"); ImGui::SameLine();
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_DEPTH).Get(), ImVec2(imgWidth, imgHeight), "GBuffer Depth"); ImGui::SameLine();
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::GBUFFER_METAL_ROUGH).Get(), ImVec2(imgWidth, imgHeight), "GBuffer Metal & Roughness"); ImGui::SameLine();
+		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::LIGHT_BUFFER).Get(), ImVec2(imgWidth, imgHeight), "Light Buffer");
+
+		ImGui::End();
+	}
 }
 
 void Game::UIEntity(GameEntity* entity, int index)

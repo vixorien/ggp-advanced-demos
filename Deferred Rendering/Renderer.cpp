@@ -307,7 +307,7 @@ void Renderer::Render(Camera* camera)
 	}
 
 	// Draw the lights if necessary
-	if (pointLightsVisible || drawDeferredLightSilhouettes)
+	if (pointLightsVisible)
 	{
 		context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 		DrawPointLights(camera);
