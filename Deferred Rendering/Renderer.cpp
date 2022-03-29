@@ -67,11 +67,6 @@ using namespace DirectX;
 	scb->ConstantBuffer.Get()->GetDesc(&bufferDesc);
 	device->CreateBuffer(&bufferDesc, 0, psPerFrameConstantBuffer.GetAddressOf());
 
-	// Same for deferred
-	scb = psDeferred->GetBufferInfo("perFrame");
-	scb->ConstantBuffer.Get()->GetDesc(&bufferDesc);
-	device->CreateBuffer(&bufferDesc, 0, psPerFrameDeferredConstantBuffer.GetAddressOf());
-
 	// Make a new buffer that matches the existing PS per-frame buffer
 	scb = vs->GetBufferInfo("perFrame");
 	scb->ConstantBuffer.Get()->GetDesc(&bufferDesc);
@@ -433,9 +428,7 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 		context->UpdateSubresource(vsPerFrameConstantBuffer.Get(), 0, 0, &vsPerFrameData, 0, 0);
 
 		// ps ----
-		// Just the camera position
-		psPerFrameDeferredData.CameraPosition = camera->GetTransform()->GetPosition();
-		context->UpdateSubresource(psPerFrameDeferredConstantBuffer.Get(), 0, 0, &psPerFrameDeferredData, 0, 0);
+		// None (for now)
 	}
 
 	// Make a copy of the renderable list so we can sort it
@@ -451,9 +444,7 @@ void Renderer::RenderSceneDeferred(Camera* camera)
 	// the GBuffer for now
 	SimplePixelShader* gbufferPS = Assets::GetInstance().GetPixelShader("GBufferRenderPS.cso");
 	gbufferPS->SetShader();
-
-	// Set the per-frame constant buffer after the shader is set (due to simple shader auto set)
-	context->PSSetConstantBuffers(0, 1, psPerFrameDeferredConstantBuffer.GetAddressOf());
+	// If we had PS per frame data, we'd set the constant buffer here
 
 	// Draw all of the entities
 	SimpleVertexShader* currentVS = 0;
@@ -534,8 +525,10 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 	// We'll need the inverse of the view/projection matrix below
 	XMFLOAT4X4 view = camera->GetView();
 	XMFLOAT4X4 proj = camera->GetProjection();
-	XMFLOAT4X4 invViewProj; 
-	XMStoreFloat4x4(&invViewProj, XMMatrixInverse(0, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj))));
+	XMFLOAT4X4 invViewProj;
+	XMMATRIX v = XMLoadFloat4x4(&view);
+	XMMATRIX p = XMLoadFloat4x4(&proj);
+	XMStoreFloat4x4(&invViewProj, XMMatrixInverse(0, XMMatrixMultiply(v, p)));
 
 	// Set GBuffer SRVs once
 	// Note: Making the assumption that all deferred "light" shaders
@@ -569,13 +562,9 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 
 				// Set up common shader data
 				dirVS->SetShader();
-				dirVS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
-				dirVS->SetMatrix4x4("InverseViewProjection", invViewProj);
-				dirVS->CopyAllBufferData();
 
 				dirPS->SetShader();
-				dirPS->SetFloat("NearClip", camera->GetNearClip());
-				dirPS->SetFloat("FarClip", camera->GetFarClip());
+				dirPS->SetMatrix4x4("InvViewProj", invViewProj);
 				dirPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
 				dirPS->CopyBufferData("perFrame");
 
@@ -609,9 +598,10 @@ void Renderer::RenderLightsDeferred(Camera* camera)
 				pointVS->CopyBufferData("perFrame");
 
 				pointPS->SetShader();
-				pointPS->SetFloat("NearClip", camera->GetNearClip());
-				pointPS->SetFloat("FarClip", camera->GetFarClip());
+				pointPS->SetMatrix4x4("InvViewProj", invViewProj);
 				pointPS->SetFloat3("CameraPosition", camera->GetTransform()->GetPosition());
+				pointPS->SetFloat("WindowWidth", windowWidth);
+				pointPS->SetFloat("WindowHeight", windowHeight);
 				pointPS->CopyBufferData("perFrame");
 
 				// Remember light type

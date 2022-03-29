@@ -6,6 +6,10 @@ static const float PI = 3.14159265359f;
 static const float TWO_PI = PI * 2.0f;
 static const float PI_OVER_2 = PI / 2.0f;
 
+#define MAX_IBL_SAMPLES					1024 //4096 // Or fewer as necessary for performance
+#define IRRADIANCE_SAMPLE_STEP_PHI		0.25f //0.025f // Or larger for performance
+#define IRRADIANCE_SAMPLE_STEP_THETA	0.25f //0.025f // Or larger for performance
+
 #define MAX_LIGHTS 512
 
 #define LIGHT_TYPE_DIRECTIONAL	0
@@ -79,6 +83,18 @@ float3 WorldSpaceFromDepth(float depth, float2 uv, matrix invViewMatrix, matrix 
 
 	// Back to world space
 	return mul(invViewMatrix, viewPos).xyz;
+}
+
+float3 WorldSpaceFromDepth(float depth, float2 uv, matrix invViewProj)
+{
+	// Back to NDCs
+	uv = uv * 2.0f - 1.0f;
+	uv.y *= -1.0f; // Flip y due to UV <--> NDC 
+	float4 screenPos = float4(uv, depth, 1.0f);
+
+	// Back to world space
+	float4 worldPos = mul(invViewProj, screenPos);
+	return worldPos.xyz / worldPos.w;
 }
 
 // Linearizes the logarithmic depth from a depth buffer

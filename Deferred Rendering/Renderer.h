@@ -49,12 +49,6 @@ struct PSPerFrameData
 	float IBLIntensity;
 };
 
-struct PSPerFrameDeferredData
-{
-	DirectX::XMFLOAT3 CameraPosition;
-	float pad;
-};
-
 class Renderer
 {
 
@@ -151,10 +145,8 @@ private:
 
 	// Per-frame constant buffers and data
 	Microsoft::WRL::ComPtr<ID3D11Buffer> psPerFrameConstantBuffer;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> psPerFrameDeferredConstantBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> vsPerFrameConstantBuffer;
 	PSPerFrameData psPerFrameData;
-	PSPerFrameDeferredData psPerFrameDeferredData;
 	VSPerFrameData vsPerFrameData;
 
 	// Render helpers

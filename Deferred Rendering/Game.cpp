@@ -557,10 +557,18 @@ void Game::Update(float deltaTime, float totalTime)
 	// Update the camera
 	camera->Update(deltaTime);
 
-	// Move an object
-	//entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
-	//float scale = 2.0f + sin(totalTime) / 2.0f;
-	//entities[0]->GetTransform()->SetScale(scale, scale, scale);
+	// Slowly rotate entities (aside from floor)
+	for (int i = 1; i < entities.size(); i++)
+	{
+		float rot = deltaTime * 0.1f;
+		switch (i % 4)
+		{
+		case 0:	entities[i]->GetTransform()->Rotate(rot, rot, rot); break;
+		case 1:	entities[i]->GetTransform()->Rotate(rot, 0, 0); break;
+		case 2:	entities[i]->GetTransform()->Rotate(0, rot, 0); break;
+		case 3:	entities[i]->GetTransform()->Rotate(0, 0, rot); break;
+		}
+	}
 
 	// Move lights
 	for (int i = 0; i < lights.size() /*&& !freezeLightMovement*/; i++)

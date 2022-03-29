@@ -1,13 +1,6 @@
 
 #include "Lighting.hlsli"
 
-// Data that only changes once per frame
-cbuffer perFrame : register(b0)
-{
-	float3 CameraPosition;
-	float pad;
-};
-
 // Data that can change per material
 cbuffer perMaterial : register(b1)
 {
@@ -24,7 +17,7 @@ struct VertexToPixel
 	float2 uv				: TEXCOORD;
 	float3 normal			: NORMAL;
 	float3 tangent			: TANGENT;
-	float3 worldPos			: POSITION; // The world position of this PIXEL
+	float3 worldPos			: POSITION;
 };
 
 struct GBuffer
@@ -57,14 +50,14 @@ GBuffer main(VertexToPixel input)
 	float metal = MetalTexture.Sample(BasicSampler, input.uv).r;
 
 	// Gamma correct the texture back to linear space and apply the color tint
-	float3 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
+	float3 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv).rgb;
 	surfaceColor = pow(surfaceColor, 2.2) * Color.rgb;
 	
 	// Multiple render target output
 	GBuffer gbuffer;
 	gbuffer.Albedo		= float4(surfaceColor, 1);
 	gbuffer.Normals		= float4(input.normal, 1);
-	gbuffer.Depth		= length(CameraPosition - input.worldPos); // Linear depth
+	gbuffer.Depth		= input.screenPosition.z;
 	gbuffer.MetalRough	= float4(metal, roughness, 0, 1);
 	return gbuffer;
 

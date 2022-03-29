@@ -3,9 +3,10 @@
 
 cbuffer perFrame : register(b0)
 {
+	matrix InvViewProj;
 	float3 CameraPosition;
-	float NearClip;
-	float FarClip;
+	float WindowWidth;
+	float WindowHeight;
 }
 
 cbuffer perLight : register(b1)
@@ -35,8 +36,11 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float  depth			= GBufferDepth.Load(pixelIndex).r;
 	float3 metalRough		= GBufferMetalRough.Load(pixelIndex).rgb;
 
-	// Calc world position using depth and view ray
-	float3 worldPos = CameraPosition + normalize(input.viewRay) * depth;
+	// Calc UV of this pixel in screen space
+	float2 pixelUV = input.position.xy / float2(WindowWidth, WindowHeight);
+
+	// Calc world position from depth
+	float3 worldPos = WorldSpaceFromDepth(depth, pixelUV, InvViewProj);
 
 	// Handle lighting calculation (using regular albedo here due to energy conservation calculation inside PointLightPBR(),
 	// so the deferred light buffer will already have the albedo taken into account - no need for a combine later)
