@@ -1,8 +1,6 @@
 
 #include "Lighting.hlsli"
 
-#define MAX_SAMPLES 1024 //4096
-
 
 struct VertexToPixel
 {
@@ -47,10 +45,10 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 	// Run the calculation MANY times
 	//  - 4096 would be an ideal number of times 
 	//  - Fewer is faster, but is less accurate
-	for (uint i = 0; i < MAX_SAMPLES; i++)
+	for (uint i = 0; i < MAX_IBL_SAMPLES; i++)
 	{
 		// Grab this sample
-		float2 Xi = Hammersley2d(i, MAX_SAMPLES);
+		float2 Xi = Hammersley2d(i, MAX_IBL_SAMPLES);
 		float3 H = ImportanceSampleGGX(Xi, roughnessValue, N);
 		float3 L = 2 * dot(V, H) * H - V;
 
@@ -70,7 +68,7 @@ float2 IntegrateBRDF(float roughnessValue, float nDotV)
 	}
 
 	// Divide and return result
-	return float2(A, B) / MAX_SAMPLES;
+	return float2(A, B) / MAX_IBL_SAMPLES;
 }
 
 // All from http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
