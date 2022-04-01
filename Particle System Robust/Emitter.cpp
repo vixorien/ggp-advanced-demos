@@ -13,6 +13,7 @@ Emitter::Emitter(
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture,
 	float startSize,
 	float endSize,
+	bool constrainYAxis,
 	DirectX::XMFLOAT4 startColor,
 	DirectX::XMFLOAT4 endColor,
 	DirectX::XMFLOAT3 emitterPosition,
@@ -36,6 +37,7 @@ Emitter::Emitter(
 	texture(texture),
 	startSize(startSize),
 	endSize(endSize),
+	constrainYAxis(constrainYAxis),
 	startColor(startColor),
 	endColor(endColor),
 	emitterPosition(emitterPosition),
@@ -302,6 +304,7 @@ void Emitter::Draw(Camera* camera, float currentTime)
 	vs->SetFloat("endSize", endSize);
 	vs->SetFloat4("startColor", startColor);
 	vs->SetFloat4("endColor", endColor);
+	vs->SetInt("constrainYAxis", constrainYAxis);
 	vs->SetInt("spriteSheetWidth", spriteSheetWidth);
 	vs->SetInt("spriteSheetHeight", spriteSheetHeight);
 	vs->SetFloat("spriteSheetFrameWidth", spriteSheetFrameWidth);
@@ -322,10 +325,25 @@ int Emitter::GetParticlesPerSecond()
 
 void Emitter::SetParticlesPerSecond(int particlesPerSecond)
 {
-	if (particlesPerSecond < 1) particlesPerSecond = 1;
-
-	this->particlesPerSecond = particlesPerSecond;
+	this->particlesPerSecond = max(1, particlesPerSecond);
 	this->secondsPerParticle = 1.0f / particlesPerSecond;
+}
+
+int Emitter::GetMaxParticles()
+{
+	return maxParticles;
+}
+
+void Emitter::SetMaxParticles(int maxParticles)
+{
+	this->maxParticles = max(1, maxParticles);
+	CreateParticlesAndGPUResources();
+
+	// Reset emission details
+	timeSinceLastEmit = 0.0f;
+	livingParticleCount = 0;
+	indexFirstAlive = 0;
+	indexFirstDead = 0;
 }
 
 

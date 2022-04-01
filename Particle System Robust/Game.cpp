@@ -364,6 +364,7 @@ void Game::LoadAssetsAndCreateEntities()
 		assets.GetTexture("Textures\\Particles\\cloud.png"),
 		0.25f,	// Start size
 		2.0f,	// End size
+		false,	// Constrain Y axis rotation for billboard
 		{ 1.0f, 0.1f, 0.1f, 0.5f },// Start color
 		{ 1.0f, 1.0f, 0.1f, 0.0f },	// End color
 		{ -1, 0, 0 },				// Position
@@ -387,6 +388,7 @@ void Game::LoadAssetsAndCreateEntities()
 		assets.GetTexture("Textures\\Particles\\trace_01.png"),
 		1.0f,	// Start size
 		0.0f,	// End size
+		true,	// Constrain Y axis rotation for billboard
 		{ 1.0f, 0.1f, 1.0f, 1.0f },	// Start color
 		{ 0.1f, 0.1f, 1.0f, 0.0f },	// End color
 		{ 3, 0, 0 },				// Position
@@ -410,6 +412,7 @@ void Game::LoadAssetsAndCreateEntities()
 		assets.GetTexture("Textures\\Particles\\trace_01.png"),
 		0.25f,						// Start size
 		0.25f,						// End size
+		true,						// Constrain Y axis rotation for billboard
 		{ 0.5f, 0.5f, 1.0f, 1.0f },	// Start color
 		{ 0.5f, 0.5f, 1.0f, 1.0f },	// End color
 		{ 0, 15, 0 },				// Position
@@ -433,6 +436,7 @@ void Game::LoadAssetsAndCreateEntities()
 		assets.GetTexture("Textures\\Particles\\flame_animated.png"),
 		2.0f,	// Start size
 		1.0f,	// End size
+		false,	// Constrain Y axis rotation for billboard
 		{ 1.0f, 1.0f, 1.0f, 0.75f },// Start color
 		{ 1.0f, 1.0f, 1.0f, 0.0f },	// End color
 		{ 0, -2, 0 },				// Position
@@ -863,8 +867,12 @@ void Game::UIEmitter(Emitter* emitter, int index)
 		{
 			ImGui::Indent(5.0f);
 
+			int maxPart = emitter->GetMaxParticles();
+			if (ImGui::DragInt("Max Particles", &maxPart, 1.0f, 1, 2000))
+				emitter->SetMaxParticles(maxPart);
+
 			int partPerSec = emitter->GetParticlesPerSecond();
-			if (ImGui::DragInt("Particles Per Second", &partPerSec, 1.0f, 1))
+			if (ImGui::DragInt("Particles Per Second", &partPerSec, 1.0f, 1, 2000))
 				emitter->SetParticlesPerSecond(partPerSec);
 
 			ImGui::SliderFloat("Lifetime", &emitter->lifetime, 0.1f, 25.0f);
@@ -910,6 +918,8 @@ void Game::UIEmitter(Emitter* emitter, int index)
 				&emitter->rotationEndMinMax.x,
 				&emitter->rotationEndMinMax.y,
 				0.01f);
+
+			ImGui::Checkbox("Constrain Rotation on Y", &emitter->constrainYAxis);
 
 			if (emitter->IsSpriteSheet())
 			{
