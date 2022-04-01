@@ -315,3 +315,22 @@ void Emitter::Draw(Camera* camera, float currentTime)
 	context->DrawIndexed(livingParticleCount * 6, 0, 0);
 }
 
+int Emitter::GetParticlesPerSecond()
+{
+	return particlesPerSecond;
+}
+
+void Emitter::SetParticlesPerSecond(int particlesPerSecond)
+{
+	if (particlesPerSecond < 1) particlesPerSecond = 1;
+
+	this->particlesPerSecond = particlesPerSecond;
+	this->secondsPerParticle = 1.0f / particlesPerSecond;
+}
+
+
+bool Emitter::IsSpriteSheet()
+{
+	return spriteSheetHeight > 1 || spriteSheetWidth > 1;
+}
+
