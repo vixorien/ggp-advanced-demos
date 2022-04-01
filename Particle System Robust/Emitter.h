@@ -98,6 +98,7 @@ private:
 	float spriteSheetSpeedScale;
 	
 	// Rendering
+	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> particleDataBuffer;
@@ -107,6 +108,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture;
 	SimpleVertexShader* vs;
 	SimplePixelShader* ps;
+
+	// Creation methods
+	void CreateParticlesAndGPUResources();
 
 	// Simulation methods
 	void UpdateSingleParticle(float currentTime, int index);

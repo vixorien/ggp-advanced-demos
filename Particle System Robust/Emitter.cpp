@@ -29,6 +29,7 @@ Emitter::Emitter(
 	maxParticles(maxParticles),
 	particlesPerSecond(particlesPerSecond),
 	lifetime(lifetime),
+	device(device),
 	context(context),
 	vs(vs),
 	ps(ps),
@@ -59,13 +60,33 @@ Emitter::Emitter(
 	indexFirstAlive = 0;
 	indexFirstDead = 0;
 
+	// Actually create the array and underlying GPU resources
+	CreateParticlesAndGPUResources();
+}
+
+Emitter::~Emitter()
+{
+	// Clean up the particle array
+	delete[] particles;
+}
+
+
+void Emitter::CreateParticlesAndGPUResources()
+{
+	// Delete and release existing resources
+	if (particles) delete[] particles;
+	indexBuffer.Reset();
+	particleDataBuffer.Reset();
+	particleDataSRV.Reset();
+
 	// Set up the particle array
 	particles = new Particle[maxParticles];
 	ZeroMemory(particles, sizeof(Particle) * maxParticles);
 
 	// Create an index buffer for particle drawing
 	// indices as if we had two triangles per particle
-	unsigned int* indices = new unsigned int[maxParticles * 6];
+	int numIndices = maxParticles * 6;
+	unsigned int* indices = new unsigned int[numIndices];
 	int indexCount = 0;
 	for (int i = 0; i < maxParticles * 4; i += 4)
 	{
@@ -98,7 +119,7 @@ Emitter::Emitter(
 	allParticleBufferDesc.StructureByteStride = sizeof(Particle);
 	allParticleBufferDesc.ByteWidth = sizeof(Particle) * maxParticles;
 	device->CreateBuffer(&allParticleBufferDesc, 0, particleDataBuffer.GetAddressOf());
-	
+
 	// Create an SRV that points to a structured buffer of particles
 	// so we can grab this data in a vertex shader
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -107,13 +128,6 @@ Emitter::Emitter(
 	srvDesc.Buffer.FirstElement = 0;
 	srvDesc.Buffer.NumElements = maxParticles;
 	device->CreateShaderResourceView(particleDataBuffer.Get(), &srvDesc, particleDataSRV.GetAddressOf());
-
-}
-
-Emitter::~Emitter()
-{
-	// Clean up the particle array
-	delete[] particles;
 }
 
 
@@ -206,6 +220,7 @@ void Emitter::Update(float dt, float currentTime)
 	// Unmap now that we're done copying
 	context->Unmap(particleDataBuffer.Get(), 0);
 }
+
 
 void Emitter::UpdateSingleParticle(float currentTime, int index)
 {
