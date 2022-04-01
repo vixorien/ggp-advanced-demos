@@ -57,21 +57,10 @@ public:
 	void Update(float dt, float currentTime);
 	void Draw(Camera* camera, float currentTime);
 
-private:
-	// Emission
-	int particlesPerSecond;
-	float secondsPerParticle;
-	float timeSinceLastEmit;
-
-	// Array of particle data
-	Particle* particles;
-	int maxParticles;
-
-	// Lifetime tracking
-	float lifetime; 
-	int indexFirstDead;
-	int indexFirstAlive;
-	int livingParticleCount;
+	// Lifetime and emission
+	float lifetime;
+	int GetParticlesPerSecond();
+	void SetParticlesPerSecond(int particlesPerSecond);
 
 	// Emitter-level data (this is the same for all particles)
 	DirectX::XMFLOAT3 emitterAcceleration;
@@ -90,12 +79,30 @@ private:
 	DirectX::XMFLOAT2 rotationStartMinMax;
 	DirectX::XMFLOAT2 rotationEndMinMax;
 
+	// Sprite sheet animation
+	float spriteSheetSpeedScale;
+	bool IsSpriteSheet();
+
+private:
+	// Emission
+	int particlesPerSecond;
+	float secondsPerParticle;
+	float timeSinceLastEmit;
+
+	// Array of particle data
+	Particle* particles;
+	int maxParticles;
+
+	// Lifetime tracking
+	int indexFirstDead;
+	int indexFirstAlive;
+	int livingParticleCount;
+
 	// Sprite sheet options
 	int spriteSheetWidth;
 	int spriteSheetHeight;
 	float spriteSheetFrameWidth;
 	float spriteSheetFrameHeight;
-	float spriteSheetSpeedScale;
 	
 	// Rendering
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;

@@ -620,6 +620,17 @@ void Game::CreateUI(float dt)
 			renderer->SetPointLightsVisible(!visible);
 	}
 
+	// Emitters
+	if (ImGui::CollapsingHeader("Particle Emitters"))
+	{
+		ImGui::Indent(10.0f);
+		for (int i = 0; i < emitters.size(); i++)
+		{
+			UIEmitter(emitters[i], i);
+		}
+		ImGui::Indent(-10.0f);
+	}
+
 	// All entity transforms
 	if (ImGui::CollapsingHeader("Lights"))
 	{
@@ -834,6 +845,82 @@ void Game::UILight(Light& light, int index)
 		std::string intenseID = "Intensity##" + indexStr;
 		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
 
+		ImGui::TreePop();
+	}
+}
+
+void Game::UIEmitter(Emitter* emitter, int index)
+{
+	std::string indexStr = std::to_string(index);
+
+	std::string nodeName = "Emitter " + indexStr;
+	if (ImGui::TreeNode(nodeName.c_str()))
+	{
+		ImGui::Indent(10.0f);
+
+		// Emission
+		ImGui::Text("Emission & Lifetime");
+		{
+			ImGui::Indent(5.0f);
+
+			int partPerSec = emitter->GetParticlesPerSecond();
+			if (ImGui::DragInt("Particles Per Second", &partPerSec, 1.0f, 1))
+				emitter->SetParticlesPerSecond(partPerSec);
+
+			ImGui::SliderFloat("Lifetime", &emitter->lifetime, 0.1f, 25.0f);
+
+			// TODO: Max particles?
+			ImGui::Indent(-5.0f);
+		}
+
+		// Overall movement data
+		ImGui::Spacing();
+		ImGui::Text("Movement");
+		{
+			ImGui::Indent(5.0f);
+			ImGui::DragFloat3("Emitter Position", &emitter->emitterPosition.x, 0.05f);
+			ImGui::DragFloat3("Position Randomness", &emitter->positionRandomRange.x, 0.05f);
+
+			ImGui::DragFloat3("Starting Velocity", &emitter->startVelocity.x, 0.05f);
+			ImGui::DragFloat3("Velocity Randomness", &emitter->velocityRandomRange.x, 0.05f);
+
+			ImGui::DragFloat3("Acceleration", &emitter->emitterAcceleration.x, 0.05f);
+			ImGui::Indent(-5.0f);
+		}
+
+		// Visuals
+		ImGui::Spacing();
+		ImGui::Text("Visuals");
+		{
+			ImGui::Indent(5.0f);
+			ImGui::ColorEdit4("Starting Color", &emitter->startColor.x);
+			ImGui::ColorEdit4("Ending Color", &emitter->endColor.x);
+
+			ImGui::SliderFloat("Starting Size", &emitter->startSize, 0.0f, 10.0f);
+			ImGui::SliderFloat("Ending Size", &emitter->endSize, 0.0f, 10.0f);
+
+			ImGui::DragFloatRange2(
+				"Rotation Start Range",
+				&emitter->rotationStartMinMax.x,
+				&emitter->rotationStartMinMax.y,
+				0.01f);
+
+			ImGui::DragFloatRange2(
+				"Rotation End Range",
+				&emitter->rotationEndMinMax.x,
+				&emitter->rotationEndMinMax.y,
+				0.01f);
+
+			if (emitter->IsSpriteSheet())
+			{
+				ImGui::SliderFloat("Sprite Sheet Animation Speed", &emitter->spriteSheetSpeedScale, 0.0f, 10.0f);
+			}
+
+			ImGui::Indent(-5.0f);
+		}
+
+		// Clean up this node
+		ImGui::Indent(-10.0f);
 		ImGui::TreePop();
 	}
 }
