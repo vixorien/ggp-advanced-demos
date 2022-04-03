@@ -39,6 +39,7 @@ public:
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture,
 		float startSize = 1.0f,
 		float endSize = 1.0f,
+		bool constrainYAxis = false,
 		DirectX::XMFLOAT4 startColor = DirectX::XMFLOAT4(1,1,1,1),
 		DirectX::XMFLOAT4 endColor = DirectX::XMFLOAT4(1, 1, 1, 1),
 		DirectX::XMFLOAT3 emitterPosition = DirectX::XMFLOAT3(0, 0, 0),
@@ -61,6 +62,8 @@ public:
 	float lifetime;
 	int GetParticlesPerSecond();
 	void SetParticlesPerSecond(int particlesPerSecond);
+	int GetMaxParticles();
+	void SetMaxParticles(int maxParticles);
 
 	// Emitter-level data (this is the same for all particles)
 	DirectX::XMFLOAT3 emitterAcceleration;
@@ -72,6 +75,7 @@ public:
 	DirectX::XMFLOAT4 endColor;
 	float startSize;
 	float endSize;
+	bool constrainYAxis;
 
 	// Particle randomization ranges
 	DirectX::XMFLOAT3 positionRandomRange;
@@ -105,6 +109,7 @@ private:
 	float spriteSheetFrameHeight;
 	
 	// Rendering
+	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> particleDataBuffer;
@@ -114,6 +119,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture;
 	SimpleVertexShader* vs;
 	SimplePixelShader* ps;
+
+	// Creation methods
+	void CreateParticlesAndGPUResources();
 
 	// Simulation methods
 	void UpdateSingleParticle(float currentTime, int index);

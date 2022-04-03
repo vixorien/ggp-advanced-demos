@@ -19,6 +19,7 @@ cbuffer externalData : register(b0)
 	float endSize;
 	float lifetime;
 
+	int constrainYAxis;
 };
 
 // Struct representing a single particle
@@ -96,7 +97,7 @@ VertexToPixel main(uint id : SV_VertexID)
 	// Billboarding!
 	// Offset the position based on the camera's right and up vectors
 	pos += float3(view._11, view._12, view._13) * rotatedOffset.x; // RIGHT
-	pos += float3(view._21, view._22, view._23) * rotatedOffset.y; // UP
+	pos += (constrainYAxis ? float3(0,1,0) : float3(view._21, view._22, view._23)) * rotatedOffset.y; // UP
 
 	// Calculate output position
 	matrix viewProj = mul(projection, view);
