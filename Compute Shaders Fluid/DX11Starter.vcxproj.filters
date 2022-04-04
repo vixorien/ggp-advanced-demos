@@ -238,5 +238,11 @@
     <FxCompile Include="ProjectionCS.hlsl">
       <Filter>Shaders\Fluid</Filter>
     </FxCompile>
+    <FxCompile Include="InjectSmokeCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
+    <FxCompile Include="BuoyancyCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

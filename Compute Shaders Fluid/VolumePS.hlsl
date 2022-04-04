@@ -18,7 +18,7 @@ struct VertexToPixel
 
 Texture3D volumeTexture : register(t0);
 
-SamplerState basicSampler : register(s0);
+SamplerState SamplerLinearClamp : register(s0);
 
 
 // Performs a Ray-Box (specifically AABB) intersection
@@ -76,7 +76,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Set up the current position and the step amount
 	float maxDist = farHit - nearHit;
 	float3 currentPos = rayStart;
-	float step = 0.01f;// length(rayStart - rayEnd) / NUM_SAMPLES;
+	float step = 1.0f / NUM_SAMPLES;// length(rayStart - rayEnd) / NUM_SAMPLES;
 	float3 stepDir = step * dir;
 
 	// Accumulate as we raymarch
@@ -89,7 +89,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	{
 		float3 uvw = currentPos + float3(0.5f, 0.5f, 0.5f);
 
-		float4 color = volumeTexture.SampleLevel(basicSampler, uvw, 0);
+		float4 color = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
 		c += color * step;
 
 		// Continue stepping along ray

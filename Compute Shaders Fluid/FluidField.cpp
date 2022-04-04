@@ -12,14 +12,14 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	device(device),
 	context(context),
 	gridSize(gridSize),
-	pressureIterations(20)
+	pressureIterations(32)
 {
 	// Note the usage of PackedVector::XMUBYTEN4, which corresponds to R8G8B8A8.  The constructor
 	// also converts from the 0.0-1.0 float range to the 0-255 uint range
 	// See here for other types: https://docs.microsoft.com/en-us/windows/win32/dxmath/pg-xnamath-internals#graphics-library-type-equivalence
 
 	// TEMP: Some initial data for testing the volumes!
-	float invDim = 1.0f / gridSize;
+	/*float invDim = 1.0f / gridSize;
 	PackedVector::XMUBYTEN4* colors = new PackedVector::XMUBYTEN4[gridSize * gridSize * gridSize];
 	for (unsigned int x = 0; x < gridSize; x++)
 		for (unsigned int y = 0; y < gridSize; y++)
@@ -27,15 +27,19 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 			{
 				int index = x + (gridSize * y) + (gridSize * gridSize * z);
 				colors[index] = PackedVector::XMUBYTEN4(x * invDim, y * invDim, z * invDim, 1.0f);
-			}
+			}*/
 
-	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM, colors);
-	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM, colors);
+	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	divergenceBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	pressureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	pressureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM);
+	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM);
+	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 
-	delete[] colors;
+	//delete[] colors;
 
 	D3D11_SAMPLER_DESC sampDesc = {};
 	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -52,16 +56,19 @@ FluidField::~FluidField()
 
 void FluidField::UpdateFluid(float deltaTime)
 {
-	Advection(velocityBuffers, deltaTime, 1.0f);
+	// Add smoke to the field
+	InjectSmoke(1.0f);// deltaTime);
+
+	// Advect the velocity and other quantities
+	Advection(velocityBuffers, deltaTime);
+	Buoyancy(deltaTime);
+	Advection(densityBuffers, deltaTime);
+	Advection(temperatureBuffers, deltaTime);
+
+	// Final fluid steps
 	Divergence();
 	Pressure();
 	Projection();
-
-	// Unset all CS resources before rendering
-	ID3D11ShaderResourceView* nullSRVs[8] = {};
-	ID3D11UnorderedAccessView* nullUAVs[8] = {};
-	context->CSSetShaderResources(0, 8, nullSRVs);
-	context->CSSetUnorderedAccessViews(0, 8, nullUAVs, 0);
 }
 
 
@@ -99,7 +106,8 @@ void FluidField::RenderFluid(Camera* camera)
 	volumePS->SetMatrix4x4("invWorld", invWorld);
 	volumePS->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
 	volumePS->CopyAllBufferData();
-	volumePS->SetShaderResourceView("volumeTexture", velocityBuffers[0].SRV);
+	volumePS->SetShaderResourceView("volumeTexture", densityBuffers[0].SRV);
+	volumePS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
 
 	Mesh* cube = assets.GetMesh("Models\\cube.obj");
 	cube->SetBuffersAndDraw(context);
@@ -142,12 +150,13 @@ VolumeResource FluidField::CreateVolumeResource(int sideDimension, DXGI_FORMAT f
 
 	// Struct to hold both resource views
 	VolumeResource vr;
+	vr.ChannelCount = DXGIFormatChannels(format);
 	device->CreateShaderResourceView(texture.Get(), 0, vr.SRV.GetAddressOf());
 	device->CreateUnorderedAccessView(texture.Get(), 0, vr.UAV.GetAddressOf());
 	return vr;
 }
 
-void FluidField::Advection(VolumeResource volumes[2], float deltaTime, float advectionDamper)
+void FluidField::Advection(VolumeResource volumes[2], float deltaTime)
 {
 	// Grab the advection shader
 	Assets& assets = Assets::GetInstance();
@@ -156,23 +165,38 @@ void FluidField::Advection(VolumeResource volumes[2], float deltaTime, float adv
 	// Turn on and set external data
 	advectCS->SetShader();
 	advectCS->SetFloat("deltaTime", deltaTime);
-	advectCS->SetFloat("advectionDamper", advectionDamper);
 	advectCS->SetInt("gridSizeX", gridSize);
 	advectCS->SetInt("gridSizeY", gridSize);
 	advectCS->SetInt("gridSizeZ", gridSize);
+	advectCS->SetInt("channelCount", volumes[1].ChannelCount);
 	advectCS->CopyAllBufferData();
 
 	// Set resources
-	advectCS->SetShaderResourceView("TextureIn", volumes[0].SRV);
-	advectCS->SetUnorderedAccessView("TextureOut", volumes[1].UAV);
+	advectCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	advectCS->SetShaderResourceView("AdvectionIn", volumes[0].SRV);
 	advectCS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
+	switch (volumes[1].ChannelCount)
+	{
+	case 1: advectCS->SetUnorderedAccessView("AdvectionOut1", volumes[1].UAV); break;
+	case 2: advectCS->SetUnorderedAccessView("AdvectionOut2", volumes[1].UAV); break;
+	case 3: advectCS->SetUnorderedAccessView("AdvectionOut3", volumes[1].UAV); break;
+	case 4: advectCS->SetUnorderedAccessView("AdvectionOut4", volumes[1].UAV); break;
+	default: return;
+	}
 
 	// Run compute
 	advectCS->DispatchByThreads(gridSize, gridSize, gridSize);
 
 	// Unset resources
-	advectCS->SetShaderResourceView("TextureIn", 0);
-	advectCS->SetUnorderedAccessView("TextureOut", 0);
+	advectCS->SetShaderResourceView("VelocityIn", 0);
+	advectCS->SetShaderResourceView("AdvectionIn", 0);
+	switch (volumes[1].ChannelCount)
+	{
+	case 1: advectCS->SetUnorderedAccessView("AdvectionOut1", 0); break;
+	case 2: advectCS->SetUnorderedAccessView("AdvectionOut2", 0); break;
+	case 3: advectCS->SetUnorderedAccessView("AdvectionOut3", 0); break;
+	case 4: advectCS->SetUnorderedAccessView("AdvectionOut4", 0); break;
+	}
 
 	// Swap buffers
 	SwapBuffers(volumes);
@@ -255,6 +279,75 @@ void FluidField::Projection()
 	projCS->SetShaderResourceView("PressureIn", 0);
 	projCS->SetShaderResourceView("VelocityIn", 0);
 	projCS->SetUnorderedAccessView("VelocityOut", 0);
+
+	// Swap buffers
+	SwapBuffers(velocityBuffers);
+}
+
+void FluidField::InjectSmoke(float deltaTime)
+{
+	// Grab the inject shader
+	Assets& assets = Assets::GetInstance();
+	SimpleComputeShader* injCS = assets.GetComputeShader("InjectSmokeCS.cso");
+
+	// Turn on and set data
+	injCS->SetShader();
+	injCS->SetInt("gridSizeX", gridSize);
+	injCS->SetInt("gridSizeY", gridSize);
+	injCS->SetInt("gridSizeZ", gridSize);
+	injCS->SetFloat("deltaTime", deltaTime);
+	injCS->SetFloat("injectRadius", 0.1f);
+	injCS->SetFloat3("injectPosition", XMFLOAT3(0.5f, 0.5f, 0.5f));
+	injCS->SetFloat4("injectDensityColor", XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f));
+	injCS->SetFloat("injectDensity", 10.0f);
+	injCS->SetFloat("injectTemperature", 200.0f);
+	injCS->CopyAllBufferData();
+
+	// Set resources
+	injCS->SetShaderResourceView("DensityIn", densityBuffers[0].SRV);
+	injCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
+	injCS->SetUnorderedAccessView("DensityOut", densityBuffers[1].UAV);
+	injCS->SetUnorderedAccessView("TemperatureOut", temperatureBuffers[1].UAV);
+
+	// Run compute
+	injCS->DispatchByThreads(gridSize, gridSize, gridSize);
+
+	// Unset resources
+	injCS->SetShaderResourceView("DensityIn", 0);
+	injCS->SetShaderResourceView("TemperatureIn", 0);
+	injCS->SetUnorderedAccessView("DensityOut", 0);
+	injCS->SetUnorderedAccessView("TemperatureOut", 0);
+
+	// Swap buffers
+	SwapBuffers(densityBuffers);
+	SwapBuffers(temperatureBuffers);
+}
+
+void FluidField::Buoyancy(float deltaTime)
+{
+	// Grab the buoyancy shader
+	Assets& assets = Assets::GetInstance();
+	SimpleComputeShader* buoyCS = assets.GetComputeShader("BuoyancyCS.cso");
+
+	// Turn on and set data
+	buoyCS->SetShader();
+	buoyCS->SetFloat("deltaTime", deltaTime);
+	buoyCS->SetFloat("buoyancyConstant", 5.0f);
+	buoyCS->SetFloat("ambientTemperature", 75.0f);
+	buoyCS->CopyAllBufferData();
+
+	// Set resources
+	buoyCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	buoyCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
+	buoyCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
+
+	// Run compute
+	buoyCS->DispatchByThreads(gridSize, gridSize, gridSize);
+
+	// Unset resources
+	buoyCS->SetShaderResourceView("VelocityIn", 0);
+	buoyCS->SetShaderResourceView("TemperatureIn", 0);
+	buoyCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers
 	SwapBuffers(velocityBuffers);
@@ -415,6 +508,139 @@ unsigned int FluidField::DXGIFormatBytes(DXGI_FORMAT format)
 		return 0;
 
 	return max(1, bits / 8);
+}
+
+unsigned int FluidField::DXGIFormatChannels(DXGI_FORMAT format)
+{
+	switch (format)
+	{
+	case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+	case DXGI_FORMAT_R32G32B32A32_FLOAT:
+	case DXGI_FORMAT_R32G32B32A32_UINT:
+	case DXGI_FORMAT_R32G32B32A32_SINT:
+	case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+	case DXGI_FORMAT_R16G16B16A16_FLOAT:
+	case DXGI_FORMAT_R16G16B16A16_UNORM:
+	case DXGI_FORMAT_R16G16B16A16_UINT:
+	case DXGI_FORMAT_R16G16B16A16_SNORM:
+	case DXGI_FORMAT_R16G16B16A16_SINT:
+	case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+	case DXGI_FORMAT_R10G10B10A2_UNORM:
+	case DXGI_FORMAT_R10G10B10A2_UINT:
+	case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+	case DXGI_FORMAT_R8G8B8A8_UNORM:
+	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+	case DXGI_FORMAT_R8G8B8A8_UINT:
+	case DXGI_FORMAT_R8G8B8A8_SNORM:
+	case DXGI_FORMAT_R8G8B8A8_SINT:
+	case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:	
+	case DXGI_FORMAT_R8G8_B8G8_UNORM:
+	case DXGI_FORMAT_G8R8_G8B8_UNORM:
+	case DXGI_FORMAT_B8G8R8A8_UNORM:
+	case DXGI_FORMAT_B8G8R8X8_UNORM:
+	case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+	case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+	case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+	case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+	case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:	
+	case DXGI_FORMAT_B5G5R5A1_UNORM:
+	case DXGI_FORMAT_B4G4R4A4_UNORM:
+		return 4;
+
+	case DXGI_FORMAT_R32G32B32_TYPELESS:
+	case DXGI_FORMAT_R32G32B32_FLOAT:
+	case DXGI_FORMAT_R32G32B32_UINT:
+	case DXGI_FORMAT_R32G32B32_SINT:
+	case DXGI_FORMAT_R32G8X24_TYPELESS:
+	case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+	case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+	case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+	case DXGI_FORMAT_R11G11B10_FLOAT:
+	case DXGI_FORMAT_B5G6R5_UNORM:
+		return 3;
+
+
+	case DXGI_FORMAT_R32G32_TYPELESS:
+	case DXGI_FORMAT_R32G32_FLOAT:
+	case DXGI_FORMAT_R32G32_UINT:
+	case DXGI_FORMAT_R32G32_SINT:
+	case DXGI_FORMAT_R16G16_TYPELESS:
+	case DXGI_FORMAT_R16G16_FLOAT:
+	case DXGI_FORMAT_R16G16_UNORM:
+	case DXGI_FORMAT_R16G16_UINT:
+	case DXGI_FORMAT_R16G16_SNORM:
+	case DXGI_FORMAT_R16G16_SINT:
+	case DXGI_FORMAT_R24G8_TYPELESS:
+	case DXGI_FORMAT_D24_UNORM_S8_UINT:
+	case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+	case DXGI_FORMAT_X24_TYPELESS_G8_UINT:	
+	case DXGI_FORMAT_R8G8_TYPELESS:
+	case DXGI_FORMAT_R8G8_UNORM:
+	case DXGI_FORMAT_R8G8_UINT:
+	case DXGI_FORMAT_R8G8_SNORM:
+	case DXGI_FORMAT_R8G8_SINT:
+	case DXGI_FORMAT_A8P8:
+		return 2;
+
+	case DXGI_FORMAT_R16_TYPELESS:
+	case DXGI_FORMAT_R16_FLOAT:
+	case DXGI_FORMAT_D16_UNORM:
+	case DXGI_FORMAT_R16_UNORM:
+	case DXGI_FORMAT_R16_UINT:
+	case DXGI_FORMAT_R16_SNORM:
+	case DXGI_FORMAT_R16_SINT:
+	case DXGI_FORMAT_AYUV:
+	case DXGI_FORMAT_Y410:
+	case DXGI_FORMAT_YUY2:
+	case DXGI_FORMAT_P010:
+	case DXGI_FORMAT_P016:
+	case DXGI_FORMAT_R32_TYPELESS:
+	case DXGI_FORMAT_D32_FLOAT:
+	case DXGI_FORMAT_R32_FLOAT:
+	case DXGI_FORMAT_R32_UINT:
+	case DXGI_FORMAT_R32_SINT:
+	case DXGI_FORMAT_Y416:
+	case DXGI_FORMAT_Y210:
+	case DXGI_FORMAT_Y216:
+	case DXGI_FORMAT_NV12:
+	case DXGI_FORMAT_420_OPAQUE:
+	case DXGI_FORMAT_NV11:
+	case DXGI_FORMAT_R8_TYPELESS:
+	case DXGI_FORMAT_R8_UNORM:
+	case DXGI_FORMAT_R8_UINT:
+	case DXGI_FORMAT_R8_SNORM:
+	case DXGI_FORMAT_R8_SINT:
+	case DXGI_FORMAT_A8_UNORM:
+	case DXGI_FORMAT_AI44:
+	case DXGI_FORMAT_IA44:
+	case DXGI_FORMAT_P8:
+	case DXGI_FORMAT_R1_UNORM:
+	case DXGI_FORMAT_BC1_TYPELESS:
+	case DXGI_FORMAT_BC1_UNORM:
+	case DXGI_FORMAT_BC1_UNORM_SRGB:
+	case DXGI_FORMAT_BC4_TYPELESS:
+	case DXGI_FORMAT_BC4_UNORM:
+	case DXGI_FORMAT_BC4_SNORM:
+	case DXGI_FORMAT_BC2_TYPELESS:
+	case DXGI_FORMAT_BC2_UNORM:
+	case DXGI_FORMAT_BC2_UNORM_SRGB:
+	case DXGI_FORMAT_BC3_TYPELESS:
+	case DXGI_FORMAT_BC3_UNORM:
+	case DXGI_FORMAT_BC3_UNORM_SRGB:
+	case DXGI_FORMAT_BC5_TYPELESS:
+	case DXGI_FORMAT_BC5_UNORM:
+	case DXGI_FORMAT_BC5_SNORM:
+	case DXGI_FORMAT_BC6H_TYPELESS:
+	case DXGI_FORMAT_BC6H_UF16:
+	case DXGI_FORMAT_BC6H_SF16:
+	case DXGI_FORMAT_BC7_TYPELESS:
+	case DXGI_FORMAT_BC7_UNORM:
+	case DXGI_FORMAT_BC7_UNORM_SRGB:
+		return 1;
+
+	default:
+		return 0;
+	}
 }
 
 

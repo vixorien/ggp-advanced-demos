@@ -4,14 +4,18 @@
 cbuffer externalData : register(b0)
 {
 	float deltaTime;
-	float advectionDamper;
 	int gridSizeX;
 	int gridSizeY;
 	int gridSizeZ;
+	int channelCount;
 }
 
-Texture3D			TextureIn		: register(t0);
-RWTexture3D<float4> TextureOut		: register(u0);
+Texture3D			VelocityIn		: register(t0);
+Texture3D			AdvectionIn		: register(t1);
+RWTexture3D<float>  AdvectionOut1	: register(u0);
+RWTexture3D<float2> AdvectionOut2	: register(u1);
+RWTexture3D<float3> AdvectionOut3	: register(u2);
+RWTexture3D<float4> AdvectionOut4	: register(u3);
 
 SamplerState SamplerLinearClamp		: register(s0);
 
@@ -25,11 +29,17 @@ void main( uint3 id : SV_DispatchThreadID )
 	float3 posInGrid = float3(id);
 
 	// Move backwards based on velocity (still in [0-gridSize] range)
-	posInGrid -= deltaTime * TextureIn[id].xyz * advectionDamper;
+	posInGrid -= deltaTime * VelocityIn[id].xyz;
 
 	// Convert position to UVW coords ([0-1] range)
 	float3 posUVW = PixelIndexToUVW(posInGrid, gridSizeX, gridSizeY, gridSizeZ);
 
-	// Interpolate and output
-	TextureOut[id] = TextureIn.SampleLevel(SamplerLinearClamp, posUVW, 0) * advectionDamper;
+	// Which dimension?
+	switch (channelCount)
+	{
+	case 1: AdvectionOut1[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).r; break;
+	case 2:	AdvectionOut2[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rg; break;
+	case 3:	AdvectionOut3[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rgb; break;
+	case 4:	AdvectionOut4[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0); break;
+	}
 }
