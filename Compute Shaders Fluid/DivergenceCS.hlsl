@@ -33,6 +33,14 @@ void main(uint3 id : SV_DispatchThreadID)
 	float velB = VelocityIn[idB].z;
 	float velF = VelocityIn[idF].z;
 
+	// Check for boundaries
+	if (idL.x == id.x) { velL = 0; }
+	if (idR.x == id.x) { velR = 0; }
+	if (idD.y == id.y) { velD = 0; }
+	if (idU.y == id.y) { velU = 0; }
+	if (idB.z == id.z) { velB = 0; }
+	if (idF.z == id.z) { velF = 0; }
+
 	// Compute velocity's divergence and save
 	float divergence = 0.5f * (
 		(velR - velL) +

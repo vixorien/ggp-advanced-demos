@@ -244,5 +244,11 @@
     <FxCompile Include="BuoyancyCS.hlsl">
       <Filter>Shaders\Fluid</Filter>
     </FxCompile>
+    <FxCompile Include="VorticityCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
+    <FxCompile Include="ConfinementCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

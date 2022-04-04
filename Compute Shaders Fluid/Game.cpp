@@ -488,8 +488,8 @@ void Game::Update(float deltaTime, float totalTime)
 	// Get the input instance once
 	Input& input = Input::GetInstance();
 
-	// Update the renderer (mostly for fluid)
-	renderer->Update(deltaTime);
+	// Update the fluid field (which runs the compute shaders)
+	fluid->UpdateFluid();
 
 	// Update the camera
 	camera->Update(deltaTime);
@@ -643,18 +643,49 @@ void Game::CreateUI(float dt)
 	// Fluid options
 	if (ImGui::CollapsingHeader("Fluid Field"))
 	{
+		ImGui::Indent(10.0f);
 		if (ImGui::Button("Reset Fluid Buffers")) { fluid->RecreateGPUResources(); }
-		ImGui::SliderFloat("Time Step Multiplier", &fluid->timeStepMultiplier, 0.0f, 50.0f);
-		ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 2000);
-		ImGui::Checkbox("Inject Smoke", &fluid->injectSmoke);
 
 		// Get names of render types
-		const char* renderTypes[] = {"Velocity", "Divergence", "Pressure", "Density", "Temperature"};
+		const char* renderTypes[] = { "Velocity", "Divergence", "Pressure", "Density", "Temperature", "Vorticity" };
 		static int selected = (int)fluid->renderType;
 		if (ImGui::Combo("Render Type", &selected, renderTypes, IM_ARRAYSIZE(renderTypes)))
 		{
 			fluid->renderType = (FLUID_RENDER_TYPE)selected;
 		}
+
+		ImGui::SliderFloat("Time Step", &fluid->fixedTimeStep, 0.0f, 1.0f);
+		ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 200);
+
+		if (ImGui::CollapsingHeader("Smoke Injection"))
+		{
+			ImGui::Indent(10.0f);
+			ImGui::Checkbox("Inject Smoke", &fluid->injectSmoke);  
+			ImGui::SameLine();
+			ImGui::Checkbox("Apply Vorticity", &fluid->applyVorticity);
+			ImGui::ColorEdit3("Color", &fluid->fluidColor.x);
+			ImGui::SliderFloat3("Injection Position", &fluid->injectPosition.x, 0.0f, 1.0f);
+			ImGui::SliderFloat("Injection Radius", &fluid->injectRadius, 0.0f, 1.0f);
+			ImGui::SliderFloat("Injection Density", &fluid->injectDensity, 0.0f, 50.0f);
+			ImGui::SliderFloat("Injection Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
+			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, 0.0f, 200.0f);
+			ImGui::Spacing();
+			ImGui::Text("Buoyancy Characteristics");
+			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, 0.0f, 1.0f);
+			ImGui::SliderFloat("Density Weight", &fluid->densityWeight, 0.0f, 1.0f);
+			ImGui::Indent(-10.0f);
+		}
+
+		if (ImGui::CollapsingHeader("Advection Dampening"))
+		{
+			ImGui::Indent(10.0f);
+			ImGui::SliderFloat("Velocity Damper", &fluid->velocityDamper, 0.9f, 1.0f);
+			ImGui::SliderFloat("Density Damper", &fluid->densityDamper, 0.9f, 1.0f);
+			ImGui::SliderFloat("Temperature Damper", &fluid->temperatureDamper, 0.9f, 1.0f);
+			ImGui::Indent(-10.0f);
+		}
+		
+		ImGui::Indent(-10.0f);
 	}
 
 	// All render targets from the renderer

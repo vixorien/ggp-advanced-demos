@@ -103,11 +103,6 @@ Renderer::~Renderer()
 
 }
 
-void Renderer::Update(float deltaTime)
-{
-	fluid->UpdateFluid(deltaTime);
-}
-
 void Renderer::Render(Camera* camera)
 {
 	// Clear all targets and depth buffers

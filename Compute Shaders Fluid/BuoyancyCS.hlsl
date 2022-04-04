@@ -3,10 +3,8 @@
 
 cbuffer externalData : register(b0)
 {
-	//float deltaTime;
-	//float buoyancyConstant;
-	float densityConstant;
-	float temperatureConstant;
+	float densityWeight;
+	float temperatureBuoyancy;
 	float ambientTemperature;
 }
 
@@ -32,11 +30,8 @@ void main(uint3 id : SV_DispatchThreadID)
 		deltaTime * buoyancyConstant * float3(0, 1, 0);*/
 
 	// From: http://web.stanford.edu/class/cs237d/smoke.pdf
-	float3 buoyancyForce =
-		(-densityConstant * density +
-			temperatureConstant * (temp - ambientTemperature)) *
-		float3(0, -1, 0); // Invert due to UVW.y being upside down
-
+	float3 buoyancyForce = float3(0, 1, 0) *
+		(-densityWeight * density + temperatureBuoyancy * (temp - ambientTemperature));
 
 	// Add to current velocity for output
 	VelocityOut[id] = float4(VelocityIn[id].xyz + buoyancyForce, 1);

@@ -18,24 +18,22 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	context(context),
 	gridSize(gridSize),
 	injectSmoke(false),
+	applyVorticity(false),
 	pressureIterations(32),
-	timeStepMultiplier(1.0f),
+	fixedTimeStep(0.1f),
+	ambientTemperature(50.0f),
+	injectTemperature(100.0f),
+	injectDensity(0.1f),
+	injectRadius(0.1f),
+	injectPosition(0.5f, 0.2f, 0.5f),
+	temperatureBuoyancy(0.1f),
+	densityWeight(0.1f),
+	velocityDamper(0.999f),
+	densityDamper(0.999f),
+	temperatureDamper(0.999f),
+	fluidColor(1.0f, 1.0f, 1.0f),
 	renderType(FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY)
 {
-	// Note the usage of PackedVector::XMUBYTEN4, which corresponds to R8G8B8A8.  The constructor
-	// also converts from the 0.0-1.0 float range to the 0-255 uint range
-	// See here for other types: https://docs.microsoft.com/en-us/windows/win32/dxmath/pg-xnamath-internals#graphics-library-type-equivalence
-
-	// TEMP: Some initial data for testing the volumes!
-	/*float invDim = 1.0f / gridSize;
-	PackedVector::XMUBYTEN4* colors = new PackedVector::XMUBYTEN4[gridSize * gridSize * gridSize];
-	for (unsigned int x = 0; x < gridSize; x++)
-		for (unsigned int y = 0; y < gridSize; y++)
-			for (unsigned int z = 0; z < gridSize; z++)
-			{
-				int index = x + (gridSize * y) + (gridSize * gridSize * z);
-				colors[index] = PackedVector::XMUBYTEN4(x * invDim, y * invDim, z * invDim, 1.0f);
-			}*/
 
 	RecreateGPUResources();
 
@@ -45,6 +43,23 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	device->CreateSamplerState(&sampDesc, samplerLinearClamp.GetAddressOf());
+
+	D3D11_DEPTH_STENCIL_DESC depthDesc = {};
+	depthDesc.DepthEnable = true;
+	depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+	depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
+	device->CreateDepthStencilState(&depthDesc, depthState.GetAddressOf());
+
+	D3D11_BLEND_DESC blendDesc = {};
+	blendDesc.RenderTarget[0].BlendEnable = true;
+	blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	device->CreateBlendState(&blendDesc, blendState.GetAddressOf());
 }
 
 FluidField::~FluidField()
@@ -63,6 +78,7 @@ void FluidField::RecreateGPUResources()
 	densityBuffers[1].Reset();
 	temperatureBuffers[0].Reset();
 	temperatureBuffers[1].Reset();
+	vorticityBuffer.Reset();
 
 	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
@@ -73,40 +89,65 @@ void FluidField::RecreateGPUResources()
 	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	vorticityBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+	// Unused, but for reference...
+
+	// Note the usage of PackedVector::XMUBYTEN4, which corresponds to R8G8B8A8.  The constructor
+	// also converts from the 0.0-1.0 float range to the 0-255 uint range
+	// See here for other types: https://docs.microsoft.com/en-us/windows/win32/dxmath/pg-xnamath-internals#graphics-library-type-equivalence
+
+	// TEMP: Some initial data for testing the volumes!
+	/*float invDim = 1.0f / gridSize;
+	PackedVector::XMUBYTEN4* colors = new PackedVector::XMUBYTEN4[gridSize * gridSize * gridSize];
+	for (unsigned int x = 0; x < gridSize; x++)
+		for (unsigned int y = 0; y < gridSize; y++)
+			for (unsigned int z = 0; z < gridSize; z++)
+			{
+				int index = x + (gridSize * y) + (gridSize * gridSize * z);
+				colors[index] = PackedVector::XMUBYTEN4(x * invDim, y * invDim, z * invDim, 1.0f);
+			}*/
+
 }
 
 
-void FluidField::UpdateFluid(float deltaTime)
+void FluidField::UpdateFluid()
 {
-	float timeStep = deltaTime * timeStepMultiplier;
-
 	// Add smoke to the field
 	if(injectSmoke)
-		InjectSmoke(timeStep);
+		InjectSmoke();
 
 	// Advect the velocity and other quantities
-	Buoyancy(timeStep);
-	Advection(velocityBuffers, timeStep);
+	Buoyancy();
+	Advection(velocityBuffers, velocityDamper);
+
+	// Check for vorticity
+	if (applyVorticity)
+	{
+		Vorticity();
+		Confinement();
+	}
 
 	// Final fluid steps
 	Divergence();
 	Pressure();
 	Projection();
 
-	Advection(densityBuffers, timeStep);
-	Advection(temperatureBuffers, timeStep);
+	Advection(densityBuffers, densityDamper);
+	Advection(temperatureBuffers, temperatureDamper);
 }
 
 
 void FluidField::RenderFluid(Camera* camera)
 {
+	// Set up render states
+	context->OMSetDepthStencilState(depthState.Get(), 0);
+	context->OMSetBlendState(blendState.Get(), 0, 0xFFFFFFFF);
+	// TODO: Change cull mode?
+
 	// Cube size
 	XMFLOAT3 translation(0, 0, 0);
-	XMFLOAT3 scale(1, 1, 1);
-
-	// TODO: 
-	// - Set up transparent blend state
-	// - Set up backface draw (front cull)
+	XMFLOAT3 scale(2,2,2);
 
 	Assets& assets = Assets::GetInstance();
 	SimplePixelShader* volumePS = assets.GetPixelShader("VolumePS.cso");
@@ -128,14 +169,10 @@ void FluidField::RenderFluid(Camera* camera)
 	volumeVS->SetMatrix4x4("projection", camera->GetProjection());
 	volumeVS->CopyAllBufferData();
 
-	// Pixel shader data
-	volumePS->SetMatrix4x4("invWorld", invWorld);
-	volumePS->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
-	volumePS->CopyAllBufferData();
-
 	// Resources
 	volumePS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
-
+	
+	bool debugDraw = true;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
 	switch (renderType)
 	{
@@ -143,13 +180,26 @@ void FluidField::RenderFluid(Camera* camera)
 	case FLUID_RENDER_TYPE::FLUID_RENDER_VELOCITY: srv = velocityBuffers[0].SRV; break;
 	case FLUID_RENDER_TYPE::FLUID_RENDER_DIVERGENCE: srv = divergenceBuffer.SRV; break;
 	case FLUID_RENDER_TYPE::FLUID_RENDER_PRESSURE: srv = pressureBuffers[0].SRV; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY: srv = densityBuffers[0].SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY: srv = densityBuffers[0].SRV; debugDraw = false; break;
 	case FLUID_RENDER_TYPE::FLUID_RENDER_TEMPERATURE: srv = temperatureBuffers[0].SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_VORTICITY: srv = vorticityBuffer.SRV; break;
 	}
 	volumePS->SetShaderResourceView("volumeTexture", srv);
 
+	// Pixel shader data
+	volumePS->SetMatrix4x4("invWorld", invWorld);
+	volumePS->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
+	volumePS->SetFloat3("fluidColor", fluidColor);
+	volumePS->SetInt("debugRaymarchTexture", (int)debugDraw);
+	volumePS->CopyAllBufferData();
+
+	// Draw the geometry for the volume
 	Mesh* cube = assets.GetMesh("Models\\cube.obj");
 	cube->SetBuffersAndDraw(context);
+
+	// Reset render states
+	context->OMSetDepthStencilState(0, 0);
+	context->OMSetBlendState(0, 0, 0xFFFFFFFF);
 }
 
 
@@ -195,7 +245,7 @@ VolumeResource FluidField::CreateVolumeResource(int sideDimension, DXGI_FORMAT f
 	return vr;
 }
 
-void FluidField::Advection(VolumeResource volumes[2], float deltaTime, float damper)
+void FluidField::Advection(VolumeResource volumes[2], float damper)
 {
 	// Grab the advection shader
 	Assets& assets = Assets::GetInstance();
@@ -203,7 +253,7 @@ void FluidField::Advection(VolumeResource volumes[2], float deltaTime, float dam
 
 	// Turn on and set external data
 	advectCS->SetShader();
-	advectCS->SetFloat("deltaTime", deltaTime);
+	advectCS->SetFloat("deltaTime", fixedTimeStep);
 	advectCS->SetInt("gridSizeX", gridSize);
 	advectCS->SetInt("gridSizeY", gridSize);
 	advectCS->SetInt("gridSizeZ", gridSize);
@@ -336,7 +386,7 @@ void FluidField::Projection()
 	SwapBuffers(velocityBuffers);
 }
 
-void FluidField::InjectSmoke(float deltaTime)
+void FluidField::InjectSmoke()
 {
 	// Grab the inject shader
 	Assets& assets = Assets::GetInstance();
@@ -347,11 +397,11 @@ void FluidField::InjectSmoke(float deltaTime)
 	injCS->SetInt("gridSizeX", gridSize);
 	injCS->SetInt("gridSizeY", gridSize);
 	injCS->SetInt("gridSizeZ", gridSize);
-	injCS->SetFloat("deltaTime", deltaTime);
-	injCS->SetFloat("injectRadius", 0.1f);
-	injCS->SetFloat3("injectPosition", XMFLOAT3(0.5f, 0.5f, 0.5f));
-	injCS->SetFloat("injectDensity", 1.0f);
-	injCS->SetFloat("injectTemperature", 55.0f);
+	injCS->SetFloat("deltaTime", fixedTimeStep);
+	injCS->SetFloat("injectRadius", injectRadius);
+	injCS->SetFloat3("injectPosition", injectPosition);
+	injCS->SetFloat("injectDensity", injectDensity);
+	injCS->SetFloat("injectTemperature", injectTemperature);
 	injCS->CopyAllBufferData();
 
 	// Set resources
@@ -374,7 +424,7 @@ void FluidField::InjectSmoke(float deltaTime)
 	SwapBuffers(temperatureBuffers);
 }
 
-void FluidField::Buoyancy(float deltaTime)
+void FluidField::Buoyancy()
 {
 	// Grab the buoyancy shader
 	Assets& assets = Assets::GetInstance();
@@ -382,11 +432,10 @@ void FluidField::Buoyancy(float deltaTime)
 
 	// Turn on and set data
 	buoyCS->SetShader();
-	buoyCS->SetFloat("deltaTime", deltaTime);
-	//buoyCS->SetFloat("buoyancyConstant", 3.0f);
-	buoyCS->SetFloat("densityConstant", 0.0f);
-	buoyCS->SetFloat("temperatureConstant", 1.0f);
-	buoyCS->SetFloat("ambientTemperature", 50.0f);
+	buoyCS->SetFloat("deltaTime", fixedTimeStep);
+	buoyCS->SetFloat("densityWeight", densityWeight);
+	buoyCS->SetFloat("temperatureBuoyancy", temperatureBuoyancy);
+	buoyCS->SetFloat("ambientTemperature", ambientTemperature);
 	buoyCS->CopyAllBufferData();
 
 	// Set resources
@@ -402,6 +451,63 @@ void FluidField::Buoyancy(float deltaTime)
 	buoyCS->SetShaderResourceView("VelocityIn", 0);
 	buoyCS->SetShaderResourceView("TemperatureIn", 0);
 	buoyCS->SetUnorderedAccessView("VelocityOut", 0);
+
+	// Swap buffers
+	SwapBuffers(velocityBuffers);
+}
+
+void FluidField::Vorticity()
+{
+	// Grab the projection shader
+	Assets& assets = Assets::GetInstance();
+	SimpleComputeShader* vortCS = assets.GetComputeShader("VorticityCS.cso");
+
+	// Turn on
+	vortCS->SetShader();
+	vortCS->SetInt("gridSizeX", gridSize);
+	vortCS->SetInt("gridSizeY", gridSize);
+	vortCS->SetInt("gridSizeZ", gridSize);
+	vortCS->CopyAllBufferData();
+
+	// Set resources
+	vortCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	vortCS->SetUnorderedAccessView("VorticityOut", vorticityBuffer.UAV);
+
+	// Run compute
+	vortCS->DispatchByThreads(gridSize, gridSize, gridSize);
+
+	// Unset resources
+	vortCS->SetShaderResourceView("VelocityIn", 0);
+	vortCS->SetUnorderedAccessView("VorticityOut", 0);
+}
+
+void FluidField::Confinement()
+{
+	// Grab the projection shader
+	Assets& assets = Assets::GetInstance();
+	SimpleComputeShader* confCS = assets.GetComputeShader("ConfinementCS.cso");
+
+	// Turn on
+	confCS->SetShader();
+	confCS->SetFloat("deltaTime", fixedTimeStep);
+	confCS->SetInt("gridSizeX", gridSize);
+	confCS->SetInt("gridSizeY", gridSize);
+	confCS->SetInt("gridSizeZ", gridSize);
+	confCS->SetFloat("vorticityEpsilon", 1.0f); // TODO: Parameterize?
+	confCS->CopyAllBufferData();
+
+	// Set resources
+	confCS->SetShaderResourceView("VorticityIn", vorticityBuffer.SRV);
+	confCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	confCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
+
+	// Run compute
+	confCS->DispatchByThreads(gridSize, gridSize, gridSize);
+
+	// Unset resources
+	confCS->SetShaderResourceView("VorticityIn", 0);
+	confCS->SetShaderResourceView("VelocityIn", 0);
+	confCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers
 	SwapBuffers(velocityBuffers);

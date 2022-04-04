@@ -37,6 +37,12 @@ void main(uint3 id : SV_DispatchThreadID)
 	float pB = PressureIn[idB].r;
 	float pF = PressureIn[idF].r;
 
+	// Note: The nature of our neighbor checking here
+	// will return the current cell's pressure value
+	// (since we're basically clamping), which is exactly
+	// what we want at the boundaries of the volume.  This
+	// means we don't need to explicitly check for edges.
+
 	// Compute the pressure based on surrounding cells
 	float pressure = (pL + pR + pD + pU + pB + pF - div) / 6.0f;
 	PressureOut[id] = pressure;

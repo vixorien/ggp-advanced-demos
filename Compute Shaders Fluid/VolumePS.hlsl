@@ -1,5 +1,5 @@
 
-#include "SimplexNoise.hlsli"
+#include "ComputeHelpers.hlsli"
 
 #define NUM_SAMPLES 256
 
@@ -7,6 +7,8 @@ cbuffer externalData : register(b0)
 {
 	matrix invWorld;
 	float3 cameraPosition;
+	int debugRaymarchTexture;
+	float3 fluidColor;
 }
 
 struct VertexToPixel
@@ -58,7 +60,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 dir = normalize(input.worldPos - pos);
 
 	float3 posLocal = mul(invWorld, float4(pos, 1)).xyz;
-	float3 dirLocal = mul(invWorld, float4(dir, 1)).xyz;
+	float3 dirLocal = normalize(mul(invWorld, float4(dir, 1)).xyz);
 
 	// Intersect the bounds
 	float nearHit;
@@ -80,25 +82,39 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 stepDir = step * dir;
 
 	// Accumulate as we raymarch
-	float a = 0.0f;
-	float4 c = float4(0, 0, 0, 0);
+	float4 finalColor = float4(0, 0, 0, 0);
 	float totalDist = 0.0f;
 
 	[loop]
-	for (int i = 0; i < NUM_SAMPLES; i++)
+	for (int i = 0; i < NUM_SAMPLES && totalDist < maxDist; i++)
 	{
+		// Get the current position in UVW space
 		float3 uvw = currentPos + float3(0.5f, 0.5f, 0.5f);
 
-		float4 color = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
-		c += color * step;
+		// Simple debug draw?
+		if (debugRaymarchTexture)
+		{
+			float4 color = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
+			finalColor += color * step;
+		}
+		else
+		{
+			// Grab the density here and blend below
+			float density = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0).r;
+			//float density = TricubicInterpolation(volumeTexture, SamplerLinearClamp, uvw).r; // TOO SLOW
+
+			// Perform a "front to back" blend and exit early
+			// if we hit "full" alpha.  Found in GPU Gems 3 Chapter 30 (fluid)
+			finalColor.rgb += fluidColor * density * (1.0f - finalColor.a);
+			finalColor.a += density * (1.0f - finalColor.a);
+			if (finalColor.a > 0.99f)
+				break;
+		}
 
 		// Continue stepping along ray
 		currentPos += stepDir;
 		totalDist += step;
-
-		if (totalDist >= maxDist)
-			break;
 	}
 
-	return c;
+	return finalColor;
 }
