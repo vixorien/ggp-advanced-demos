@@ -1,6 +1,13 @@
 
 #include "ComputeHelpers.hlsli"
 
+cbuffer externalData : register(b0)
+{
+	int gridSizeX;
+	int gridSizeY;
+	int gridSizeZ;
+}
+
 Texture3D			DivergenceIn	: register(t0);
 Texture3D			PressureIn		: register(t1);
 RWTexture3D<float>	PressureOut		: register(u0);
@@ -15,12 +22,12 @@ void main(uint3 id : SV_DispatchThreadID)
 	float div = DivergenceIn[id].r;
 
 	// Indices of surrounding pixels
-	uint3 idL = id; idL.x--;
-	uint3 idR = id; idR.x++;
-	uint3 idD = id; idD.y--;
-	uint3 idU = id; idU.y++;
-	uint3 idB = id; idB.z--;
-	uint3 idF = id; idF.z++;
+	uint3 idL = GetLeftIndex(id);
+	uint3 idR = GetRightIndex(id, gridSizeX);
+	uint3 idD = GetDownIndex(id);
+	uint3 idU = GetUpIndex(id, gridSizeY);
+	uint3 idB = GetBackIndex(id);
+	uint3 idF = GetForwardIndex(id, gridSizeZ);
 
 	// Pressure of surrounding pixels
 	float pL = PressureIn[idL].r;

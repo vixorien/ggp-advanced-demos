@@ -9,6 +9,7 @@
 #include "Sky.h"
 #include "Renderer.h"
 #include "ImGui/imgui.h"
+#include "FluidField.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
@@ -35,6 +36,8 @@ private:
 	std::vector<Material*> materials;
 	std::vector<GameEntity*> entities;
 	Camera* camera;
+
+	std::shared_ptr<FluidField> fluid;
 
 	// Smart renderer
 	Renderer* renderer;

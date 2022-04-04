@@ -3,13 +3,16 @@
 
 cbuffer externalData : register(b0)
 {
-	float deltaTime;
-	float buoyancyConstant;
+	//float deltaTime;
+	//float buoyancyConstant;
+	float densityConstant;
+	float temperatureConstant;
 	float ambientTemperature;
 }
 
 Texture3D			VelocityIn		: register(t0);
-Texture3D			TemperatureIn	: register(t1);
+Texture3D			DensityIn		: register(t1);
+Texture3D			TemperatureIn	: register(t2);
 RWTexture3D<float4> VelocityOut		: register(u0);
 
 [numthreads(
@@ -20,13 +23,19 @@ void main(uint3 id : SV_DispatchThreadID)
 {
 	// Grab the temperature
 	float temp = TemperatureIn[id].r;
-	if (temp == 0.0f) 
-		return;
+	float density = DensityIn[id].r;
 
 	// Calculate buoyancy force
-	float3 buoyancyForce =
+	// GPU Gems 3 version... not great?
+	/*float3 buoyancyForce =
 		(1.0f / ambientTemperature - 1.0f / temp) *
-		deltaTime * buoyancyConstant * float3(0, 1, 0);
+		deltaTime * buoyancyConstant * float3(0, 1, 0);*/
+
+	// From: http://web.stanford.edu/class/cs237d/smoke.pdf
+	float3 buoyancyForce =
+		(-densityConstant * density +
+			temperatureConstant * (temp - ambientTemperature)) *
+		float3(0, -1, 0); // Invert due to UVW.y being upside down
 
 
 	// Add to current velocity for output

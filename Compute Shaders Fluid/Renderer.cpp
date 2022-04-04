@@ -13,7 +13,8 @@ using namespace DirectX;
 
  Renderer::Renderer(
 	const std::vector<GameEntity*>& entities,
-	const std::vector<Light>& lights,
+	const std::vector<Light>& lights, 
+	 std::shared_ptr<FluidField> fluid,
 	unsigned int activeLightCount,
 	Sky* sky,
 	unsigned int windowWidth,
@@ -25,6 +26,7 @@ using namespace DirectX;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthBufferDSV) :
 		entities(entities),
 		lights(lights),
+		fluid(fluid),
 		activeLightCount(activeLightCount),
 		sky(sky),
 		windowWidth(windowWidth),
@@ -94,9 +96,6 @@ using namespace DirectX;
 		XMStoreFloat4(&ssaoOffsets[i], v * scaleVector);
 		
 	}
-
-	// Set up the fluid volumes
-	fluid = std::make_shared<FluidField>(device, context, 64);
 }
 
 Renderer::~Renderer()

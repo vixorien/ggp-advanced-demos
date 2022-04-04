@@ -8,6 +8,7 @@ cbuffer externalData : register(b0)
 	int gridSizeY;
 	int gridSizeZ;
 	int channelCount;
+	float damper;
 }
 
 Texture3D			VelocityIn		: register(t0);
@@ -37,9 +38,9 @@ void main( uint3 id : SV_DispatchThreadID )
 	// Which dimension?
 	switch (channelCount)
 	{
-	case 1: AdvectionOut1[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).r; break;
-	case 2:	AdvectionOut2[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rg; break;
-	case 3:	AdvectionOut3[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rgb; break;
-	case 4:	AdvectionOut4[id] = AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0); break;
+	case 1: AdvectionOut1[id] = damper * AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).r; break;
+	case 2:	AdvectionOut2[id] = damper * AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rg; break;
+	case 3:	AdvectionOut3[id] = damper * AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0).rgb; break;
+	case 4:	AdvectionOut4[id] = damper * AdvectionIn.SampleLevel(SamplerLinearClamp, posUVW, 0); break;
 	}
 }

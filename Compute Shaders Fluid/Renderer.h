@@ -48,6 +48,7 @@ public:
 	Renderer(
 		const std::vector<GameEntity*>& entities,
 		const std::vector<Light>& lights,
+		std::shared_ptr<FluidField> fluid,
 		unsigned int activeLightCount,
 		Sky* sky,
 		unsigned int windowWidth,
@@ -102,9 +103,6 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetRTVs[RenderTargetType::RENDER_TARGET_TYPE_COUNT];
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> renderTargetSRVs[RenderTargetType::RENDER_TARGET_TYPE_COUNT];
 
-	// Compute/fluid resources
-	std::shared_ptr<FluidField> fluid;
-
 	// SSAO variables
 	DirectX::XMFLOAT4 ssaoOffsets[64];
 	int ssaoSamples;
@@ -123,6 +121,7 @@ private:
 	const std::vector<GameEntity*>& entities;
 	const std::vector<Light>& lights;
 	Sky* sky;
+	std::shared_ptr<FluidField> fluid;
 	unsigned int activeLightCount;
 
 	// Per-frame constant buffers and data

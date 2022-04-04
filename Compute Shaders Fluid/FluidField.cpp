@@ -7,12 +7,20 @@
 
 using namespace DirectX;
 
+// References:
+// https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-30-real-time-simulation-and-rendering-3d-fluids
+// http://web.stanford.edu/class/cs237d/smoke.pdf
+// TODO: Update based on paper above (GPU Gems has some inconsistencies)
+
 
 FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, unsigned int gridSize) :
 	device(device),
 	context(context),
 	gridSize(gridSize),
-	pressureIterations(32)
+	injectSmoke(false),
+	pressureIterations(32),
+	timeStepMultiplier(1.0f),
+	renderType(FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY)
 {
 	// Note the usage of PackedVector::XMUBYTEN4, which corresponds to R8G8B8A8.  The constructor
 	// also converts from the 0.0-1.0 float range to the 0-255 uint range
@@ -29,17 +37,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 				colors[index] = PackedVector::XMUBYTEN4(x * invDim, y * invDim, z * invDim, 1.0f);
 			}*/
 
-	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	divergenceBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	pressureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	pressureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM);
-	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R8G8B8A8_UNORM);
-	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-
-	//delete[] colors;
+	RecreateGPUResources();
 
 	D3D11_SAMPLER_DESC sampDesc = {};
 	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -54,21 +52,49 @@ FluidField::~FluidField()
 }
 
 
+void FluidField::RecreateGPUResources()
+{
+	velocityBuffers[0].Reset();
+	velocityBuffers[1].Reset();
+	divergenceBuffer.Reset();
+	pressureBuffers[0].Reset();
+	pressureBuffers[1].Reset();
+	densityBuffers[0].Reset();
+	densityBuffers[1].Reset();
+	temperatureBuffers[0].Reset();
+	temperatureBuffers[1].Reset();
+
+	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	divergenceBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	pressureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	pressureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+}
+
+
 void FluidField::UpdateFluid(float deltaTime)
 {
+	float timeStep = deltaTime * timeStepMultiplier;
+
 	// Add smoke to the field
-	InjectSmoke(1.0f);// deltaTime);
+	if(injectSmoke)
+		InjectSmoke(timeStep);
 
 	// Advect the velocity and other quantities
-	Advection(velocityBuffers, deltaTime);
-	Buoyancy(deltaTime);
-	Advection(densityBuffers, deltaTime);
-	Advection(temperatureBuffers, deltaTime);
+	Buoyancy(timeStep);
+	Advection(velocityBuffers, timeStep);
 
 	// Final fluid steps
 	Divergence();
 	Pressure();
 	Projection();
+
+	Advection(densityBuffers, timeStep);
+	Advection(temperatureBuffers, timeStep);
 }
 
 
@@ -106,8 +132,21 @@ void FluidField::RenderFluid(Camera* camera)
 	volumePS->SetMatrix4x4("invWorld", invWorld);
 	volumePS->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
 	volumePS->CopyAllBufferData();
-	volumePS->SetShaderResourceView("volumeTexture", densityBuffers[0].SRV);
+
+	// Resources
 	volumePS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+	switch (renderType)
+	{
+	default:
+	case FLUID_RENDER_TYPE::FLUID_RENDER_VELOCITY: srv = velocityBuffers[0].SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_DIVERGENCE: srv = divergenceBuffer.SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_PRESSURE: srv = pressureBuffers[0].SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY: srv = densityBuffers[0].SRV; break;
+	case FLUID_RENDER_TYPE::FLUID_RENDER_TEMPERATURE: srv = temperatureBuffers[0].SRV; break;
+	}
+	volumePS->SetShaderResourceView("volumeTexture", srv);
 
 	Mesh* cube = assets.GetMesh("Models\\cube.obj");
 	cube->SetBuffersAndDraw(context);
@@ -156,7 +195,7 @@ VolumeResource FluidField::CreateVolumeResource(int sideDimension, DXGI_FORMAT f
 	return vr;
 }
 
-void FluidField::Advection(VolumeResource volumes[2], float deltaTime)
+void FluidField::Advection(VolumeResource volumes[2], float deltaTime, float damper)
 {
 	// Grab the advection shader
 	Assets& assets = Assets::GetInstance();
@@ -169,6 +208,7 @@ void FluidField::Advection(VolumeResource volumes[2], float deltaTime)
 	advectCS->SetInt("gridSizeY", gridSize);
 	advectCS->SetInt("gridSizeZ", gridSize);
 	advectCS->SetInt("channelCount", volumes[1].ChannelCount);
+	advectCS->SetFloat("damper", damper);
 	advectCS->CopyAllBufferData();
 
 	// Set resources
@@ -209,7 +249,11 @@ void FluidField::Divergence()
 	SimpleComputeShader* divCS = assets.GetComputeShader("DivergenceCS.cso");
 
 	// Turn on
-	divCS->SetShader();
+	divCS->SetShader(); 
+	divCS->SetInt("gridSizeX", gridSize);
+	divCS->SetInt("gridSizeY", gridSize);
+	divCS->SetInt("gridSizeZ", gridSize);
+	divCS->CopyAllBufferData();
 
 	// Set resources
 	divCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
@@ -231,12 +275,16 @@ void FluidField::Pressure()
 
 	// Turn on
 	pressCS->SetShader();
+	pressCS->SetInt("gridSizeX", gridSize);
+	pressCS->SetInt("gridSizeY", gridSize);
+	pressCS->SetInt("gridSizeZ", gridSize);
+	pressCS->CopyAllBufferData();
 
 	// Set resources
 	pressCS->SetShaderResourceView("DivergenceIn", divergenceBuffer.SRV);
 
 	// Run the pressure solver for several iterations
-	for (unsigned int i = 0; i < pressureIterations; i++)
+	for (int i = 0; i < pressureIterations; i++)
 	{
 		// Set pressures (which swap each iteration)
 		pressCS->SetShaderResourceView("PressureIn", pressureBuffers[0].SRV);
@@ -266,6 +314,10 @@ void FluidField::Projection()
 
 	// Turn on
 	projCS->SetShader();
+	projCS->SetInt("gridSizeX", gridSize);
+	projCS->SetInt("gridSizeY", gridSize);
+	projCS->SetInt("gridSizeZ", gridSize);
+	projCS->CopyAllBufferData();
 
 	// Set resources
 	projCS->SetShaderResourceView("PressureIn", pressureBuffers[0].SRV);
@@ -298,9 +350,8 @@ void FluidField::InjectSmoke(float deltaTime)
 	injCS->SetFloat("deltaTime", deltaTime);
 	injCS->SetFloat("injectRadius", 0.1f);
 	injCS->SetFloat3("injectPosition", XMFLOAT3(0.5f, 0.5f, 0.5f));
-	injCS->SetFloat4("injectDensityColor", XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f));
-	injCS->SetFloat("injectDensity", 10.0f);
-	injCS->SetFloat("injectTemperature", 200.0f);
+	injCS->SetFloat("injectDensity", 1.0f);
+	injCS->SetFloat("injectTemperature", 55.0f);
 	injCS->CopyAllBufferData();
 
 	// Set resources
@@ -332,12 +383,15 @@ void FluidField::Buoyancy(float deltaTime)
 	// Turn on and set data
 	buoyCS->SetShader();
 	buoyCS->SetFloat("deltaTime", deltaTime);
-	buoyCS->SetFloat("buoyancyConstant", 5.0f);
-	buoyCS->SetFloat("ambientTemperature", 75.0f);
+	//buoyCS->SetFloat("buoyancyConstant", 3.0f);
+	buoyCS->SetFloat("densityConstant", 0.0f);
+	buoyCS->SetFloat("temperatureConstant", 1.0f);
+	buoyCS->SetFloat("ambientTemperature", 50.0f);
 	buoyCS->CopyAllBufferData();
 
 	// Set resources
 	buoyCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	buoyCS->SetShaderResourceView("DensityIn", densityBuffers[0].SRV);
 	buoyCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
 	buoyCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 

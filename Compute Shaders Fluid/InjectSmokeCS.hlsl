@@ -11,7 +11,7 @@ cbuffer externalData : register(b0)
 	float injectRadius;		// In UV coords
 	float3 injectPosition;	// In UV coords
 	
-	float4 injectDensityColor;
+	//float4 injectDensityColor;
 	float injectDensity;
 
 	float injectTemperature;
@@ -34,9 +34,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
 	// How much to inject based on distance?
 	float dist = length(posUVW - injectPosition);
-	float injAmount = max(0, injectRadius - dist);
+	float injAmount = max(0, injectRadius - dist) / injectRadius;
 
 	// Output should match input plus any new injection
-	DensityOut[id] = DensityIn[id] + injAmount * injectDensityColor * injectDensity * deltaTime;
+	DensityOut[id] = DensityIn[id] + injAmount * injectDensity * deltaTime;
 	TemperatureOut[id] = TemperatureIn[id].r + injAmount * injectTemperature * deltaTime;
 }

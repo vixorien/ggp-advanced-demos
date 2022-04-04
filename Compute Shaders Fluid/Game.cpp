@@ -128,10 +128,14 @@ void Game::Init()
 		1.0f,		// Mouse look
 		this->width / (float)this->height); // Aspect ratio
 
+	// Create fluid field
+	fluid = std::make_shared<FluidField>(device, context, 64);
+
 	// Create the renderer (last since we need some other pieces like the Sky)
 	renderer = new Renderer(
 		entities,
 		lights,
+		fluid,
 		MAX_LIGHTS / 2, // Half the maximum lights are active to start with
 		sky,
 		width,
@@ -636,6 +640,24 @@ void Game::CreateUI(float dt)
 		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
 	}
 
+	// Fluid options
+	if (ImGui::CollapsingHeader("Fluid Field"))
+	{
+		if (ImGui::Button("Reset Fluid Buffers")) { fluid->RecreateGPUResources(); }
+		ImGui::SliderFloat("Time Step Multiplier", &fluid->timeStepMultiplier, 0.0f, 50.0f);
+		ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 2000);
+		ImGui::Checkbox("Inject Smoke", &fluid->injectSmoke);
+
+		// Get names of render types
+		const char* renderTypes[] = {"Velocity", "Divergence", "Pressure", "Density", "Temperature"};
+		static int selected = (int)fluid->renderType;
+		if (ImGui::Combo("Render Type", &selected, renderTypes, IM_ARRAYSIZE(renderTypes)))
+		{
+			fluid->renderType = (FLUID_RENDER_TYPE)selected;
+		}
+	}
+
+	// All render targets from the renderer
 	if (ImGui::CollapsingHeader("All Render Targets"))
 	{
 		ImVec2 size = ImGui::GetItemRectSize();
