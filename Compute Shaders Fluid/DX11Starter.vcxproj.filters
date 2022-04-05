@@ -250,5 +250,8 @@
     <FxCompile Include="ConfinementCS.hlsl">
       <Filter>Shaders\Fluid</Filter>
     </FxCompile>
+    <FxCompile Include="AdvectionMacCormackCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

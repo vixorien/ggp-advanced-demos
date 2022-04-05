@@ -489,7 +489,7 @@ void Game::Update(float deltaTime, float totalTime)
 	Input& input = Input::GetInstance();
 
 	// Update the fluid field (which runs the compute shaders)
-	fluid->UpdateFluid();
+	fluid->UpdateFluid(deltaTime);
 
 	// Update the camera
 	camera->Update(deltaTime);
@@ -663,16 +663,20 @@ void Game::CreateUI(float dt)
 			ImGui::Checkbox("Inject Smoke", &fluid->injectSmoke);  
 			ImGui::SameLine();
 			ImGui::Checkbox("Apply Vorticity", &fluid->applyVorticity);
+			if (fluid->applyVorticity)
+			{
+				ImGui::SliderFloat("Vorticity", &fluid->vorticityEpsilon, 0.0f, 1.5f);
+			}
 			ImGui::ColorEdit3("Color", &fluid->fluidColor.x);
 			ImGui::SliderFloat3("Injection Position", &fluid->injectPosition.x, 0.0f, 1.0f);
 			ImGui::SliderFloat("Injection Radius", &fluid->injectRadius, 0.0f, 1.0f);
-			ImGui::SliderFloat("Injection Density", &fluid->injectDensity, 0.0f, 50.0f);
+			ImGui::SliderFloat("Injection Density", &fluid->injectDensity, 0.0f, 1.0f);
 			ImGui::SliderFloat("Injection Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
 			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, 0.0f, 200.0f);
 			ImGui::Spacing();
 			ImGui::Text("Buoyancy Characteristics");
-			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, 0.0f, 1.0f);
-			ImGui::SliderFloat("Density Weight", &fluid->densityWeight, 0.0f, 1.0f);
+			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, -1.0f, 1.0f);
+			ImGui::SliderFloat("Density Weight", &fluid->densityWeight, 0.0f, 100.0f);
 			ImGui::Indent(-10.0f);
 		}
 

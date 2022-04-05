@@ -17,14 +17,15 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	device(device),
 	context(context),
 	gridSize(gridSize),
+	timeCounter(0.0f),
 	injectSmoke(false),
 	applyVorticity(false),
 	pressureIterations(32),
-	fixedTimeStep(0.1f),
-	ambientTemperature(50.0f),
-	injectTemperature(100.0f),
-	injectDensity(0.1f),
-	injectRadius(0.1f),
+	fixedTimeStep(0.016f),
+	ambientTemperature(5.0f),
+	injectTemperature(10.0f),
+	injectDensity(0.05f),
+	injectRadius(0.15f),
 	injectPosition(0.5f, 0.2f, 0.5f),
 	temperatureBuoyancy(0.1f),
 	densityWeight(0.1f),
@@ -32,6 +33,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	densityDamper(0.999f),
 	temperatureDamper(0.999f),
 	fluidColor(1.0f, 1.0f, 1.0f),
+	vorticityEpsilon(1.0f),
 	renderType(FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY)
 {
 
@@ -85,8 +87,8 @@ void FluidField::RecreateGPUResources()
 	divergenceBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	pressureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	pressureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
+	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	vorticityBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
@@ -111,8 +113,13 @@ void FluidField::RecreateGPUResources()
 }
 
 
-void FluidField::UpdateFluid()
+void FluidField::UpdateFluid(float deltaTime)
 {
+	// Pile up the time
+	timeCounter += deltaTime;
+	if (timeCounter < fixedTimeStep)
+		return;
+
 	// Add smoke to the field
 	if(injectSmoke)
 		InjectSmoke();
@@ -135,6 +142,9 @@ void FluidField::UpdateFluid()
 
 	Advection(densityBuffers, densityDamper);
 	Advection(temperatureBuffers, temperatureDamper);
+
+	// Apply one time step
+	timeCounter -= fixedTimeStep;
 }
 
 
@@ -400,6 +410,7 @@ void FluidField::InjectSmoke()
 	injCS->SetFloat("deltaTime", fixedTimeStep);
 	injCS->SetFloat("injectRadius", injectRadius);
 	injCS->SetFloat3("injectPosition", injectPosition);
+	injCS->SetFloat3("injectColor", fluidColor);
 	injCS->SetFloat("injectDensity", injectDensity);
 	injCS->SetFloat("injectTemperature", injectTemperature);
 	injCS->CopyAllBufferData();
@@ -493,7 +504,7 @@ void FluidField::Confinement()
 	confCS->SetInt("gridSizeX", gridSize);
 	confCS->SetInt("gridSizeY", gridSize);
 	confCS->SetInt("gridSizeZ", gridSize);
-	confCS->SetFloat("vorticityEpsilon", 1.0f); // TODO: Parameterize?
+	confCS->SetFloat("vorticityEpsilon", vorticityEpsilon);
 	confCS->CopyAllBufferData();
 
 	// Set resources

@@ -45,7 +45,7 @@ public:
 	~FluidField();
 
 	void RecreateGPUResources();
-	void UpdateFluid();
+	void UpdateFluid(float deltaTime);
 	void RenderFluid(Camera* camera);
 
 	// Publically accessible data
@@ -62,6 +62,7 @@ public:
 	float velocityDamper;
 	float densityDamper;
 	float temperatureDamper; 
+	float vorticityEpsilon;
 	DirectX::XMFLOAT3 fluidColor;
 	DirectX::XMFLOAT3 injectPosition;
 	FLUID_RENDER_TYPE renderType;
@@ -70,6 +71,7 @@ private:
 
 	// Field data
 	unsigned int gridSize;
+	float timeCounter;
 
 	// Volume textures for all fluids
 	VolumeResource velocityBuffers[2];

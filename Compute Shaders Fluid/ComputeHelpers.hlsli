@@ -13,6 +13,11 @@ float3 PixelIndexToUVW(uint3 index, int gridSizeX, int gridSizeY, int gridSizeZ)
 		(index.z + 0.5f) / (gridSizeZ-1));
 }
 
+uint3 UVWToPixelIndex(float3 uvw, float3 sizes)
+{
+	return floor(uvw * (sizes - 1));
+}
+
 uint3 GetLeftIndex(uint3 index)
 {
 	// Make sure we don't go "negative", since
@@ -55,6 +60,13 @@ uint3 GetForwardIndex(uint3 index, int gridSizeZ)
 {
 	// Clamp to the grid size
 	index.z = min(index.z + 1, gridSizeZ - 1);
+	return index;
+}
+
+uint3 GetOffsetIndex(int3 index, int3 sizes, int xOff, int yOff, int zOff)
+{
+	index += int3(xOff, yOff, zOff);
+	index = min(max(index, 0), sizes - 1);
 	return index;
 }
 

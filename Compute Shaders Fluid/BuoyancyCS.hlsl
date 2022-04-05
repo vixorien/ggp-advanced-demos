@@ -21,7 +21,7 @@ void main(uint3 id : SV_DispatchThreadID)
 {
 	// Grab the temperature
 	float temp = TemperatureIn[id].r;
-	float density = DensityIn[id].r;
+	float density = DensityIn[id].a;
 
 	// Calculate buoyancy force
 	// GPU Gems 3 version... not great?

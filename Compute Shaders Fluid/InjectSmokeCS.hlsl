@@ -6,12 +6,11 @@ cbuffer externalData : register(b0)
 	int gridSizeX;
 	int gridSizeY;
 	int gridSizeZ;
-	float deltaTime;
 
 	float injectRadius;		// In UV coords
 	float3 injectPosition;	// In UV coords
 	
-	//float4 injectDensityColor;
+	float3 injectColor;
 	float injectDensity;
 
 	float injectTemperature;
@@ -37,9 +36,16 @@ void main(uint3 id : SV_DispatchThreadID)
 
 	// How much to inject based on distance?
 	float dist = length(posUVW - injectPosition);
-	float injAmount = max(0, injectRadius - dist) / injectRadius;
+	float injFalloff = max(0, injectRadius - dist) / injectRadius;
 
-	// Output should match input plus any new injection
-	DensityOut[id] = DensityIn[id] + injAmount * injectDensity * deltaTime;
-	TemperatureOut[id] = TemperatureIn[id].r + injAmount * injectTemperature * deltaTime;
+	// Grab the old values
+	float4 oldColorAndDensity = DensityIn[id];
+
+	// Calculate new values - color is a replacement, density is an add
+	float3 newColor = injFalloff > 0 ? injectColor : oldColorAndDensity.rgb;
+	float newDensity = oldColorAndDensity.a + injectDensity * injFalloff;
+
+	// Spit out the updates
+	DensityOut[id] = float4(newColor, newDensity);
+	TemperatureOut[id] = TemperatureIn[id].r + injectTemperature * injFalloff;
 }

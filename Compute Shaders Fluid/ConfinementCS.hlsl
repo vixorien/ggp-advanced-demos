@@ -28,7 +28,7 @@ void main(uint3 id : SV_DispatchThreadID)
 	uint3 idB = GetBackIndex(id);
 	uint3 idF = GetForwardIndex(id, gridSizeZ);
 
-	// Velocity of surrounding pixels
+	// Vorticity of surrounding pixels
 	float vortL = length(VorticityIn[idL].rgb);
 	float vortR = length(VorticityIn[idR].rgb);
 	float vortD = length(VorticityIn[idD].rgb);
@@ -48,7 +48,7 @@ void main(uint3 id : SV_DispatchThreadID)
 		(vortU - vortD),
 		(vortF - vortB));
 	float3 N = eta / (length(eta) + 0.0001f);
-	float3 confine = cross(N, omega) * deltaTime * vorticityEpsilon;
+	float3 confine = cross(N, omega) * vorticityEpsilon;
 
 	// Apply
 	VelocityOut[id] = float4(VelocityIn[id].rgb + confine, 1);

@@ -8,7 +8,7 @@ cbuffer externalData : register(b0)
 	matrix invWorld;
 	float3 cameraPosition;
 	int debugRaymarchTexture;
-	float3 fluidColor;
+	//float3 fluidColor;
 }
 
 struct VertexToPixel
@@ -100,13 +100,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 		else
 		{
 			// Grab the density here and blend below
-			float density = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0).r;
+			float4 colorAndDensity = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
 			//float density = TricubicInterpolation(volumeTexture, SamplerLinearClamp, uvw).r; // TOO SLOW
 
-			// Perform a "front to back" blend and exit early
-			// if we hit "full" alpha.  Found in GPU Gems 3 Chapter 30 (fluid)
-			finalColor.rgb += fluidColor * density * (1.0f - finalColor.a);
-			finalColor.a += density * (1.0f - finalColor.a);
+			// Perform a "front to back" blend and exit early if we hit "full" alpha
+			// From GPU Gems 3 Chapter 30 (fluid)
+			finalColor.rgb += colorAndDensity.rgb * colorAndDensity.a * (1.0f - finalColor.a);
+			finalColor.a += colorAndDensity.a * (1.0f - finalColor.a);
 			if (finalColor.a > 0.99f)
 				break;
 		}
