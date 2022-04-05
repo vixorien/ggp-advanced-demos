@@ -20,7 +20,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	timeCounter(0.0f),
 	injectSmoke(false),
 	applyVorticity(false),
-	pressureIterations(32),
+	pressureIterations(20),
 	raymarchSamples(128),
 	fixedTimeStep(0.016f),
 	ambientTemperature(5.0f),

@@ -27,16 +27,13 @@ RWTexture3D<float>	TemperatureOut	: register(u1);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main(uint3 id : SV_DispatchThreadID)
 {
-	if (injectRadius == 0.0f)
-		return;
-
 	// Pixel position in [0-gridSize] range and UV coords [0-1] range
 	float3 posInGrid = float3(id);
 	float3 posUVW = PixelIndexToUVW(posInGrid, gridSizeX, gridSizeY, gridSizeZ);
 
 	// How much to inject based on distance?
 	float dist = length(posUVW - injectPosition);
-	float injFalloff = max(0, injectRadius - dist) / injectRadius;
+	float injFalloff = injectRadius == 0.0f ? 0.0f : max(0, injectRadius - dist) / injectRadius;
 
 	// Grab the old values
 	float4 oldColorAndDensity = DensityIn[id];

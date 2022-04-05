@@ -208,59 +208,6 @@ void Game::LoadAssetsAndCreateEntities()
 	SimplePixelShader* ps = assets.GetPixelShader("PixelShader.cso");
 	SimplePixelShader* psPBR = assets.GetPixelShader("PixelShaderPBR.cso");
 
-
-	// Create basic materials
-	Material* cobbleMat2x = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	cobbleMat2x->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\cobblestone_albedo.png"));
-	cobbleMat2x->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\cobblestone_normals.png"));
-	cobbleMat2x->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\cobblestone_roughness.png"));
-	cobbleMat2x->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* floorMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	floorMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\floor_albedo.png"));
-	floorMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\floor_normals.png"));
-	floorMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\floor_roughness.png"));
-	floorMat->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* paintMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	paintMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\paint_albedo.png"));
-	paintMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\paint_normals.png"));
-	paintMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\paint_roughness.png"));
-	paintMat->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* scratchedMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	scratchedMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\scratched_albedo.png"));
-	scratchedMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\scratched_normals.png"));
-	scratchedMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\scratched_roughness.png"));
-	scratchedMat->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* bronzeMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	bronzeMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\bronze_albedo.png"));
-	bronzeMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\bronze_normals.png"));
-	bronzeMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\bronze_roughness.png"));
-	bronzeMat->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* roughMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	roughMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\rough_albedo.png"));
-	roughMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\rough_normals.png"));
-	roughMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\rough_roughness.png"));
-	roughMat->AddPSSampler("BasicSampler", samplerOptions);
-
-	Material* woodMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	woodMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\wood_albedo.png"));
-	woodMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\wood_normals.png"));
-	woodMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\wood_roughness.png"));
-	woodMat->AddPSSampler("BasicSampler", samplerOptions);
-
-
-	materials.push_back(cobbleMat2x);
-	materials.push_back(floorMat);
-	materials.push_back(paintMat);
-	materials.push_back(scratchedMat);
-	materials.push_back(bronzeMat);
-	materials.push_back(roughMat);
-	materials.push_back(woodMat);
-
 	// Create PBR materials
 	Material* cobbleMat2xPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
 	cobbleMat2xPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\cobblestone_albedo.png"));
@@ -340,15 +287,15 @@ void Game::LoadAssetsAndCreateEntities()
 
 	GameEntity* paintSpherePBR = new GameEntity(sphereMesh, paintMatPBR);
 	paintSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	paintSpherePBR->GetTransform()->SetPosition(-2, 2, 0);
+	paintSpherePBR->GetTransform()->SetPosition(-2, 2.5f, 0);
 
 	GameEntity* scratchSpherePBR = new GameEntity(sphereMesh, scratchedMatPBR);
 	scratchSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	scratchSpherePBR->GetTransform()->SetPosition(0, 2, 0);
+	scratchSpherePBR->GetTransform()->SetPosition(0, 3, 0);
 
 	GameEntity* bronzeSpherePBR = new GameEntity(sphereMesh, bronzeMatPBR);
 	bronzeSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	bronzeSpherePBR->GetTransform()->SetPosition(2, 2, 0);
+	bronzeSpherePBR->GetTransform()->SetPosition(2, 2.5f, 0);
 
 	GameEntity* roughSpherePBR = new GameEntity(sphereMesh, roughMatPBR);
 	roughSpherePBR->GetTransform()->SetScale(2, 2, 2);
@@ -365,43 +312,6 @@ void Game::LoadAssetsAndCreateEntities()
 	entities.push_back(bronzeSpherePBR);
 	entities.push_back(roughSpherePBR);
 	entities.push_back(woodSpherePBR);
-
-	// Create the non-PBR entities ==============================
-	GameEntity* cobSphere = new GameEntity(sphereMesh, cobbleMat2x);
-	cobSphere->GetTransform()->SetScale(2, 2, 2);
-	cobSphere->GetTransform()->SetPosition(-6, -2, 0);
-
-	GameEntity* floorSphere = new GameEntity(sphereMesh, floorMat);
-	floorSphere->GetTransform()->SetScale(2, 2, 2);
-	floorSphere->GetTransform()->SetPosition(-4, -2, 0);
-
-	GameEntity* paintSphere = new GameEntity(sphereMesh, paintMat);
-	paintSphere->GetTransform()->SetScale(2, 2, 2);
-	paintSphere->GetTransform()->SetPosition(-2, -2, 0);
-
-	GameEntity* scratchSphere = new GameEntity(sphereMesh, scratchedMat);
-	scratchSphere->GetTransform()->SetScale(2, 2, 2);
-	scratchSphere->GetTransform()->SetPosition(0, -2, 0);
-
-	GameEntity* bronzeSphere = new GameEntity(sphereMesh, bronzeMat);
-	bronzeSphere->GetTransform()->SetScale(2, 2, 2);
-	bronzeSphere->GetTransform()->SetPosition(2, -2, 0);
-
-	GameEntity* roughSphere = new GameEntity(sphereMesh, roughMat);
-	roughSphere->GetTransform()->SetScale(2, 2, 2);
-	roughSphere->GetTransform()->SetPosition(4, -2, 0);
-
-	GameEntity* woodSphere = new GameEntity(sphereMesh, woodMat);
-	woodSphere->GetTransform()->SetScale(2, 2, 2);
-	woodSphere->GetTransform()->SetPosition(6, -2, 0);
-
-	entities.push_back(cobSphere);
-	entities.push_back(floorSphere);
-	entities.push_back(paintSphere);
-	entities.push_back(scratchSphere);
-	entities.push_back(bronzeSphere);
-	entities.push_back(roughSphere);
-	entities.push_back(woodSphere);
 
 }
 
@@ -672,17 +582,17 @@ void Game::CreateUI(float dt)
 			ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 200);
 			ImGui::Spacing();
 
-			// Dampening
-			ImGui::Text("Dampening");
-			ImGui::SliderFloat("Velocity Damper", &fluid->velocityDamper, 0.9f, 1.0f);
-			ImGui::SliderFloat("Density Damper", &fluid->densityDamper, 0.9f, 1.0f);
-			ImGui::SliderFloat("Temperature Damper", &fluid->temperatureDamper, 0.9f, 1.0f);
-			ImGui::Spacing();
-
 			// Vorticity
 			ImGui::Text("Vorticity");
 			ImGui::Checkbox("Apply Vorticity", &fluid->applyVorticity);
 			ImGui::SliderFloat("Vorticity", &fluid->vorticityEpsilon, 0.0f, 1.5f);
+			ImGui::Spacing();
+
+			// Dampening
+			ImGui::Text("Advection Dampening");
+			ImGui::SliderFloat("Velocity Damper", &fluid->velocityDamper, 0.9f, 1.0f);
+			ImGui::SliderFloat("Density Damper", &fluid->densityDamper, 0.9f, 1.0f);
+			ImGui::SliderFloat("Temperature Damper", &fluid->temperatureDamper, 0.9f, 1.0f);
 
 			ImGui::TreePop();
 		}

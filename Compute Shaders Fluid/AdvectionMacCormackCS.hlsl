@@ -28,6 +28,12 @@ SamplerState SamplerLinearClamp		: register(s0);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main(uint3 id : SV_DispatchThreadID)
 {
+	// =================== NOTE ===================
+	//  This shader is currently UNUSED!  Instead,
+	//  vorticity is used to give the fluid its
+	//  swirling patterns.
+	// ============================================
+
 	// Pixel position in [0-gridSize] range
 	float3 posInGrid = float3(id);
 
