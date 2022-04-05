@@ -4,18 +4,18 @@
 #define FLUID_COMPUTE_THREADS_PER_AXIS 8
 
 
-float3 PixelIndexToUVW(uint3 index, int gridSizeX, int gridSizeY, int gridSizeZ)
+float3 PixelIndexToUVW(float3 index, int gridSizeX, int gridSizeY, int gridSizeZ)
 {
 	// Note: Must account for half-pixel offset!
 	return float3(
-		(index.x + 0.5f) / (gridSizeX-1),
-		(index.y + 0.5f) / (gridSizeY-1),
-		(index.z + 0.5f) / (gridSizeZ-1));
+		(index.x + 0.5f) / gridSizeX,
+		(index.y + 0.5f) / gridSizeY,
+		(index.z + 0.5f) / gridSizeZ);
 }
 
 uint3 UVWToPixelIndex(float3 uvw, float3 sizes)
 {
-	return floor(uvw * (sizes - 1));
+	return (uint3)floor(uvw * (sizes - 1));
 }
 
 uint3 GetLeftIndex(uint3 index)

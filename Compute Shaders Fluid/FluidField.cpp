@@ -21,6 +21,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	injectSmoke(false),
 	applyVorticity(false),
 	pressureIterations(32),
+	raymarchSamples(128),
 	fixedTimeStep(0.016f),
 	ambientTemperature(5.0f),
 	injectTemperature(10.0f),
@@ -33,8 +34,9 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	densityDamper(0.999f),
 	temperatureDamper(0.999f),
 	fluidColor(1.0f, 1.0f, 1.0f),
-	vorticityEpsilon(1.0f),
-	renderType(FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY)
+	vorticityEpsilon(0.3f),
+	renderBuffer(FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY),
+	renderMode(FLUID_RENDER_MODE::FLUID_RENDER_MODE_BLEND)
 {
 
 	RecreateGPUResources();
@@ -124,7 +126,7 @@ void FluidField::UpdateFluid(float deltaTime)
 	if(injectSmoke)
 		InjectSmoke();
 
-	// Advect the velocity and other quantities
+	// Apply the buoyancy force and advect velocity
 	Buoyancy();
 	Advection(velocityBuffers, velocityDamper);
 
@@ -140,6 +142,7 @@ void FluidField::UpdateFluid(float deltaTime)
 	Pressure();
 	Projection();
 
+	// Advect other quantities
 	Advection(densityBuffers, densityDamper);
 	Advection(temperatureBuffers, temperatureDamper);
 
@@ -182,17 +185,22 @@ void FluidField::RenderFluid(Camera* camera)
 	// Resources
 	volumePS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
 	
-	bool debugDraw = true;
+	// Assume debug mode unless we're doing the density buffer
+	int modeOverride = -1;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
-	switch (renderType)
+	switch (renderBuffer)
 	{
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_VELOCITY: srv = velocityBuffers[0].SRV; break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DIVERGENCE: srv = divergenceBuffer.SRV; break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_PRESSURE: srv = pressureBuffers[0].SRV; break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_TEMPERATURE: srv = temperatureBuffers[0].SRV; break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_VORTICITY: srv = vorticityBuffer.SRV; break;
+
 	default:
-	case FLUID_RENDER_TYPE::FLUID_RENDER_VELOCITY: srv = velocityBuffers[0].SRV; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_DIVERGENCE: srv = divergenceBuffer.SRV; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_PRESSURE: srv = pressureBuffers[0].SRV; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_DENSITY: srv = densityBuffers[0].SRV; debugDraw = false; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_TEMPERATURE: srv = temperatureBuffers[0].SRV; break;
-	case FLUID_RENDER_TYPE::FLUID_RENDER_VORTICITY: srv = vorticityBuffer.SRV; break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY: 
+		srv = densityBuffers[0].SRV; 
+		modeOverride = (int)renderMode;
+		break;
 	}
 	volumePS->SetShaderResourceView("volumeTexture", srv);
 
@@ -200,7 +208,8 @@ void FluidField::RenderFluid(Camera* camera)
 	volumePS->SetMatrix4x4("invWorld", invWorld);
 	volumePS->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
 	volumePS->SetFloat3("fluidColor", fluidColor);
-	volumePS->SetInt("debugRaymarchTexture", (int)debugDraw);
+	volumePS->SetInt("renderMode", modeOverride);
+	volumePS->SetInt("raymarchSamples", raymarchSamples);
 	volumePS->CopyAllBufferData();
 
 	// Draw the geometry for the volume
@@ -210,6 +219,11 @@ void FluidField::RenderFluid(Camera* camera)
 	// Reset render states
 	context->OMSetDepthStencilState(0, 0);
 	context->OMSetBlendState(0, 0, 0xFFFFFFFF);
+}
+
+unsigned int FluidField::GetGridSize()
+{
+	return gridSize;
 }
 
 

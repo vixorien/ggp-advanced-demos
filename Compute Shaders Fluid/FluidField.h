@@ -6,20 +6,20 @@
 
 #include "Camera.h"
 
-enum FLUID_TYPE
+enum class FLUID_RENDER_BUFFER
 {
-	FLUID_TYPE_SMOKE,
-	FLUID_TYPE_FIRE
+	FLUID_RENDER_BUFFER_VELOCITY,
+	FLUID_RENDER_BUFFER_DIVERGENCE,
+	FLUID_RENDER_BUFFER_PRESSURE,
+	FLUID_RENDER_BUFFER_DENSITY,
+	FLUID_RENDER_BUFFER_TEMPERATURE,
+	FLUID_RENDER_BUFFER_VORTICITY
 };
 
-enum class FLUID_RENDER_TYPE
+enum class FLUID_RENDER_MODE
 {
-	FLUID_RENDER_VELOCITY,
-	FLUID_RENDER_DIVERGENCE,
-	FLUID_RENDER_PRESSURE,
-	FLUID_RENDER_DENSITY,
-	FLUID_RENDER_TEMPERATURE,
-	FLUID_RENDER_VORTICITY
+	FLUID_RENDER_MODE_BLEND,
+	FLUID_RENDER_MODE_ADD
 };
 
 struct VolumeResource
@@ -52,6 +52,7 @@ public:
 	bool injectSmoke;
 	bool applyVorticity;
 	int pressureIterations;
+	int raymarchSamples;
 	float fixedTimeStep;
 	float ambientTemperature;
 	float injectTemperature;
@@ -65,7 +66,10 @@ public:
 	float vorticityEpsilon;
 	DirectX::XMFLOAT3 fluidColor;
 	DirectX::XMFLOAT3 injectPosition;
-	FLUID_RENDER_TYPE renderType;
+	FLUID_RENDER_BUFFER renderBuffer;
+	FLUID_RENDER_MODE renderMode;
+
+	unsigned int GetGridSize();
 
 private:
 

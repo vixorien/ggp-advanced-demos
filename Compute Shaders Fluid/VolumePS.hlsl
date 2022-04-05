@@ -3,12 +3,17 @@
 
 #define NUM_SAMPLES 256
 
+// Must match fluid field render types
+#define RENDER_MODE_DEBUG -1
+#define RENDER_MODE_BLEND 0
+#define RENDER_MODE_ADD 1
+
 cbuffer externalData : register(b0)
 {
 	matrix invWorld;
 	float3 cameraPosition;
-	int debugRaymarchTexture;
-	//float3 fluidColor;
+	int renderMode;
+	int raymarchSamples;
 }
 
 struct VertexToPixel
@@ -78,7 +83,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Set up the current position and the step amount
 	float maxDist = farHit - nearHit;
 	float3 currentPos = rayStart;
-	float step = 1.0f / NUM_SAMPLES;// length(rayStart - rayEnd) / NUM_SAMPLES;
+	float step = 1.0f / raymarchSamples;
 	float3 stepDir = step * dir;
 
 	// Accumulate as we raymarch
@@ -86,27 +91,32 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float totalDist = 0.0f;
 
 	[loop]
-	for (int i = 0; i < NUM_SAMPLES && totalDist < maxDist; i++)
+	for (int i = 0; i < raymarchSamples && totalDist < maxDist; i++)
 	{
-		// Get the current position in UVW space
+		// Get the current position in UVW space and sample the texture
 		float3 uvw = currentPos + float3(0.5f, 0.5f, 0.5f);
+		float4 color = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
 
-		// Simple debug draw?
-		if (debugRaymarchTexture)
+		// Which rendering mode?
+		if (renderMode == RENDER_MODE_DEBUG)
 		{
-			float4 color = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
 			finalColor += color * step;
+			finalColor.a = 1;
 		}
-		else
+		else if (renderMode == RENDER_MODE_ADD)
 		{
 			// Grab the density here and blend below
 			float4 colorAndDensity = volumeTexture.SampleLevel(SamplerLinearClamp, uvw, 0);
-			//float density = TricubicInterpolation(volumeTexture, SamplerLinearClamp, uvw).r; // TOO SLOW
 
+			finalColor.rgb += color.rgb * color.a;
+			finalColor.a += color.a;
+		}
+		else if(renderMode == RENDER_MODE_BLEND)
+		{
 			// Perform a "front to back" blend and exit early if we hit "full" alpha
 			// From GPU Gems 3 Chapter 30 (fluid)
-			finalColor.rgb += colorAndDensity.rgb * colorAndDensity.a * (1.0f - finalColor.a);
-			finalColor.a += colorAndDensity.a * (1.0f - finalColor.a);
+			finalColor.rgb += color.rgb * color.a * (1.0f - finalColor.a);
+			finalColor.a += color.a * (1.0f - finalColor.a);
 			if (finalColor.a > 0.99f)
 				break;
 		}

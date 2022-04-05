@@ -136,7 +136,7 @@ void Game::Init()
 		entities,
 		lights,
 		fluid,
-		MAX_LIGHTS / 2, // Half the maximum lights are active to start with
+		3, 
 		sky,
 		width,
 		height,
@@ -643,53 +643,86 @@ void Game::CreateUI(float dt)
 	// Fluid options
 	if (ImGui::CollapsingHeader("Fluid Field"))
 	{
-		ImGui::Indent(10.0f);
-		if (ImGui::Button("Reset Fluid Buffers")) { fluid->RecreateGPUResources(); }
-
-		// Get names of render types
-		const char* renderTypes[] = { "Velocity", "Divergence", "Pressure", "Density", "Temperature", "Vorticity" };
-		static int selected = (int)fluid->renderType;
-		if (ImGui::Combo("Render Type", &selected, renderTypes, IM_ARRAYSIZE(renderTypes)))
+		if (ImGui::TreeNode("Quantity Injection"))
 		{
-			fluid->renderType = (FLUID_RENDER_TYPE)selected;
-		}
+			ImGui::Checkbox("Inject Quantity into Volume", &fluid->injectSmoke);
+			ImGui::Spacing();
 
-		ImGui::SliderFloat("Time Step", &fluid->fixedTimeStep, 0.0f, 1.0f);
-		ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 200);
-
-		if (ImGui::CollapsingHeader("Smoke Injection"))
-		{
-			ImGui::Indent(10.0f);
-			ImGui::Checkbox("Inject Smoke", &fluid->injectSmoke);  
-			ImGui::SameLine();
-			ImGui::Checkbox("Apply Vorticity", &fluid->applyVorticity);
-			if (fluid->applyVorticity)
-			{
-				ImGui::SliderFloat("Vorticity", &fluid->vorticityEpsilon, 0.0f, 1.5f);
-			}
+			ImGui::Text("Injection Details");
 			ImGui::ColorEdit3("Color", &fluid->fluidColor.x);
-			ImGui::SliderFloat3("Injection Position", &fluid->injectPosition.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Injection Radius", &fluid->injectRadius, 0.0f, 1.0f);
-			ImGui::SliderFloat("Injection Density", &fluid->injectDensity, 0.0f, 1.0f);
-			ImGui::SliderFloat("Injection Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
+			ImGui::SliderFloat3("Position", &fluid->injectPosition.x, 0.0f, 1.0f);
+			ImGui::SliderFloat("Radius", &fluid->injectRadius, 0.0f, 1.0f);
+			ImGui::SliderFloat("Density", &fluid->injectDensity, 0.0f, 1.0f);
+			ImGui::SliderFloat("Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
 			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, 0.0f, 200.0f);
 			ImGui::Spacing();
+
 			ImGui::Text("Buoyancy Characteristics");
 			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, -1.0f, 1.0f);
 			ImGui::SliderFloat("Density Weight", &fluid->densityWeight, 0.0f, 100.0f);
-			ImGui::Indent(-10.0f);
+
+			ImGui::TreePop();
 		}
 
-		if (ImGui::CollapsingHeader("Advection Dampening"))
+		ImGui::Spacing();
+		if (ImGui::TreeNode("Simulation & Advection"))
 		{
-			ImGui::Indent(10.0f);
+			// General sim
+			ImGui::SliderFloat("Time Step", &fluid->fixedTimeStep, 0.0f, 1.0f);
+			ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 200);
+			ImGui::Spacing();
+
+			// Dampening
+			ImGui::Text("Dampening");
 			ImGui::SliderFloat("Velocity Damper", &fluid->velocityDamper, 0.9f, 1.0f);
 			ImGui::SliderFloat("Density Damper", &fluid->densityDamper, 0.9f, 1.0f);
 			ImGui::SliderFloat("Temperature Damper", &fluid->temperatureDamper, 0.9f, 1.0f);
-			ImGui::Indent(-10.0f);
+			ImGui::Spacing();
+
+			// Vorticity
+			ImGui::Text("Vorticity");
+			ImGui::Checkbox("Apply Vorticity", &fluid->applyVorticity);
+			ImGui::SliderFloat("Vorticity", &fluid->vorticityEpsilon, 0.0f, 1.5f);
+
+			ImGui::TreePop();
 		}
-		
-		ImGui::Indent(-10.0f);
+
+		ImGui::Spacing();
+		if (ImGui::TreeNode("Rendering"))
+		{
+			// Grid size report
+			ImGui::AlignTextToFramePadding();
+			unsigned int gridSize = fluid->GetGridSize();
+			ImGui::Text("Grid Resolution: %dx%dx%d", gridSize, gridSize, gridSize);
+			ImGui::SameLine();
+
+			// Button for reset
+			if (ImGui::Button("Reset Fluid Buffers")) 
+			{ 
+				fluid->RecreateGPUResources(); 
+			}
+
+			// Combo box to choose rendering buffer
+			const char* renderTypes[] = { "Velocity", "Divergence", "Pressure", "Density", "Temperature", "Vorticity" };
+			static int selectedBuffer = (int)fluid->renderBuffer;
+			if (ImGui::Combo("Buffer to Render", &selectedBuffer, renderTypes, IM_ARRAYSIZE(renderTypes)))
+			{
+				fluid->renderBuffer = (FLUID_RENDER_BUFFER)selectedBuffer;
+			}
+
+			// Combo box to choose render mode
+			const char* renderModes[] = { "Alpha Blend (Smoke)", "Additive (Fire)" };
+			static int selectedMode = (int)fluid->renderMode;
+			if (ImGui::Combo("Render Mode", &selectedMode, renderModes, IM_ARRAYSIZE(renderModes)))
+			{
+				fluid->renderMode = (FLUID_RENDER_MODE)selectedMode;
+			}
+
+			// Render samples
+			ImGui::SliderInt("Raymarch Samples", &fluid->raymarchSamples, 16, 256);
+
+			ImGui::TreePop();
+		}
 	}
 
 	// All render targets from the renderer
