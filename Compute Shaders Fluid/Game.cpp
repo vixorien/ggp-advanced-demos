@@ -558,10 +558,23 @@ void Game::CreateUI(float dt)
 			ImGui::Checkbox("Inject Quantity into Volume", &fluid->injectSmoke);
 			ImGui::Spacing();
 
-			ImGui::Text("Injection Details");
+			ImGui::Text("Injection Details");			
 			ImGui::ColorEdit3("Color", &fluid->fluidColor.x);
 			ImGui::SliderFloat3("Position", &fluid->injectPosition.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Radius", &fluid->injectRadius, 0.0f, 1.0f);
+			ImGui::SameLine();
+			if (ImGui::SmallButton("[o]"))
+				ImGui::OpenPopup("Position Drag");
+			if (ImGui::BeginPopup("Position Drag"))
+			{
+				ImVec2 pos = ImVec2(fluid->injectPosition.x, 1.0f - fluid->injectPosition.y);
+				if (Drag2D("Position [X,Y]", ImVec2(100, 100), ImVec2(0, 0), ImVec2(1, 1), &pos))
+				{
+					fluid->injectPosition.x = pos.x;
+					fluid->injectPosition.y = 1.0f - pos.y;
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::SliderFloat("Radius", &fluid->injectRadius, 0.0f, 0.5f);
 			ImGui::SliderFloat("Density", &fluid->injectDensity, 0.0f, 1.0f);
 			ImGui::SliderFloat("Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
 			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, 0.0f, 200.0f);
@@ -822,6 +835,63 @@ void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
 		ImGui::Image(user_texture_id, ImVec2(256,256), uvTL, uvBR);
 		ImGui::EndTooltip();
 	}
+}
+
+bool Game::Drag2D(const char* label, ImVec2 size, ImVec2 min, ImVec2 max, ImVec2* currentValues)
+{
+	// Set up label first
+	if(label) ImGui::Text(label);
+
+	// Define bounds
+	ImVec2 drag2D_TopLeft = ImGui::GetCursorScreenPos();
+	ImVec2 drag2D_BottomRight = ImVec2(
+		drag2D_TopLeft.x + size.x,
+		drag2D_TopLeft.y + size.y);
+
+	// Draw bounds
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->AddRectFilled(drag2D_TopLeft, drag2D_BottomRight, IM_COL32(50, 50, 50, 255));
+	draw_list->AddRect(drag2D_TopLeft, drag2D_BottomRight, IM_COL32(100, 100, 100, 255));
+	
+	// Set up grabber and draw clamped to rect
+	float grabberRadius = 3;
+	ImVec2 clampedVals = ImVec2(
+		max(min.x, min(max.x, (*currentValues).x)),
+		max(min.y, min(max.y, (*currentValues).y)));
+	ImVec2 percentVals = ImVec2(
+		(clampedVals.x - min.x) / (max.x - min.x),
+		(clampedVals.y - min.y) / (max.y - min.y));
+	ImVec2 rectVals = ImVec2(percentVals.x * size.x, percentVals.y * size.y);
+
+	ImVec2 grabberTL = ImVec2(drag2D_TopLeft.x + rectVals.x - grabberRadius, drag2D_TopLeft.y + rectVals.y - grabberRadius);
+	ImVec2 grabberBR = ImVec2(drag2D_TopLeft.x + rectVals.x + grabberRadius, drag2D_TopLeft.y + rectVals.y + grabberRadius);
+	draw_list->AddRectFilled(grabberTL, grabberBR, IM_COL32(128, 128, 0, 255));
+	draw_list->AddRect(grabberTL, grabberBR, IM_COL32(255, 255, 0, 255));
+
+	// Invisible button to get interaction
+	ImGui::InvisibleButton("Drag2D", size);
+
+	// Are we active and either dragging or a single click?
+	if (ImGui::IsItemActive() &&
+		(ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
+		 ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+	{
+		// Grab mouse absolute, relative to the box, and 0-1
+		ImVec2 mousePosAbsolute = ImGui::GetMousePos();
+		ImVec2 mousePosRelative = ImVec2(mousePosAbsolute.x - drag2D_TopLeft.x, mousePosAbsolute.y - drag2D_TopLeft.y);
+		ImVec2 percent = ImVec2(
+			max(0.0f, min(1.0f, mousePosRelative.x / size.x)),
+			max(0.0f, min(1.0f, mousePosRelative.y / size.y)));
+
+		// Determine new value based on given range
+		(*currentValues).x = min.x + percent.x * (max.x - min.x);
+		(*currentValues).y = min.y + percent.y * (max.y - min.y);
+
+		// Interaction has occurred
+		return true;
+	}
+
+	return false;
 }
 
 

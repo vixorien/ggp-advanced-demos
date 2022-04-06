@@ -64,6 +64,12 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 	device->CreateBlendState(&blendDesc, blendState.GetAddressOf());
+
+	D3D11_RASTERIZER_DESC rasterDesc = {};
+	rasterDesc.CullMode = D3D11_CULL_FRONT;
+	rasterDesc.FillMode = D3D11_FILL_SOLID;
+	rasterDesc.DepthClipEnable = true;
+	device->CreateRasterizerState(&rasterDesc, rasterState.GetAddressOf());
 }
 
 FluidField::~FluidField()
@@ -156,7 +162,7 @@ void FluidField::RenderFluid(Camera* camera)
 	// Set up render states
 	context->OMSetDepthStencilState(depthState.Get(), 0);
 	context->OMSetBlendState(blendState.Get(), 0, 0xFFFFFFFF);
-	// TODO: Change cull mode?
+	context->RSSetState(rasterState.Get());
 
 	// Cube size
 	XMFLOAT3 translation(0, 0, 0);
@@ -219,6 +225,7 @@ void FluidField::RenderFluid(Camera* camera)
 	// Reset render states
 	context->OMSetDepthStencilState(0, 0);
 	context->OMSetBlendState(0, 0, 0xFFFFFFFF);
+	context->RSSetState(0);
 }
 
 unsigned int FluidField::GetGridSize()

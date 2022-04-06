@@ -93,6 +93,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerLinearClamp;
 	Microsoft::WRL::ComPtr<ID3D11BlendState> blendState;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthState;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterState;
 
 	// Helper methods
 	void SwapBuffers(VolumeResource volumes[2]);

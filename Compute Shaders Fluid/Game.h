@@ -57,6 +57,7 @@ private:
 	void UIEntity(GameEntity* entity, int index);
 	void UILight(Light& light, int index);
 	void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size);
+	bool Drag2D(const char* label, ImVec2 size, ImVec2 min, ImVec2 max, ImVec2* currentValues);
 
 	// General helpers
 	void GenerateLights();
