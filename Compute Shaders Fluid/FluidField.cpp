@@ -23,7 +23,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	pressureIterations(20),
 	raymarchSamples(128),
 	fixedTimeStep(0.016f),
-	ambientTemperature(5.0f),
+	ambientTemperature(0.0f),
 	injectTemperature(10.0f),
 	injectDensity(0.05f),
 	injectRadius(0.15f),
@@ -99,6 +99,7 @@ void FluidField::RecreateGPUResources()
 	temperatureBuffers[0].Reset();
 	temperatureBuffers[1].Reset();
 	vorticityBuffer.Reset();
+	obstacleBuffer.Reset();
 
 	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
@@ -110,6 +111,25 @@ void FluidField::RecreateGPUResources()
 	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
 	vorticityBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+	// Obstacle for testing
+	unsigned int dataSize = gridSize * gridSize * gridSize;
+	unsigned char* obData = new unsigned char[dataSize];
+	for (unsigned int z = 0; z < gridSize; z++)
+		for (unsigned int y = 0; y < gridSize; y++)
+			for (unsigned int x = 0; x < gridSize; x++)
+			{
+				int index = x + (gridSize * y) + (gridSize * gridSize * z);
+				obData[index] = (unsigned char)0;
+
+				if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y > 32 && y < 40)
+				{
+					obData[index] = (unsigned char)255;
+				}
+			}
+
+	obstacleBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R8_UNORM, obData);
+	delete[] obData;
 
 	// Unused, but for reference...
 
@@ -206,17 +226,18 @@ void FluidField::RenderFluid(Camera* camera)
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
 	switch (renderBuffer)
 	{
+	default:
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY:
+		srv = densityBuffers[0].SRV;
+		modeOverride = (int)renderMode;
+		break;
+
 	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_VELOCITY: srv = velocityBuffers[0].SRV; break;
 	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DIVERGENCE: srv = divergenceBuffer.SRV; break;
 	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_PRESSURE: srv = pressureBuffers[0].SRV; break;
 	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_TEMPERATURE: srv = temperatureBuffers[0].SRV; break;
 	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_VORTICITY: srv = vorticityBuffer.SRV; break;
-
-	default:
-	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY: 
-		srv = densityBuffers[0].SRV; 
-		modeOverride = (int)renderMode;
-		break;
+	case FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_OBSTACLES: srv = obstacleBuffer.SRV; break;
 	}
 	volumePS->SetShaderResourceView("volumeTexture", srv);
 
@@ -305,6 +326,7 @@ void FluidField::Advection(VolumeResource volumes[2], float damper)
 	// Set resources
 	advectCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
 	advectCS->SetShaderResourceView("AdvectionIn", volumes[0].SRV);
+	advectCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	advectCS->SetSamplerState("SamplerLinearClamp", samplerLinearClamp);
 	switch (volumes[1].ChannelCount)
 	{
@@ -321,6 +343,7 @@ void FluidField::Advection(VolumeResource volumes[2], float damper)
 	// Unset resources
 	advectCS->SetShaderResourceView("VelocityIn", 0);
 	advectCS->SetShaderResourceView("AdvectionIn", 0);
+	advectCS->SetShaderResourceView("ObstaclesIn", 0);
 	switch (volumes[1].ChannelCount)
 	{
 	case 1: advectCS->SetUnorderedAccessView("AdvectionOut1", 0); break;
@@ -348,6 +371,7 @@ void FluidField::Divergence()
 
 	// Set resources
 	divCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	divCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	divCS->SetUnorderedAccessView("DivergenceOut", divergenceBuffer.UAV);
 
 	// Run compute
@@ -355,6 +379,7 @@ void FluidField::Divergence()
 
 	// Unset resources
 	divCS->SetShaderResourceView("VelocityIn", 0);
+	divCS->SetShaderResourceView("ObstaclesIn", 0);
 	divCS->SetUnorderedAccessView("DivergenceOut", 0);
 }
 
@@ -373,6 +398,7 @@ void FluidField::Pressure()
 
 	// Set resources
 	pressCS->SetShaderResourceView("DivergenceIn", divergenceBuffer.SRV);
+	pressCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 
 	// Run the pressure solver for several iterations
 	for (int i = 0; i < pressureIterations; i++)
@@ -394,6 +420,7 @@ void FluidField::Pressure()
 	// Unset resources
 	pressCS->SetShaderResourceView("DivergenceIn", 0);
 	pressCS->SetShaderResourceView("PressureIn", 0);
+	pressCS->SetShaderResourceView("ObstaclesIn", 0);
 	pressCS->SetUnorderedAccessView("PressureOut", 0);
 }
 
@@ -413,6 +440,7 @@ void FluidField::Projection()
 	// Set resources
 	projCS->SetShaderResourceView("PressureIn", pressureBuffers[0].SRV);
 	projCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	projCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	projCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
@@ -421,6 +449,7 @@ void FluidField::Projection()
 	// Unset resources
 	projCS->SetShaderResourceView("PressureIn", 0);
 	projCS->SetShaderResourceView("VelocityIn", 0);
+	projCS->SetShaderResourceView("ObstaclesIn", 0);
 	projCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers
@@ -449,6 +478,7 @@ void FluidField::InjectSmoke()
 	// Set resources
 	injCS->SetShaderResourceView("DensityIn", densityBuffers[0].SRV);
 	injCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
+	injCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	injCS->SetUnorderedAccessView("DensityOut", densityBuffers[1].UAV);
 	injCS->SetUnorderedAccessView("TemperatureOut", temperatureBuffers[1].UAV);
 
@@ -458,6 +488,7 @@ void FluidField::InjectSmoke()
 	// Unset resources
 	injCS->SetShaderResourceView("DensityIn", 0);
 	injCS->SetShaderResourceView("TemperatureIn", 0);
+	injCS->SetShaderResourceView("ObstaclesIn", 0);
 	injCS->SetUnorderedAccessView("DensityOut", 0);
 	injCS->SetUnorderedAccessView("TemperatureOut", 0);
 
@@ -484,6 +515,7 @@ void FluidField::Buoyancy()
 	buoyCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
 	buoyCS->SetShaderResourceView("DensityIn", densityBuffers[0].SRV);
 	buoyCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
+	buoyCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	buoyCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
@@ -491,7 +523,9 @@ void FluidField::Buoyancy()
 
 	// Unset resources
 	buoyCS->SetShaderResourceView("VelocityIn", 0);
+	buoyCS->SetShaderResourceView("DensityIn", 0);
 	buoyCS->SetShaderResourceView("TemperatureIn", 0);
+	buoyCS->SetShaderResourceView("ObstaclesIn", 0);
 	buoyCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers

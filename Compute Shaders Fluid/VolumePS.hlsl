@@ -83,7 +83,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Set up the current position and the step amount
 	float maxDist = farHit - nearHit;
 	float3 currentPos = rayStart;
-	float step = 1.0f / raymarchSamples;
+	float step = 1.73205f / raymarchSamples; // Longest diagonal in cube
 	float3 stepDir = step * dir;
 
 	// Accumulate as we raymarch

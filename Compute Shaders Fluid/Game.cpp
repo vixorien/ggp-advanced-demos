@@ -626,7 +626,7 @@ void Game::CreateUI(float dt)
 			}
 
 			// Combo box to choose rendering buffer
-			const char* renderTypes[] = { "Velocity", "Divergence", "Pressure", "Density", "Temperature", "Vorticity" };
+			const char* renderTypes[] = { "Density", "Velocity", "Divergence", "Pressure", "Temperature", "Vorticity", "Obstacles" };
 			static int selectedBuffer = (int)fluid->renderBuffer;
 			if (ImGui::Combo("Buffer to Render", &selectedBuffer, renderTypes, IM_ARRAYSIZE(renderTypes)))
 			{

@@ -13,6 +13,7 @@ cbuffer externalData : register(b0)
 
 Texture3D			VelocityIn		: register(t0);
 Texture3D			AdvectionIn		: register(t1);
+Texture3D			ObstaclesIn		: register(t2);
 RWTexture3D<float>  AdvectionOut1	: register(u0);
 RWTexture3D<float2> AdvectionOut2	: register(u1);
 RWTexture3D<float3> AdvectionOut3	: register(u2);
@@ -26,6 +27,10 @@ SamplerState SamplerLinearClamp		: register(s0);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main( uint3 id : SV_DispatchThreadID )
 {
+	// Check for obstacle at this cell
+	if (ObstaclesIn[id].r > 0.0f)
+		return;
+
 	// Pixel position in [0-gridSize] range
 	float3 posInGrid = float3(id);
 

@@ -10,6 +10,7 @@ cbuffer externalData : register(b0)
 
 Texture3D			PressureIn		: register(t0);
 Texture3D			VelocityIn		: register(t1);
+Texture3D			ObstaclesIn		: register(t2);
 RWTexture3D<float4>	VelocityOut		: register(u0);
 
 [numthreads(
@@ -18,6 +19,14 @@ RWTexture3D<float4>	VelocityOut		: register(u0);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main(uint3 id : SV_DispatchThreadID)
 {
+	// Is this cell an obstacle?
+	if (ObstaclesIn[id].r > 0.0f)
+	{
+		VelocityOut[id] = float4(0, 0, 0, 1);
+		// NOTE: This should really be the obstacle's velocity
+		// but we don't have that yet
+	}
+
 	// Indices of surrounding pixels
 	uint3 idL = GetLeftIndex(id);
 	uint3 idR = GetRightIndex(id, gridSizeX);
@@ -27,6 +36,7 @@ void main(uint3 id : SV_DispatchThreadID)
 	uint3 idF = GetForwardIndex(id, gridSizeZ);
 
 	// Pressure of surrounding pixels
+	float pressureHere = PressureIn[id].r;
 	float pL = PressureIn[idL].r;
 	float pR = PressureIn[idR].r;
 	float pD = PressureIn[idD].r;
@@ -44,13 +54,14 @@ void main(uint3 id : SV_DispatchThreadID)
 	// so we still need a check here!
 
 	// Check for boundaries
+	// NOTE: Will need obstacle velocity!
 	float3 velocityMask = float3(1, 1, 1);
-	if (idL.x == id.x) { velocityMask.x = 0; }
-	if (idR.x == id.x) { velocityMask.x = 0; }
-	if (idD.y == id.y) { velocityMask.y = 0; }
-	if (idU.y == id.y) { velocityMask.y = 0; }
-	if (idB.z == id.z) { velocityMask.z = 0; }
-	if (idF.z == id.z) { velocityMask.z = 0; }
+	if (ObstaclesIn[idL].r > 0.0f || idL.x == id.x) { pL = pressureHere; velocityMask.x = 0; }
+	if (ObstaclesIn[idR].r > 0.0f || idR.x == id.x) { pR = pressureHere; velocityMask.x = 0; }
+	if (ObstaclesIn[idD].r > 0.0f || idD.y == id.y) { pD = pressureHere; velocityMask.y = 0; }
+	if (ObstaclesIn[idU].r > 0.0f || idU.y == id.y) { pU = pressureHere; velocityMask.y = 0; }
+	if (ObstaclesIn[idB].r > 0.0f || idB.z == id.z) { pB = pressureHere; velocityMask.z = 0; }
+	if (ObstaclesIn[idF].r > 0.0f || idF.z == id.z) { pF = pressureHere; velocityMask.z = 0; }
 
 	// Pressure gradient
 	float3 pressureGradient = 

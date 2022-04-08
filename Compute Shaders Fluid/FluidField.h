@@ -8,12 +8,13 @@
 
 enum class FLUID_RENDER_BUFFER
 {
+	FLUID_RENDER_BUFFER_DENSITY,
 	FLUID_RENDER_BUFFER_VELOCITY,
 	FLUID_RENDER_BUFFER_DIVERGENCE,
 	FLUID_RENDER_BUFFER_PRESSURE,
-	FLUID_RENDER_BUFFER_DENSITY,
 	FLUID_RENDER_BUFFER_TEMPERATURE,
-	FLUID_RENDER_BUFFER_VORTICITY
+	FLUID_RENDER_BUFFER_VORTICITY,
+	FLUID_RENDER_BUFFER_OBSTACLES
 };
 
 enum class FLUID_RENDER_MODE
@@ -87,6 +88,9 @@ private:
 	VolumeResource densityBuffers[2];
 	VolumeResource temperatureBuffers[2];
 	VolumeResource vorticityBuffer;
+
+	// Obstacle textures
+	VolumeResource obstacleBuffer;
 
 	// DX Resources
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
