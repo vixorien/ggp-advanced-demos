@@ -38,7 +38,16 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	renderBuffer(FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY),
 	renderMode(FLUID_RENDER_MODE::FLUID_RENDER_MODE_BLEND)
 {
+	// Check for obstacle voxelization capabilities (DX11.3 feature
+	// that allows for render target array index in the vertex shader)
+	D3D11_FEATURE_DATA_D3D11_OPTIONS3 options;
+	device->CheckFeatureSupport(
+		D3D11_FEATURE_D3D11_OPTIONS3,
+		&options,
+		sizeof(D3D11_FEATURE_DATA_D3D11_OPTIONS3));
+	obstaclesEnabled = (bool)options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizer;
 
+	// Set up buffers
 	RecreateGPUResources();
 
 	D3D11_SAMPLER_DESC sampDesc = {};
@@ -70,6 +79,7 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	rasterDesc.FillMode = D3D11_FILL_SOLID;
 	rasterDesc.DepthClipEnable = true;
 	device->CreateRasterizerState(&rasterDesc, rasterState.GetAddressOf());
+
 }
 
 FluidField::~FluidField()

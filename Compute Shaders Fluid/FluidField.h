@@ -76,6 +76,7 @@ private:
 	// Field data
 	unsigned int gridSize;
 	float timeCounter;
+	bool obstaclesEnabled;
 
 	// Volume textures for all fluids
 	VolumeResource velocityBuffers[2];
