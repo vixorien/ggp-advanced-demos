@@ -13,6 +13,7 @@ cbuffer externalData : register(b0)
 	float3 injectColor;
 	float injectDensity;
 
+	float3 injectVelocity;
 	float injectTemperature;
 }
 
@@ -52,4 +53,5 @@ void main(uint3 id : SV_DispatchThreadID)
 	// Spit out the updates
 	DensityOut[id] = float4(newColor, newDensity);
 	TemperatureOut[id] = TemperatureIn[id].r + injectTemperature * injFalloff;
+	VelocityOut[id] = VelocityIn[id] + float4(injectVelocity, 0);
 }

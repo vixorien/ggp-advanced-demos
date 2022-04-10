@@ -203,7 +203,7 @@ void FluidField::OneTimeStep()
 		InjectSmoke();
 
 	// Apply the buoyancy force and advect velocity
-	//Buoyancy();
+	Buoyancy();
 	Advection(velocityBuffers, velocityDamper);
 
 	// Advect other quantities
