@@ -9,6 +9,7 @@ cbuffer externalData : register(b0)
 }
 
 Texture3D			VelocityIn		: register(t0);
+Texture3D			ObstaclesIn		: register(t1);
 RWTexture3D<float4>	VorticityOut	: register(u0);
 
 [numthreads(
@@ -26,17 +27,26 @@ void main(uint3 id : SV_DispatchThreadID)
 	uint3 idF = GetForwardIndex(id, gridSizeZ);
 
 	// Velocity of surrounding pixels
-	float3 velL = VelocityIn[idL].rgb;
-	float3 velR = VelocityIn[idR].rgb;
-	float3 velD = VelocityIn[idD].rgb;
-	float3 velU = VelocityIn[idU].rgb;
-	float3 velB = VelocityIn[idB].rgb;
-	float3 velF = VelocityIn[idF].rgb;
-
 	// Note: The nature of our neighbor checking here
 	// will return the current cell's velocity value
 	// (since we're basically clamping).
 	// Is that what we want for vorticity?  Not sure!
+	float3 velL = VelocityIn[idL].xyz;
+	float3 velR = VelocityIn[idR].xyz;
+	float3 velD = VelocityIn[idD].xyz;
+	float3 velU = VelocityIn[idU].xyz;
+	float3 velB = VelocityIn[idB].xyz;
+	float3 velF = VelocityIn[idF].xyz;
+
+	// Use this cell's velocity for any surrounding
+	// cells that contain an obstacle
+	//float3 velHere = VelocityIn[id].xyz; // Should be obstacles eventually?
+	//if (ObstaclesIn[idL].r > 0.0f) velL = velHere;
+	//if (ObstaclesIn[idR].r > 0.0f) velR = velHere;
+	//if (ObstaclesIn[idD].r > 0.0f) velD = velHere;
+	//if (ObstaclesIn[idU].r > 0.0f) velU = velHere;
+	//if (ObstaclesIn[idB].r > 0.0f) velB = velHere;
+	//if (ObstaclesIn[idF].r > 0.0f) velF = velHere;
 
 	// Compute the vorticity based on surrounding cells
 	float3 vort = 0.5f * float3(

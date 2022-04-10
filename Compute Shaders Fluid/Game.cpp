@@ -558,30 +558,48 @@ void Game::CreateUI(float dt)
 			ImGui::Checkbox("Inject Quantity into Volume", &fluid->injectSmoke);
 			ImGui::Spacing();
 
-			ImGui::Text("Injection Details");			
+			ImGui::Text("Injection Details");
 			ImGui::ColorEdit3("Color", &fluid->fluidColor.x);
-			ImGui::SliderFloat3("Position", &fluid->injectPosition.x, 0.0f, 1.0f);
+
+			static bool posChangeInjectsVelocity = true;
+			ImGui::Checkbox("Position Change Injects Velocity", &posChangeInjectsVelocity);
+			if (posChangeInjectsVelocity)
+				ImGui::SliderFloat("Velocity Injection Scale", &fluid->injectVelocityImpulseScale, 0.0f, 10.0f);
+
+			// Position
+			XMFLOAT3 injPos = fluid->GetInjectPosition();
+			if (ImGui::SliderFloat3("Position", &injPos.x, 0.0f, 1.0f)) 
+			{
+				// Should we inject velocity?  Only if mouse is dragging
+				bool injectVel = posChangeInjectsVelocity && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+				fluid->SetInjectPosition(injPos, injectVel);
+			}
+
+			// Draggable position
 			ImGui::SameLine();
 			if (ImGui::SmallButton("[o]"))
 				ImGui::OpenPopup("Position Drag");
 			if (ImGui::BeginPopup("Position Drag"))
 			{
-				ImVec2 pos = ImVec2(fluid->injectPosition.x, 1.0f - fluid->injectPosition.y);
+				ImVec2 pos = ImVec2(injPos.x, 1.0f - injPos.y);
 				if (Drag2D("Position [X,Y]", ImVec2(100, 100), ImVec2(0, 0), ImVec2(1, 1), &pos))
 				{
-					fluid->injectPosition.x = pos.x;
-					fluid->injectPosition.y = 1.0f - pos.y;
+					// Should we inject velocity?  Only if mouse is dragging
+					bool injectVel = posChangeInjectsVelocity && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+					fluid->SetInjectPosition({ pos.x, 1.0f - pos.y, injPos.z }, injectVel);
 				}
 				ImGui::EndPopup();
 			}
+
+			// Other
 			ImGui::SliderFloat("Radius", &fluid->injectRadius, 0.0f, 0.5f);
 			ImGui::SliderFloat("Density", &fluid->injectDensity, 0.0f, 1.0f);
-			ImGui::SliderFloat("Temperature", &fluid->injectTemperature, 0.0f, 200.0f);
-			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, 0.0f, 200.0f);
+			ImGui::SliderFloat("Temperature", &fluid->injectTemperature,-1.0f, 1.0f);
+			ImGui::SliderFloat("Ambient Temperature", &fluid->ambientTemperature, -1.0f, 1.0f);
 			ImGui::Spacing();
 
 			ImGui::Text("Buoyancy Characteristics");
-			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, -1.0f, 1.0f);
+			ImGui::SliderFloat("Temperature Buoyancy", &fluid->temperatureBuoyancy, -5.0f, 5.0f);
 			ImGui::SliderFloat("Density Weight", &fluid->densityWeight, 0.0f, 100.0f);
 
 			ImGui::TreePop();

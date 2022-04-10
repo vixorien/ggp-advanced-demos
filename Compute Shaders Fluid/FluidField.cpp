@@ -10,7 +10,6 @@ using namespace DirectX;
 // References:
 // https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-30-real-time-simulation-and-rendering-3d-fluids
 // http://web.stanford.edu/class/cs237d/smoke.pdf
-// TODO: Update based on paper above (GPU Gems has some inconsistencies)
 
 
 FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, unsigned int gridSize) :
@@ -25,15 +24,17 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	raymarchSamples(128),
 	fixedTimeStep(0.016f),
 	ambientTemperature(0.0f),
-	injectTemperature(10.0f),
+	injectTemperature(0.5f),
 	injectDensity(0.05f),
 	injectRadius(0.15f),
 	injectPosition(0.5f, 0.2f, 0.5f),
-	temperatureBuoyancy(0.1f),
+	injectVelocityImpulseScale(5.0f),
+	injectVelocityImpulse(0,0,0),
+	temperatureBuoyancy(0.5f),
 	densityWeight(0.1f),
-	velocityDamper(0.999f),
-	densityDamper(0.999f),
-	temperatureDamper(0.999f),
+	velocityDamper(1.0f),
+	densityDamper(1.0f),
+	temperatureDamper(1.0f),
 	fluidColor(1.0f, 1.0f, 1.0f),
 	vorticityEpsilon(0.3f),
 	renderBuffer(FLUID_RENDER_BUFFER::FLUID_RENDER_BUFFER_DENSITY),
@@ -120,8 +121,9 @@ void FluidField::RecreateGPUResources()
 		for (unsigned int y = 0; y < gridSize; y++)
 			for (unsigned int x = 0; x < gridSize; x++)
 			{
-				int index = x + (gridSize * y) + (gridSize * gridSize * z);
-				obData[index] = 0;
+				// Using min() to remove buffer overrun warning
+				int index = min(x + (gridSize * y) + (gridSize * gridSize * z), dataSize - 1);
+				obData[index] = (unsigned char)0;
 
 				// Sphere
 				{
@@ -138,7 +140,7 @@ void FluidField::RecreateGPUResources()
 
 				// Flat cube
 				{
-					/*if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y > 31 && y < 34)
+					/*if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y == 32)
 					{
 						obData[index] = (unsigned char)255;
 					}*/
@@ -150,6 +152,12 @@ void FluidField::RecreateGPUResources()
 					if ((x >= 32 - halfSize && x < 32 + halfSize) &&
 						(y >= 32 - halfSize && y < 32 + halfSize) &&
 						(z >= 32 - halfSize && z < 32 + halfSize))
+						obData[index] = 255;*/
+				}
+
+				// Single cell(s)
+				{
+					/*if((x == 32 || x == 33) && y == 32 && z == 32)
 						obData[index] = 255;*/
 				}
 			}
@@ -198,17 +206,22 @@ void FluidField::UpdateFluid(float deltaTime)
 
 void FluidField::OneTimeStep()
 {
-	// Add smoke to the field
-	if (injectSmoke)
-		InjectSmoke();
+	//// Add smoke to the field
+	//if (injectSmoke)
+	//	InjectSmoke();
 
 	// Apply the buoyancy force and advect velocity
-	Buoyancy();
+	/*Buoyancy();*/
 	Advection(velocityBuffers, velocityDamper);
 
 	// Advect other quantities
 	Advection(densityBuffers, densityDamper);
 	Advection(temperatureBuffers, temperatureDamper);
+
+	if (injectSmoke)
+		InjectSmoke();
+
+	Buoyancy();
 
 	// Check for vorticity
 	if (applyVorticity)
@@ -300,9 +313,24 @@ void FluidField::RenderFluid(Camera* camera)
 	context->RSSetState(0);
 }
 
-unsigned int FluidField::GetGridSize()
+unsigned int FluidField::GetGridSize() { return gridSize; }
+
+DirectX::XMFLOAT3 FluidField::GetInjectPosition() {	return injectPosition; }
+
+void FluidField::SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityImpulse)
 {
-	return gridSize;
+	// Should this position change cause velocity?
+	if (applyVelocityImpulse)
+	{
+		// Note: Scaling velocity impulse by grid size because otherwise
+		// it's way too small and the scale is required to be massive
+		XMStoreFloat3(&injectVelocityImpulse, 
+			XMLoadFloat3(&injectVelocityImpulse) + 
+			(XMLoadFloat3(&newPos) - XMLoadFloat3(&injectPosition)) * gridSize * injectVelocityImpulseScale);
+	}
+
+	// Update position
+	injectPosition = newPos;
 }
 
 
@@ -528,6 +556,7 @@ void FluidField::InjectSmoke()
 	injCS->SetFloat3("injectColor", fluidColor);
 	injCS->SetFloat("injectDensity", injectDensity);
 	injCS->SetFloat("injectTemperature", injectTemperature);
+	injCS->SetFloat3("injectVelocity", injectVelocityImpulse);
 	injCS->CopyAllBufferData();
 
 	// Set resources
@@ -555,6 +584,9 @@ void FluidField::InjectSmoke()
 	SwapBuffers(densityBuffers);
 	SwapBuffers(temperatureBuffers);
 	SwapBuffers(velocityBuffers);
+
+	// Reset injection velocity impulse now that its been applied
+	injectVelocityImpulse = {};
 }
 
 void FluidField::Buoyancy()
@@ -607,6 +639,7 @@ void FluidField::Vorticity()
 
 	// Set resources
 	vortCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	vortCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	vortCS->SetUnorderedAccessView("VorticityOut", vorticityBuffer.UAV);
 
 	// Run compute
@@ -614,6 +647,7 @@ void FluidField::Vorticity()
 
 	// Unset resources
 	vortCS->SetShaderResourceView("VelocityIn", 0);
+	vortCS->SetShaderResourceView("ObstaclesIn", 0);
 	vortCS->SetUnorderedAccessView("VorticityOut", 0);
 }
 
@@ -635,6 +669,7 @@ void FluidField::Confinement()
 	// Set resources
 	confCS->SetShaderResourceView("VorticityIn", vorticityBuffer.SRV);
 	confCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
+	confCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
 	confCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
@@ -643,6 +678,7 @@ void FluidField::Confinement()
 	// Unset resources
 	confCS->SetShaderResourceView("VorticityIn", 0);
 	confCS->SetShaderResourceView("VelocityIn", 0);
+	confCS->SetShaderResourceView("ObstaclesIn", 0);
 	confCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers

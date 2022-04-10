@@ -19,7 +19,6 @@ RWTexture3D<float>	PressureOut		: register(u0);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main(uint3 id : SV_DispatchThreadID)
 {
-
 	// Get the divergence here
 	float div = DivergenceIn[id].r;
 	float pressureHere = PressureIn[id].r;

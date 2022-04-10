@@ -61,6 +61,7 @@ public:
 	float injectTemperature;
 	float injectDensity;
 	float injectRadius;
+	float injectVelocityImpulseScale;
 	float temperatureBuoyancy;
 	float densityWeight;
 	float velocityDamper;
@@ -68,18 +69,21 @@ public:
 	float temperatureDamper; 
 	float vorticityEpsilon;
 	DirectX::XMFLOAT3 fluidColor;
-	DirectX::XMFLOAT3 injectPosition;
 	FLUID_RENDER_BUFFER renderBuffer;
 	FLUID_RENDER_MODE renderMode;
 
 	unsigned int GetGridSize();
+	DirectX::XMFLOAT3 GetInjectPosition();
+	void SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityImpulse);
 
 private:
 
-	// Field data
+	// Private field data
 	unsigned int gridSize;
 	float timeCounter;
 	bool obstaclesEnabled;
+	DirectX::XMFLOAT3 injectPosition;
+	DirectX::XMFLOAT3 injectVelocityImpulse;
 
 	// Volume textures for all fluids
 	VolumeResource velocityBuffers[2];
