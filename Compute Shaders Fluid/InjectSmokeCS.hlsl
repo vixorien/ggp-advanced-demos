@@ -19,8 +19,10 @@ cbuffer externalData : register(b0)
 Texture3D			DensityIn		: register(t0);
 Texture3D			TemperatureIn	: register(t1);
 Texture3D			ObstaclesIn		: register(t2);
+Texture3D			VelocityIn		: register(t3);
 RWTexture3D<float4> DensityOut		: register(u0);
 RWTexture3D<float>	TemperatureOut	: register(u1);
+RWTexture3D<float4> VelocityOut		: register(u2);
 
 [numthreads(
 	FLUID_COMPUTE_THREADS_PER_AXIS,

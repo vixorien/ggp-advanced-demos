@@ -53,6 +53,15 @@ void main(uint3 id : SV_DispatchThreadID)
 	// HOWEVER: We do need to mask out entire dimensions, 
 	// so we still need a check here!
 
+
+	// Velocities of surrounding pixels (change to obstacle velocities then!)
+	float velL = VelocityIn[idL].x;
+	float velR = VelocityIn[idR].x;
+	float velD = VelocityIn[idD].y;
+	float velU = VelocityIn[idU].y;
+	float velB = VelocityIn[idB].z;
+	float velF = VelocityIn[idF].z;
+
 	// Check for boundaries
 	// NOTE: Will need obstacle velocity!
 	float3 velocityMask = float3(1, 1, 1);

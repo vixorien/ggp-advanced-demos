@@ -591,6 +591,12 @@ void Game::CreateUI(float dt)
 		if (ImGui::TreeNode("Simulation & Advection"))
 		{
 			// General sim
+			if (ImGui::Button(fluid->pause ? "Paused" : "Running")) { fluid->pause = !fluid->pause; }
+			if (fluid->pause)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("One Time Step")) fluid->OneTimeStep();
+			}
 			ImGui::SliderFloat("Time Step", &fluid->fixedTimeStep, 0.0f, 1.0f);
 			ImGui::SliderInt("Pressure Solver Iterations", &fluid->pressureIterations, 1, 200);
 			ImGui::Spacing();

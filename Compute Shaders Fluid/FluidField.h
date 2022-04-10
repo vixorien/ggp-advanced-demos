@@ -47,9 +47,11 @@ public:
 
 	void RecreateGPUResources();
 	void UpdateFluid(float deltaTime);
+	void OneTimeStep();
 	void RenderFluid(Camera* camera);
 
 	// Publically accessible data
+	bool pause;
 	bool injectSmoke;
 	bool applyVorticity;
 	int pressureIterations;

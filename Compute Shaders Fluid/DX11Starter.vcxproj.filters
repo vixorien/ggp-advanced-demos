@@ -253,5 +253,8 @@
     <FxCompile Include="AdvectionMacCormackCS.hlsl">
       <Filter>Shaders\Fluid</Filter>
     </FxCompile>
+    <FxCompile Include="Clear3DTextureCS.hlsl">
+      <Filter>Shaders\Fluid</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

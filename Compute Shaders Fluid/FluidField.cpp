@@ -18,9 +18,10 @@ FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::W
 	context(context),
 	gridSize(gridSize),
 	timeCounter(0.0f),
+	pause(false),
 	injectSmoke(false),
 	applyVorticity(false),
-	pressureIterations(20),
+	pressureIterations(30),
 	raymarchSamples(128),
 	fixedTimeStep(0.016f),
 	ambientTemperature(0.0f),
@@ -120,11 +121,36 @@ void FluidField::RecreateGPUResources()
 			for (unsigned int x = 0; x < gridSize; x++)
 			{
 				int index = x + (gridSize * y) + (gridSize * gridSize * z);
-				obData[index] = (unsigned char)0;
+				obData[index] = 0;
 
-				if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y > 32 && y < 40)
+				// Sphere
 				{
-					obData[index] = (unsigned char)255;
+					//// Get distance from "center"
+					//float xDist = abs(32.0f - x);
+					//float yDist = abs(32.0f - y);
+					//float zDist = abs(32.0f - z);
+
+					//float dist = sqrt(xDist * xDist + yDist * yDist + zDist * zDist);
+
+					//if (dist <= 7.0f)
+					//	obData[index] = 255;
+				}
+
+				// Flat cube
+				{
+					/*if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y > 31 && y < 34)
+					{
+						obData[index] = (unsigned char)255;
+					}*/
+				}
+
+				// NxNxN cube
+				{
+					/*int halfSize = 2;
+					if ((x >= 32 - halfSize && x < 32 + halfSize) &&
+						(y >= 32 - halfSize && y < 32 + halfSize) &&
+						(z >= 32 - halfSize && z < 32 + halfSize))
+						obData[index] = 255;*/
 				}
 			}
 
@@ -153,18 +179,36 @@ void FluidField::RecreateGPUResources()
 
 void FluidField::UpdateFluid(float deltaTime)
 {
+	// Don't run if paused
+	if (pause)
+		return;
+
 	// Pile up the time
 	timeCounter += deltaTime;
 	if (timeCounter < fixedTimeStep)
 		return;
 
+	// Run a single time step
+	OneTimeStep();
+
+	// Apply one time step
+	timeCounter -= fixedTimeStep;
+}
+
+
+void FluidField::OneTimeStep()
+{
 	// Add smoke to the field
-	if(injectSmoke)
+	if (injectSmoke)
 		InjectSmoke();
 
 	// Apply the buoyancy force and advect velocity
-	Buoyancy();
+	//Buoyancy();
 	Advection(velocityBuffers, velocityDamper);
+
+	// Advect other quantities
+	Advection(densityBuffers, densityDamper);
+	Advection(temperatureBuffers, temperatureDamper);
 
 	// Check for vorticity
 	if (applyVorticity)
@@ -178,12 +222,9 @@ void FluidField::UpdateFluid(float deltaTime)
 	Pressure();
 	Projection();
 
-	// Advect other quantities
-	Advection(densityBuffers, densityDamper);
-	Advection(temperatureBuffers, temperatureDamper);
-
-	// Apply one time step
-	timeCounter -= fixedTimeStep;
+	//// Advect other quantities
+	//Advection(densityBuffers, densityDamper);
+	//Advection(temperatureBuffers, temperatureDamper);
 }
 
 
@@ -385,9 +426,23 @@ void FluidField::Divergence()
 
 void FluidField::Pressure()
 {
-	// Grab the pressure shader
+	// Grab the clear and pressure shaders
 	Assets& assets = Assets::GetInstance();
+	SimpleComputeShader* clearCS = assets.GetComputeShader("Clear3DTextureCS.cso");
 	SimpleComputeShader* pressCS = assets.GetComputeShader("PressureCS.cso");
+
+	// Clear --------
+	clearCS->SetShader();
+	clearCS->SetFloat4("clearColor", { 0,0,0,0 });
+	clearCS->SetInt("channelCount", 1);
+	clearCS->CopyAllBufferData();
+
+	clearCS->SetUnorderedAccessView("ClearOut1", pressureBuffers[0].UAV);
+	clearCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	clearCS->SetUnorderedAccessView("ClearOut1", 0);
+
+
+	// Pressure -----
 
 	// Turn on
 	pressCS->SetShader();
@@ -479,8 +534,10 @@ void FluidField::InjectSmoke()
 	injCS->SetShaderResourceView("DensityIn", densityBuffers[0].SRV);
 	injCS->SetShaderResourceView("TemperatureIn", temperatureBuffers[0].SRV);
 	injCS->SetShaderResourceView("ObstaclesIn", obstacleBuffer.SRV);
+	injCS->SetShaderResourceView("VelocityIn", velocityBuffers[0].SRV);
 	injCS->SetUnorderedAccessView("DensityOut", densityBuffers[1].UAV);
 	injCS->SetUnorderedAccessView("TemperatureOut", temperatureBuffers[1].UAV);
+	injCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
 	injCS->DispatchByThreads(gridSize, gridSize, gridSize);
@@ -489,12 +546,15 @@ void FluidField::InjectSmoke()
 	injCS->SetShaderResourceView("DensityIn", 0);
 	injCS->SetShaderResourceView("TemperatureIn", 0);
 	injCS->SetShaderResourceView("ObstaclesIn", 0);
+	injCS->SetShaderResourceView("VelocityIn", 0);
 	injCS->SetUnorderedAccessView("DensityOut", 0);
 	injCS->SetUnorderedAccessView("TemperatureOut", 0);
+	injCS->SetUnorderedAccessView("VelocityOut", 0);
 
 	// Swap buffers
 	SwapBuffers(densityBuffers);
 	SwapBuffers(temperatureBuffers);
+	SwapBuffers(velocityBuffers);
 }
 
 void FluidField::Buoyancy()
