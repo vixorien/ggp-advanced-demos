@@ -129,7 +129,7 @@ void Game::Init()
 		this->width / (float)this->height); // Aspect ratio
 
 	// Create fluid field
-	fluid = std::make_shared<FluidField>(device, context, 64);
+	fluid = std::make_shared<FluidField>(device, context, 64, 64, 64);
 
 	// Create the renderer (last since we need some other pieces like the Sky)
 	renderer = new Renderer(
@@ -639,8 +639,10 @@ void Game::CreateUI(float dt)
 		{
 			// Grid size report
 			ImGui::AlignTextToFramePadding();
-			unsigned int gridSize = fluid->GetGridSize();
-			ImGui::Text("Grid Resolution: %dx%dx%d", gridSize, gridSize, gridSize);
+			unsigned int gridSizeX = fluid->GetGridSizeX();
+			unsigned int gridSizeY = fluid->GetGridSizeY();
+			unsigned int gridSizeZ = fluid->GetGridSizeZ();
+			ImGui::Text("Grid Resolution: %dx%dx%d", gridSizeX, gridSizeY, gridSizeZ);
 			ImGui::SameLine();
 
 			// Button for reset

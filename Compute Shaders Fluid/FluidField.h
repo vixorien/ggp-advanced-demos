@@ -23,6 +23,12 @@ enum class FLUID_RENDER_MODE
 	FLUID_RENDER_MODE_ADD
 };
 
+enum class FLUID_SIMULATION_TYPE
+{
+	SMOKE,
+	WATER
+};
+
 struct VolumeResource
 {
 	unsigned int ChannelCount{ 0 };
@@ -42,7 +48,9 @@ public:
 	FluidField(
 		Microsoft::WRL::ComPtr<ID3D11Device> device, 
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, 
-		unsigned int gridSize);
+		unsigned int gridSizeX,
+		unsigned int gridSizeY,
+		unsigned int gridSizeZ);
 	~FluidField();
 
 	void RecreateGPUResources();
@@ -72,15 +80,20 @@ public:
 	FLUID_RENDER_BUFFER renderBuffer;
 	FLUID_RENDER_MODE renderMode;
 
-	unsigned int GetGridSize();
-    void SetGridSize(unsigned int gridSize);
+	unsigned int GetGridSizeX();
+	unsigned int GetGridSizeY();
+	unsigned int GetGridSizeZ();
+    void SetGridSize(unsigned int gridSizeX, unsigned int gridSizeY, unsigned int gridSizeZ);
 	DirectX::XMFLOAT3 GetInjectPosition();
 	void SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityImpulse);
 
 private:
 
 	// Private field data
-	unsigned int gridSize;
+	FLUID_SIMULATION_TYPE simType;
+	unsigned int gridSizeX;
+	unsigned int gridSizeY;
+	unsigned int gridSizeZ;
 	float timeCounter;
 	bool obstaclesEnabled;
 	DirectX::XMFLOAT3 injectPosition;
@@ -99,6 +112,9 @@ private:
 	// Obstacle textures
 	VolumeResource obstacleBuffer;
 
+	// Liquid textures
+	VolumeResource levelSetBuffers[2];
+
 	// DX Resources
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
@@ -109,7 +125,12 @@ private:
 
 	// Helper methods
 	void SwapBuffers(VolumeResource volumes[2]);
-	VolumeResource CreateVolumeResource(int sideDimension, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM, void* initialData = 0);
+	VolumeResource CreateVolumeResource(
+		unsigned int sizeX, 
+		unsigned int sizeY, 
+		unsigned int sizeZ, 
+		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM, 
+		void* initialData = 0);
 
 	// Fluid functions
 	void Advection(VolumeResource volumes[2], float damper = 1.0f);

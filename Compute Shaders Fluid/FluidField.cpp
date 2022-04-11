@@ -12,10 +12,19 @@ using namespace DirectX;
 // http://web.stanford.edu/class/cs237d/smoke.pdf
 
 
-FluidField::FluidField(Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, unsigned int gridSize) :
+FluidField::FluidField(
+	Microsoft::WRL::ComPtr<ID3D11Device> device, 
+	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, 
+	unsigned int gridSizeX,
+	unsigned int gridSizeY,
+	unsigned int gridSizeZ) 
+	:
 	device(device),
 	context(context),
-	gridSize(gridSize),
+	gridSizeX(gridSizeX),
+	gridSizeY(gridSizeY),
+	gridSizeZ(gridSizeZ),
+	simType(FLUID_SIMULATION_TYPE::SMOKE),
 	timeCounter(0.0f),
 	pause(false),
 	injectSmoke(false),
@@ -102,27 +111,31 @@ void FluidField::RecreateGPUResources()
 	temperatureBuffers[1].Reset();
 	vorticityBuffer.Reset();
 	obstacleBuffer.Reset();
+	levelSetBuffers[0].Reset();
+	levelSetBuffers[1].Reset();
 
-	velocityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	velocityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	divergenceBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	pressureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	pressureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	densityBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	densityBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	temperatureBuffers[0] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	temperatureBuffers[1] = CreateVolumeResource(gridSize, DXGI_FORMAT_R32_FLOAT);
-	vorticityBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	velocityBuffers[0] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	velocityBuffers[1] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	divergenceBuffer = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	pressureBuffers[0] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	pressureBuffers[1] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	densityBuffers[0] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	densityBuffers[1] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	temperatureBuffers[0] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	temperatureBuffers[1] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	vorticityBuffer = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	levelSetBuffers[0] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
+	levelSetBuffers[1] = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R32_FLOAT);
 
 	// Obstacle for testing
-	unsigned int dataSize = gridSize * gridSize * gridSize;
+	unsigned int dataSize = gridSizeX * gridSizeY * gridSizeZ;
 	unsigned char* obData = new unsigned char[dataSize];
-	for (unsigned int z = 0; z < gridSize; z++)
-		for (unsigned int y = 0; y < gridSize; y++)
-			for (unsigned int x = 0; x < gridSize; x++)
+	for (unsigned int z = 0; z < gridSizeZ; z++)
+		for (unsigned int y = 0; y < gridSizeY; y++)
+			for (unsigned int x = 0; x < gridSizeX; x++)
 			{
 				// Using min() to remove buffer overrun warning
-				int index = min(x + (gridSize * y) + (gridSize * gridSize * z), dataSize - 1);
+				int index = min(x + (gridSizeX * y) + (gridSizeX * gridSizeY * z), dataSize - 1);
 				obData[index] = (unsigned char)0;
 
 				// Sphere
@@ -162,7 +175,7 @@ void FluidField::RecreateGPUResources()
 				}
 			}
 
-	obstacleBuffer = CreateVolumeResource(gridSize, DXGI_FORMAT_R8_UNORM, obData);
+	obstacleBuffer = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R8_UNORM, obData);
 	delete[] obData;
 
 	// Unused, but for reference...
@@ -248,9 +261,16 @@ void FluidField::RenderFluid(Camera* camera)
 	context->OMSetBlendState(blendState.Get(), 0, 0xFFFFFFFF);
 	context->RSSetState(rasterState.Get());
 
-	// Cube size
+	// Get smallest dimension and use that for scaling
+	float smallestDimension = min(gridSizeX, min(gridSizeY, gridSizeZ));
+	XMFLOAT3 scale = {
+		2 * gridSizeX / smallestDimension,
+		2 * gridSizeY / smallestDimension,
+		2 * gridSizeZ / smallestDimension
+	};
+
+	// Cube location
 	XMFLOAT3 translation(0, 0, 0);
-	XMFLOAT3 scale(2,2,2);
 
 	Assets& assets = Assets::GetInstance();
 	SimplePixelShader* volumePS = assets.GetPixelShader("VolumePS.cso");
@@ -313,15 +333,19 @@ void FluidField::RenderFluid(Camera* camera)
 	context->RSSetState(0);
 }
 
-unsigned int FluidField::GetGridSize() { return gridSize; }
-void FluidField::SetGridSize(unsigned int gridSize)
+unsigned int FluidField::GetGridSizeX() { return gridSizeX; }
+unsigned int FluidField::GetGridSizeY() { return gridSizeY; }
+unsigned int FluidField::GetGridSizeZ() { return gridSizeZ; }
+void FluidField::SetGridSize(unsigned int gridSizeX, unsigned int gridSizeY, unsigned int gridSizeZ)
 {
 	// Need more than 1 grid cell (probably even more)
-	if (gridSize <= 1)
+	if (gridSizeX <= 1 || gridSizeY <= 1 || gridSizeZ <= 1)
 		return;
 
 	// Save and recreate resources
-	this->gridSize = gridSize;
+	this->gridSizeX = gridSizeX;
+	this->gridSizeY = gridSizeY;
+	this->gridSizeZ = gridSizeZ;
 	RecreateGPUResources();
 }
 
@@ -336,7 +360,7 @@ void FluidField::SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityI
 		// it's way too small and the scale is required to be massive
 		XMStoreFloat3(&injectVelocityImpulse, 
 			XMLoadFloat3(&injectVelocityImpulse) + 
-			(XMLoadFloat3(&newPos) - XMLoadFloat3(&injectPosition)) * gridSize * injectVelocityImpulseScale);
+			(XMLoadFloat3(&newPos) - XMLoadFloat3(&injectPosition)) * XMVectorSet(gridSizeX, gridSizeY, gridSizeZ, 0) * injectVelocityImpulseScale);
 	}
 
 	// Update position
@@ -352,22 +376,22 @@ void FluidField::SwapBuffers(VolumeResource volumes[2])
 	volumes[1] = vr0;
 }
 
-VolumeResource FluidField::CreateVolumeResource(int sideDimension, DXGI_FORMAT format, void* initialData)
+VolumeResource FluidField::CreateVolumeResource(unsigned int sizeX, unsigned int sizeY, unsigned int sizeZ, DXGI_FORMAT format, void* initialData)
 {
 	// Subresource data to fill with colors
 	D3D11_SUBRESOURCE_DATA data = {};
 	if (initialData)
 	{
 		data.pSysMem = initialData;
-		data.SysMemPitch = DXGIFormatBytes(format) * sideDimension;
-		data.SysMemSlicePitch = DXGIFormatBytes(format) * sideDimension * sideDimension;
+		data.SysMemPitch = DXGIFormatBytes(format) * sizeX;
+		data.SysMemSlicePitch = DXGIFormatBytes(format) * sizeX * sizeY;
 	}
 
 	// Describe the texture itself
 	D3D11_TEXTURE3D_DESC desc = {};
-	desc.Width = sideDimension;
-	desc.Height = sideDimension;
-	desc.Depth = sideDimension;
+	desc.Width = sizeX;
+	desc.Height = sizeY;
+	desc.Depth = sizeZ;
 	desc.Format = format;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
 	desc.CPUAccessFlags = 0;
@@ -395,9 +419,9 @@ void FluidField::Advection(VolumeResource volumes[2], float damper)
 	// Turn on and set external data
 	advectCS->SetShader();
 	advectCS->SetFloat("deltaTime", fixedTimeStep);
-	advectCS->SetInt("gridSizeX", gridSize);
-	advectCS->SetInt("gridSizeY", gridSize);
-	advectCS->SetInt("gridSizeZ", gridSize);
+	advectCS->SetInt("gridSizeX", gridSizeX);
+	advectCS->SetInt("gridSizeY", gridSizeY);
+	advectCS->SetInt("gridSizeZ", gridSizeZ);
 	advectCS->SetInt("channelCount", volumes[1].ChannelCount);
 	advectCS->SetFloat("damper", damper);
 	advectCS->CopyAllBufferData();
@@ -417,7 +441,7 @@ void FluidField::Advection(VolumeResource volumes[2], float damper)
 	}
 
 	// Run compute
-	advectCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	advectCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	advectCS->SetShaderResourceView("VelocityIn", 0);
@@ -443,9 +467,9 @@ void FluidField::Divergence()
 
 	// Turn on
 	divCS->SetShader(); 
-	divCS->SetInt("gridSizeX", gridSize);
-	divCS->SetInt("gridSizeY", gridSize);
-	divCS->SetInt("gridSizeZ", gridSize);
+	divCS->SetInt("gridSizeX", gridSizeX);
+	divCS->SetInt("gridSizeY", gridSizeY);
+	divCS->SetInt("gridSizeZ", gridSizeZ);
 	divCS->CopyAllBufferData();
 
 	// Set resources
@@ -454,7 +478,7 @@ void FluidField::Divergence()
 	divCS->SetUnorderedAccessView("DivergenceOut", divergenceBuffer.UAV);
 
 	// Run compute
-	divCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	divCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	divCS->SetShaderResourceView("VelocityIn", 0);
@@ -476,7 +500,7 @@ void FluidField::Pressure()
 	clearCS->CopyAllBufferData();
 
 	clearCS->SetUnorderedAccessView("ClearOut1", pressureBuffers[0].UAV);
-	clearCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	clearCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 	clearCS->SetUnorderedAccessView("ClearOut1", 0);
 
 
@@ -484,9 +508,9 @@ void FluidField::Pressure()
 
 	// Turn on
 	pressCS->SetShader();
-	pressCS->SetInt("gridSizeX", gridSize);
-	pressCS->SetInt("gridSizeY", gridSize);
-	pressCS->SetInt("gridSizeZ", gridSize);
+	pressCS->SetInt("gridSizeX", gridSizeX);
+	pressCS->SetInt("gridSizeY", gridSizeY);
+	pressCS->SetInt("gridSizeZ", gridSizeZ);
 	pressCS->CopyAllBufferData();
 
 	// Set resources
@@ -501,7 +525,7 @@ void FluidField::Pressure()
 		pressCS->SetUnorderedAccessView("PressureOut", pressureBuffers[1].UAV);
 
 		// Run compute
-		pressCS->DispatchByThreads(gridSize, gridSize, gridSize);
+		pressCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 		// Unset output for next iteration
 		pressCS->SetUnorderedAccessView("PressureOut", 0);
@@ -525,9 +549,9 @@ void FluidField::Projection()
 
 	// Turn on
 	projCS->SetShader();
-	projCS->SetInt("gridSizeX", gridSize);
-	projCS->SetInt("gridSizeY", gridSize);
-	projCS->SetInt("gridSizeZ", gridSize);
+	projCS->SetInt("gridSizeX", gridSizeX);
+	projCS->SetInt("gridSizeY", gridSizeY);
+	projCS->SetInt("gridSizeZ", gridSizeZ);
 	projCS->CopyAllBufferData();
 
 	// Set resources
@@ -537,7 +561,7 @@ void FluidField::Projection()
 	projCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
-	projCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	projCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	projCS->SetShaderResourceView("PressureIn", 0);
@@ -557,9 +581,9 @@ void FluidField::InjectSmoke()
 
 	// Turn on and set data
 	injCS->SetShader();
-	injCS->SetInt("gridSizeX", gridSize);
-	injCS->SetInt("gridSizeY", gridSize);
-	injCS->SetInt("gridSizeZ", gridSize);
+	injCS->SetInt("gridSizeX", gridSizeX);
+	injCS->SetInt("gridSizeY", gridSizeY);
+	injCS->SetInt("gridSizeZ", gridSizeZ);
 	injCS->SetFloat("deltaTime", fixedTimeStep);
 	injCS->SetFloat("injectRadius", injectRadius);
 	injCS->SetFloat3("injectPosition", injectPosition);
@@ -579,7 +603,7 @@ void FluidField::InjectSmoke()
 	injCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
-	injCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	injCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	injCS->SetShaderResourceView("DensityIn", 0);
@@ -621,7 +645,7 @@ void FluidField::Buoyancy()
 	buoyCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
-	buoyCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	buoyCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	buoyCS->SetShaderResourceView("VelocityIn", 0);
@@ -642,9 +666,9 @@ void FluidField::Vorticity()
 
 	// Turn on
 	vortCS->SetShader();
-	vortCS->SetInt("gridSizeX", gridSize);
-	vortCS->SetInt("gridSizeY", gridSize);
-	vortCS->SetInt("gridSizeZ", gridSize);
+	vortCS->SetInt("gridSizeX", gridSizeX);
+	vortCS->SetInt("gridSizeY", gridSizeY);
+	vortCS->SetInt("gridSizeZ", gridSizeZ);
 	vortCS->CopyAllBufferData();
 
 	// Set resources
@@ -653,7 +677,7 @@ void FluidField::Vorticity()
 	vortCS->SetUnorderedAccessView("VorticityOut", vorticityBuffer.UAV);
 
 	// Run compute
-	vortCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	vortCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	vortCS->SetShaderResourceView("VelocityIn", 0);
@@ -670,9 +694,9 @@ void FluidField::Confinement()
 	// Turn on
 	confCS->SetShader();
 	confCS->SetFloat("deltaTime", fixedTimeStep);
-	confCS->SetInt("gridSizeX", gridSize);
-	confCS->SetInt("gridSizeY", gridSize);
-	confCS->SetInt("gridSizeZ", gridSize);
+	confCS->SetInt("gridSizeX", gridSizeX);
+	confCS->SetInt("gridSizeY", gridSizeY);
+	confCS->SetInt("gridSizeZ", gridSizeZ);
 	confCS->SetFloat("vorticityEpsilon", vorticityEpsilon);
 	confCS->CopyAllBufferData();
 
@@ -683,7 +707,7 @@ void FluidField::Confinement()
 	confCS->SetUnorderedAccessView("VelocityOut", velocityBuffers[1].UAV);
 
 	// Run compute
-	confCS->DispatchByThreads(gridSize, gridSize, gridSize);
+	confCS->DispatchByThreads(gridSizeX, gridSizeY, gridSizeZ);
 
 	// Unset resources
 	confCS->SetShaderResourceView("VorticityIn", 0);
