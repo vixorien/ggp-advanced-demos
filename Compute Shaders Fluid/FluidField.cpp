@@ -314,6 +314,16 @@ void FluidField::RenderFluid(Camera* camera)
 }
 
 unsigned int FluidField::GetGridSize() { return gridSize; }
+void FluidField::SetGridSize(unsigned int gridSize)
+{
+	// Need more than 1 grid cell (probably even more)
+	if (gridSize <= 1)
+		return;
+
+	// Save and recreate resources
+	this->gridSize = gridSize;
+	RecreateGPUResources();
+}
 
 DirectX::XMFLOAT3 FluidField::GetInjectPosition() {	return injectPosition; }
 

@@ -73,6 +73,7 @@ public:
 	FLUID_RENDER_MODE renderMode;
 
 	unsigned int GetGridSize();
+    void SetGridSize(unsigned int gridSize);
 	DirectX::XMFLOAT3 GetInjectPosition();
 	void SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityImpulse);
 
