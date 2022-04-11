@@ -140,7 +140,7 @@ void FluidField::RecreateGPUResources()
 
 				// Flat cube
 				{
-					/*if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y == 32)
+				/*	if (x > 10 && x < gridSize - 10 && z > 10 && z < gridSize - 10 && y == 32)
 					{
 						obData[index] = (unsigned char)255;
 					}*/

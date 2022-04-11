@@ -18,6 +18,10 @@ RWTexture3D<float4>	VorticityOut	: register(u0);
 	FLUID_COMPUTE_THREADS_PER_AXIS)]
 void main(uint3 id : SV_DispatchThreadID)
 {
+	// Check for obstacle at this cell
+	if (ObstaclesIn[id].r > 0.0f)
+		return;
+
 	// Indices of surrounding pixels
 	uint3 idL = GetLeftIndex(id);
 	uint3 idR = GetRightIndex(id, gridSizeX);

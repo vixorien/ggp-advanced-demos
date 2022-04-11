@@ -23,6 +23,7 @@ void main(uint3 id : SV_DispatchThreadID)
 	if (ObstaclesIn[id].r > 0.0f)
 	{
 		VelocityOut[id] = float4(0, 0, 0, 1);
+		return;
 		// NOTE: This should really be the obstacle's velocity
 		// but we don't have that yet
 	}
@@ -64,13 +65,16 @@ void main(uint3 id : SV_DispatchThreadID)
 
 	// Check for boundaries
 	// NOTE: Will need obstacle velocity!
+	// NOTE: Swapped velocity mask to be negative instead of zero!  Using
+	//       zero would result in full x/y/z corners having their velocity
+	//       completely masked out
 	float3 velocityMask = float3(1, 1, 1);
-	if (ObstaclesIn[idL].r > 0.0f || idL.x == id.x) { pL = pressureHere; velocityMask.x = 0; }
-	if (ObstaclesIn[idR].r > 0.0f || idR.x == id.x) { pR = pressureHere; velocityMask.x = 0; }
-	if (ObstaclesIn[idD].r > 0.0f || idD.y == id.y) { pD = pressureHere; velocityMask.y = 0; }
-	if (ObstaclesIn[idU].r > 0.0f || idU.y == id.y) { pU = pressureHere; velocityMask.y = 0; }
-	if (ObstaclesIn[idB].r > 0.0f || idB.z == id.z) { pB = pressureHere; velocityMask.z = 0; }
-	if (ObstaclesIn[idF].r > 0.0f || idF.z == id.z) { pF = pressureHere; velocityMask.z = 0; }
+	if (ObstaclesIn[idL].r > 0.0f || idL.x == id.x) { pL = pressureHere; velocityMask.x = -1; }
+	if (ObstaclesIn[idR].r > 0.0f || idR.x == id.x) { pR = pressureHere; velocityMask.x = -1; }
+	if (ObstaclesIn[idD].r > 0.0f || idD.y == id.y) { pD = pressureHere; velocityMask.y = -1; }
+	if (ObstaclesIn[idU].r > 0.0f || idU.y == id.y) { pU = pressureHere; velocityMask.y = -1; }
+	if (ObstaclesIn[idB].r > 0.0f || idB.z == id.z) { pB = pressureHere; velocityMask.z = -1; }
+	if (ObstaclesIn[idF].r > 0.0f || idF.z == id.z) { pF = pressureHere; velocityMask.z = -1; }
 
 	// Pressure gradient
 	float3 pressureGradient = 
