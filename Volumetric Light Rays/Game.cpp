@@ -757,6 +757,9 @@ void Game::CreateUI(float dt)
 		ImGui::Text("Sun Details");
 		ImGui::SliderFloat3("Direction to Sun", &renderer->lightRaySunDirection.x, -1.0f, 1.0f);
 		ImGui::SliderFloat("Sun Falloff Exponent", &renderer->lightRaySunFalloffExponent, 1.0f, 512.0f);
+		ImGui::Checkbox("Use Skybox Color For Sun", &renderer->lightRayUseSkyboxColor);
+		if (!renderer->lightRayUseSkyboxColor)
+			ImGui::ColorEdit3("Sun Color", &renderer->lightRaySunColor.x);
 		ImGui::Spacing();
 
 		ImGui::Text("Light Rays");

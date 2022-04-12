@@ -48,8 +48,10 @@ using namespace DirectX;
 	 lightRaySampleWeight(0.2f),
 	 lightRayDecay(0.98f),
 	 lightRayExposure(0.2f),
-	 lightRaySunDirection{ 0,0,1 },
-	 lightRaySunFalloffExponent(128.0f)
+	 lightRaySunDirection(0,0,1),
+	 lightRaySunFalloffExponent(128.0f),
+	 lightRaySunColor(1,1,1),
+	 lightRayUseSkyboxColor(false)
 {
 	// Validate active light count
 	activeLightCount = min(activeLightCount, MAX_LIGHTS);
@@ -241,6 +243,8 @@ void Renderer::Render(Camera* camera)
 	SimplePixelShader* skyPS = assets.GetPixelShader("SkyPS.cso");
 	skyPS->SetFloat3("sunDirection", lightRaySunDirection);
 	skyPS->SetFloat("falloffExponent", lightRaySunFalloffExponent);
+	skyPS->SetFloat3("sunColor", lightRaySunColor);
+	skyPS->SetInt("useSkyboxColor", (int)lightRayUseSkyboxColor);
 	skyPS->CopyAllBufferData();
 	sky->Draw(camera);
 

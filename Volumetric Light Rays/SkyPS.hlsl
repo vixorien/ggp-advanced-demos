@@ -3,6 +3,8 @@ cbuffer externalData : register(b0)
 {
 	float3 sunDirection;
 	float falloffExponent;
+	float3 sunColor;
+	int useSkyboxColor;
 }
 
 // Texture-related resources
@@ -44,9 +46,13 @@ PS_Output main(VertexToPixel input)
 	float falloff = saturate(dot(normalize(sunDirection), normalize(input.sampleDir)));
 	falloff = pow(falloff, falloffExponent);
 
+	// Colors
+	float3 skyColor = skyTexture.Sample(samplerOptions, input.sampleDir).rgb;
+	float3 lightColor = lerp(sunColor, skyColor, useSkyboxColor);
+
 	// When we sample a TextureCube (like "skyTexture"), we need
 	// to provide a direction in 3D space (a float3) instead of a uv coord
-	output.colorNoAmbient = skyTexture.Sample(samplerOptions, input.sampleDir);
-	output.skyAndOccluders = float4(falloff.rrr, 1);
+	output.colorNoAmbient = float4(skyColor,1);
+	output.skyAndOccluders = float4(falloff * lightColor, 1);
 	return output;
 }

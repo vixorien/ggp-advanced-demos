@@ -99,6 +99,8 @@ public:
 	float lightRayExposure;
 	DirectX::XMFLOAT3 lightRaySunDirection;
 	float lightRaySunFalloffExponent;
+	DirectX::XMFLOAT3 lightRaySunColor;
+	bool lightRayUseSkyboxColor;
 
 private:
 	// The renderer needs access to all the core DX stuff
