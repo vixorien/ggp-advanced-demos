@@ -13,6 +13,9 @@ Mesh* GameEntity::GetMesh() { return mesh; }
 Material* GameEntity::GetMaterial() { return material; }
 Transform* GameEntity::GetTransform() { return &transform; }
 
+void GameEntity::SetMesh(Mesh* mesh) { this->mesh = mesh; }
+void GameEntity::SetMaterial(Material* material) { this->material = material; }
+
 
 void GameEntity::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, Camera* camera)
 {

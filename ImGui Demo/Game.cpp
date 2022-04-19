@@ -452,16 +452,28 @@ void Game::Update(float deltaTime, float totalTime)
 	// Update the camera
 	camera->Update(deltaTime);
 
+	// Create the UI during update!
+	CreateUI(deltaTime);
+
+	// Check various keys
+	if (input.KeyDown(VK_ESCAPE)) Quit();
+	if (input.KeyPress(VK_TAB)) GenerateLights();
+}
+
+
+void Game::CreateUI(float dt)
+{
 	// IMGUI
 	{
 		// Reset input manager's gui state
 		// so we don't taint our own input
+		Input& input = Input::GetInstance();
 		input.SetGuiKeyboardCapture(false);
 		input.SetGuiMouseCapture(false);
 
 		// Set io info
 		ImGuiIO& io = ImGui::GetIO();
-		io.DeltaTime = deltaTime;
+		io.DeltaTime = dt;
 		io.DisplaySize.x = (float)this->width;
 		io.DisplaySize.y = (float)this->height;
 		io.KeyCtrl = input.KeyDown(VK_CONTROL);
@@ -483,34 +495,70 @@ void Game::Update(float deltaTime, float totalTime)
 		// Determine new input capture
 		input.SetGuiKeyboardCapture(io.WantCaptureKeyboard);
 		input.SetGuiMouseCapture(io.WantCaptureMouse);
-
-		// Show the demo window
-		ImGui::ShowDemoWindow();
 	}
 
-	// Create the UI during update!
-	CreateUI();
+	// Combined into a single window
+	ImGui::Begin("Debug");
 
-	// Check various keys
-	if (input.KeyDown(VK_ESCAPE)) Quit();
-	if (input.KeyPress(VK_TAB)) GenerateLights();
-}
-
-
-void Game::CreateUI()
-{
-	ImGui::Begin("Lights");
-
-	ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS);
-	while (lightCount >= lights.size())
+	// Showing the demo window?
 	{
-		Light light = {};
-		lights.push_back(light);
+		static bool showDemoWindow = false;
+		if (ImGui::Button("Show Demo Window"))
+			showDemoWindow = !showDemoWindow;
+
+		if (showDemoWindow)
+			ImGui::ShowDemoWindow();
 	}
 
-	for (int i = 0; i < lightCount; i++)
+	//// Toggle point lights
+	//{
+	//	ImGui::SameLine();
+
+	//	bool visible = renderer->GetPointLightsVisible();
+	//	if (ImGui::Button(visible ? "Hide Lights" : "Show Lights"))
+	//		renderer->SetPointLightsVisible(!visible);
+	//}
+
+	// All entity transforms
+	if (ImGui::CollapsingHeader("Lights"))
 	{
-		UILight(lights[i], i);
+		if (ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS))
+
+		while (lightCount >= lights.size())
+		{
+			Light light = {};
+			lights.push_back(light);
+		}
+
+		for (int i = 0; i < lightCount; i++)
+		{
+			UILight(lights[i], i);
+		}
+	}
+
+	// All scene entities
+	if (ImGui::CollapsingHeader("Entities"))
+	{
+		if (ImGui::Button("Set All Materials To..."))
+			ImGui::OpenPopup("SetAllMaterials");
+
+		if (ImGui::BeginPopup("SetAllMaterials"))
+		{
+			for (int i = 0; i < materials.size(); i++)
+			{
+				std::string label = "Material " + std::to_string(i);
+				if (ImGui::Selectable(label.c_str()))
+				{
+					for (auto e : entities) e->SetMaterial(materials[i]);
+				}
+			}
+			ImGui::EndPopup();
+		}
+
+		for (int i = 0; i < entities.size(); i++)
+		{
+			UIEntity(entities[i], i);
+		}
 	}
 
 	ImGui::End();
@@ -580,6 +628,134 @@ void Game::UILight(Light& light, int index)
 		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
 
 		ImGui::TreePop();
+	}
+}
+
+void Game::UIEntity(GameEntity* entity, int index)
+{
+	std::string indexStr = std::to_string(index);
+
+	std::string nodeName = "Entity " + indexStr;
+	if (ImGui::TreeNode(nodeName.c_str()))
+	{
+		// Transform -----------------------
+		if (ImGui::CollapsingHeader("Transform"))
+		{
+			Transform* transform = entity->GetTransform();
+			XMFLOAT3 pos = transform->GetPosition();
+			XMFLOAT3 rot = transform->GetPitchYawRoll();
+			XMFLOAT3 scale = transform->GetScale();
+
+			if (ImGui::DragFloat3("Position", &pos.x, 0.1f))
+			{
+				transform->SetPosition(pos.x, pos.y, pos.z);
+			}
+
+			if (ImGui::DragFloat3("Pitch/Yaw/Roll", &rot.x, 0.1f))
+			{
+				transform->SetRotation(rot.x, rot.y, rot.z);
+			}
+
+			if (ImGui::DragFloat3("Scale", &scale.x, 0.1f, 0.0f))
+			{
+				transform->SetScale(scale.x, scale.y, scale.z);
+			}
+		}
+
+		// Material ------------------------
+		if (ImGui::CollapsingHeader("Material"))
+		{
+			ImVec2 size = ImGui::GetItemRectSize();
+			ImVec2 finalSize = ImVec2(size.x, size.x);
+
+			// Material changer
+			std::string comboID = "Change Material##" + indexStr;
+
+			// Need the material index to preview the name
+			// (Ugh, gross O(n) search over and over)
+			int index = (int)std::distance(materials.begin(), std::find(materials.begin(), materials.end(), entity->GetMaterial()));
+			std::string previewName = "Material " + std::to_string(index);
+
+			// Start the material drop down box
+			ImGui::Spacing();
+			if (ImGui::BeginCombo(comboID.c_str(), previewName.c_str()))
+			{
+				// Show all materials
+				for (int i = 0; i < materials.size(); i++)
+				{
+					// Is this one selected?
+					bool selected = (entity->GetMaterial() == materials[i]);
+
+					// Create the entry
+					std::string matName = "Material " + std::to_string(i);
+					if (ImGui::Selectable(matName.c_str(), selected))
+						entity->SetMaterial(materials[i]);
+
+					if (selected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				ImGui::EndCombo();
+			}
+
+
+			ImGui::Text("Albedo");
+			ImageWithHover(entity->GetMaterial()->GetAlbedoMap().Get(), finalSize);
+
+			ImGui::Spacing();
+			ImGui::Text("Normals");
+			ImageWithHover(entity->GetMaterial()->GetNormalMap().Get(), finalSize);
+
+			ImGui::Spacing();
+			ImGui::Text("Roughness");
+			ImageWithHover(entity->GetMaterial()->GetRoughnessMap().Get(), finalSize);
+
+			ImGui::Spacing();
+			ImGui::Text("Metal");
+			ImageWithHover(entity->GetMaterial()->GetMetalMap().Get(), finalSize);
+
+			
+		}
+
+		ImGui::TreePop();
+	}
+
+}
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
+{
+	// Draw the image
+	ImGui::Image(user_texture_id, size);
+
+	// Check for hover
+	if (ImGui::IsItemHovered())
+	{
+		// Zoom amount and aspect of the image
+		float zoom = 0.03f;
+		float aspect = (float)size.x / size.y;
+
+		// Get the coords of the image
+		ImVec2 topLeft = ImGui::GetItemRectMin();
+		ImVec2 bottomRight = ImGui::GetItemRectMax();
+
+		// Get the mouse pos as a percent across the image, clamping near the edge
+		ImVec2 mousePosGlobal = ImGui::GetMousePos();
+		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
+		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
+
+		uvPercent.x = max(uvPercent.x, zoom / 2);
+		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
+		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
+		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
+
+		// Figure out the uv coords for the zoomed image
+		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
+		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
+
+		// Draw a floating box with a zoomed view of the image
+		ImGui::BeginTooltip();
+		ImGui::Image(user_texture_id, ImVec2(256, 256), uvTL, uvBR);
+		ImGui::EndTooltip();
 	}
 }
 

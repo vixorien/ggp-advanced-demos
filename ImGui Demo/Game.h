@@ -9,6 +9,7 @@
 #include "SpriteBatch.h"
 #include "Lights.h"
 #include "Sky.h"
+#include "ImGui\imgui.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
@@ -67,8 +68,10 @@ private:
 	Sky* sky;
 
 	// IMGUI-related methods
-	void CreateUI();
+	void CreateUI(float dt);
 	void UILight(Light& light, int index);
+	void UIEntity(GameEntity* entity, int index);
+    void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size);
 
 	// General helpers for setup and drawing
 	void GenerateLights();
