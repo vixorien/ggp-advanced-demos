@@ -59,3 +59,8 @@ void Material::PrepareMaterial(Transform* transform, Camera* cam)
 	// Set sampler
 	ps->SetSamplerState("BasicSampler", sampler);
 }
+
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Material::GetAlbedoMap() { return albedoSRV; }
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Material::GetNormalMap() { return normalSRV; }
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Material::GetRoughnessMap() { return roughnessSRV; }
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Material::GetMetalMap() { return metalSRV; }

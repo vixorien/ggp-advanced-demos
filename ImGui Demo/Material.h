@@ -32,6 +32,11 @@ public:
 	void SetVS(SimpleVertexShader* vs) { this->vs = vs; }
 	void SetPS(SimplePixelShader* ps) { this->ps = ps; }
 
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetAlbedoMap();
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetNormalMap();
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetRoughnessMap();
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetMetalMap();
+
 private:
 	SimpleVertexShader* vs;
 	SimplePixelShader* ps;
