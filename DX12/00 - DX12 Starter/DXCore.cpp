@@ -34,7 +34,32 @@ DXCore::DXCore(
 	const char* titleBarText,	// Text for the window's title bar
 	unsigned int windowWidth,	// Width of the window's client area
 	unsigned int windowHeight,	// Height of the window's client area
+	bool vsync,					// Sync the framerate to the monitor?
 	bool debugTitleBarStats)	// Show extra stats (fps) in title bar?
+	:
+	hInstance(hInstance),
+	titleBarText(titleBarText),
+	windowWidth(windowWidth),
+	windowHeight(windowHeight),
+	vsync(vsync),
+	isFullscreen(false),
+	deviceSupportsTearing(false),
+	titleBarStats(debugTitleBarStats),
+	dxFeatureLevel(D3D_FEATURE_LEVEL_12_0), // 12 now!
+	fpsTimeElapsed(0),
+	fpsFrameCount(0),
+	previousTime(0),
+	currentTime(0),
+	hasFocus(true),
+	deltaTime(0),
+	startTime(0),
+	totalTime(0),
+	hWnd(0),
+	currentSwapBuffer(0), // D3D12-specific stuff starts here
+	dsvHandle{},
+	rtvDescriptorSize{},
+	rtvHandles{},
+	scissorRect{}
 {
 	// Save a static reference to this object.
 	//  - Since the OS-level message function must be a non-member (global) function, 
@@ -42,40 +67,21 @@ DXCore::DXCore(
 	//  - (Yes, a singleton might be a safer choice here).
 	DXCoreInstance = this;
 
-	// Save params
-	this->hInstance = hInstance;
-	this->titleBarText = titleBarText;
-	this->width = windowWidth;
-	this->height = windowHeight;
-	this->titleBarStats = debugTitleBarStats;
-
-	// Initialize fields
-	this->hasFocus = true; 
-	
-	this->fpsFrameCount = 0;
-	this->fpsTimeElapsed = 0.0f;
-	this->currentTime = 0;
-	this->deltaTime = 0;
-	this->startTime = 0;
-	this->totalTime = 0;
-
-	currentSwapBuffer = 0;
-
 	// Query performance counter for accurate timing information
-	__int64 perfFreq;
+	__int64 perfFreq(0);
 	QueryPerformanceFrequency((LARGE_INTEGER*)&perfFreq);
 	perfCounterSeconds = 1.0 / (double)perfFreq;
 }
 
 // --------------------------------------------------------
-// Destructor - Clean up (release) all DirectX references
+// Destructor - Clean up (release) all Direct3D references
 // --------------------------------------------------------
 DXCore::~DXCore()
 {
 	// Note: Since we're using smart pointers (ComPtr),
-	// we don't need to explicitly clean up those DirectX objects
+	// we don't need to explicitly clean up those Direct3D objects
 	// - If we weren't using smart pointers, we'd need
-	//   to call Release() on each DirectX object created in DXCore
+	//   to call Release() on each Direct3D object created in DXCore
 
 	// Delete singletons
 	delete& Input::GetInstance();
@@ -116,7 +122,7 @@ HRESULT DXCore::InitWindow()
 	// Adjust the width and height so the "client size" matches
 	// the width and height given (the inner-area of the window)
 	RECT clientRect;
-	SetRect(&clientRect, 0, 0, width, height);
+	SetRect(&clientRect, 0, 0, windowWidth, windowHeight);
 	AdjustWindowRect(
 		&clientRect,
 		WS_OVERLAPPEDWINDOW,	// Has a title bar, border, min and max buttons, etc.
@@ -164,11 +170,11 @@ HRESULT DXCore::InitWindow()
 
 
 // --------------------------------------------------------
-// Initializes DirectX, which requires a window.  This method
-// also creates several DirectX objects we'll need to start
+// Initializes Direct3D, which requires a window.  This method
+// also creates several Direct3D objects we'll need to start
 // drawing things to the screen.
 // --------------------------------------------------------
-HRESULT DXCore::InitDirectX()
+HRESULT DXCore::InitDirect3D()
 {
 #if defined(DEBUG) || defined(_DEBUG)
 	// If we're in debug mode in visual studio, we also
@@ -180,6 +186,22 @@ HRESULT DXCore::InitDirectX()
 	debugController->EnableDebugLayer();
 #endif
 	
+	// Determine if screen tearing ("vsync off") is available
+	// - This is necessary due to variable refresh rate displays
+	Microsoft::WRL::ComPtr<IDXGIFactory5> factory;
+	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+	{
+		// Check for this specific feature (must use BOOL typedef here!)
+		BOOL tearingSupported = false;
+		HRESULT featureCheck = factory->CheckFeatureSupport(
+			DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+			&tearingSupported,
+			sizeof(tearingSupported));
+
+		// Final determination of support
+		deviceSupportsTearing = SUCCEEDED(featureCheck) && tearingSupported;
+	}
+
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
 
@@ -248,21 +270,21 @@ HRESULT DXCore::InitDirectX()
 	{
 		// Create a description of how our swap chain should work
 		DXGI_SWAP_CHAIN_DESC swapDesc = {};
-		swapDesc.BufferCount = numBackBuffers;
-		swapDesc.BufferDesc.Width = width;
-		swapDesc.BufferDesc.Height = height;
+		swapDesc.BufferCount		= numBackBuffers;
+		swapDesc.BufferDesc.Width	= windowWidth;
+		swapDesc.BufferDesc.Height	= windowHeight;
 		swapDesc.BufferDesc.RefreshRate.Numerator = 60;
 		swapDesc.BufferDesc.RefreshRate.Denominator = 1;
-		swapDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapDesc.BufferDesc.Format	= DXGI_FORMAT_R8G8B8A8_UNORM;
 		swapDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		swapDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-		swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		swapDesc.Flags = 0; // DX12: Do we need DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH?
-		swapDesc.OutputWindow = hWnd;
-		swapDesc.SampleDesc.Count = 1;
+		swapDesc.BufferUsage		= DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swapDesc.Flags				= deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+		swapDesc.OutputWindow		= hWnd;
+		swapDesc.SampleDesc.Count	= 1;
 		swapDesc.SampleDesc.Quality = 0;
-		swapDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-		swapDesc.Windowed = true;
+		swapDesc.SwapEffect			= DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		swapDesc.Windowed			= true;
 
 		// Create a DXGI factory, which is what we use to create a swap chain
 		Microsoft::WRL::ComPtr<IDXGIFactory> dxgiFactory;
@@ -313,12 +335,12 @@ HRESULT DXCore::InitDirectX()
 		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthBufferDesc.Height = height;
+		depthBufferDesc.Height = windowHeight;
 		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		depthBufferDesc.MipLevels = 1;
 		depthBufferDesc.SampleDesc.Count = 1;
 		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Width = width;
+		depthBufferDesc.Width = windowWidth;
 
 		// Describe the clear value that will most often be used
 		// for this buffer (which optimizes the clearing of the buffer)
@@ -362,8 +384,8 @@ HRESULT DXCore::InitDirectX()
 	viewport = {};
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Width = (float)width;
-	viewport.Height = (float)height;
+	viewport.Width = (float)windowWidth;
+	viewport.Height = (float)windowHeight;
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
 
@@ -375,8 +397,8 @@ HRESULT DXCore::InitDirectX()
 	scissorRect = {};
 	scissorRect.left = 0;
 	scissorRect.top = 0;
-	scissorRect.right = width;
-	scissorRect.bottom = height;
+	scissorRect.right = windowWidth;
+	scissorRect.bottom = windowHeight;
 
 	// Wait for the GPU before we proceed
 	DX12Helper::GetInstance().WaitForGPU();
@@ -407,7 +429,7 @@ void DXCore::OnResize()
 		backBuffers[i].Reset();
 
 	// Resize the swap chain (assuming a basic color format here)
-	swapChain->ResizeBuffers(numBackBuffers, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+	swapChain->ResizeBuffers(numBackBuffers, windowWidth, windowHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
 
 	// Go through the steps to setup the back buffers again
 	// Note: This assumes the descriptor heap already exists
@@ -439,12 +461,12 @@ void DXCore::OnResize()
 		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthBufferDesc.Height = height;
+		depthBufferDesc.Height = windowHeight;
 		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		depthBufferDesc.MipLevels = 1;
 		depthBufferDesc.SampleDesc.Count = 1;
 		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Width = width;
+		depthBufferDesc.Width = windowWidth;
 
 		// Describe the clear value that will most often be used
 		// for this buffer (which optimizes the clearing of the buffer)
@@ -487,8 +509,8 @@ void DXCore::OnResize()
 		viewport = {};
 		viewport.TopLeftX = 0;
 		viewport.TopLeftY = 0;
-		viewport.Width = (float)width;
-		viewport.Height = (float)height;
+		viewport.Width = (float)windowWidth;
+		viewport.Height = (float)windowHeight;
 		viewport.MinDepth = 0.0f;
 		viewport.MaxDepth = 1.0f;
 
@@ -500,9 +522,12 @@ void DXCore::OnResize()
 		scissorRect = {};
 		scissorRect.left = 0;
 		scissorRect.top = 0;
-		scissorRect.right = width;
-		scissorRect.bottom = height;
+		scissorRect.right = windowWidth;
+		scissorRect.bottom = windowHeight;
 	}
+
+	// Are we in a fullscreen state?
+	swapChain->GetFullscreenState(&isFullscreen, 0);
 
 	// Wait for the GPU before we proceed
 	dx12Helper.WaitForGPU();
@@ -518,7 +543,7 @@ HRESULT DXCore::Run()
 {
 	// Grab the start time now that
 	// the game loop is running
-	__int64 now;
+	__int64 now(0);
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	startTime = now;
 	currentTime = now;
@@ -581,7 +606,7 @@ void DXCore::Quit()
 void DXCore::UpdateTimer()
 {
 	// Grab the current time
-	__int64 now;
+	__int64 now(0);
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	currentTime = now;
 
@@ -603,7 +628,7 @@ void DXCore::UpdateTimer()
 // per second, including:
 //  - The window's width & height
 //  - The current FPS and ms/frame
-//  - The version of DirectX actually being used (usually 11)
+//  - The version of Direct3D actually being used (usually 11)
 // --------------------------------------------------------
 void DXCore::UpdateTitleBarStats()
 {
@@ -621,12 +646,12 @@ void DXCore::UpdateTitleBarStats()
 	std::ostringstream output;
 	output.precision(6);
 	output << titleBarText <<
-		"    Width: "		<< width <<
-		"    Height: "		<< height <<
+		"    Width: "		<< windowWidth <<
+		"    Height: "		<< windowHeight <<
 		"    FPS: "			<< fpsFrameCount <<
 		"    Frame Time: "	<< mspf << "ms";
 
-	// Append the version of DirectX the app is using
+	// Append the version of Direct3D the app is using
 	switch (dxFeatureLevel)
 	{
 	case D3D_FEATURE_LEVEL_12_1: output << "    DX 12.1"; break;
@@ -667,7 +692,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	coninfo.dwSize.X = bufferColumns;
 	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coninfo.dwSize);
 
-	SMALL_RECT rect;
+	SMALL_RECT rect = {};
 	rect.Left = 0;
 	rect.Top = 0;
 	rect.Right = windowColumns;
@@ -809,8 +834,8 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			return 0;
 		
 		// Save the new client area dimensions.
-		width = LOWORD(lParam);
-		height = HIWORD(lParam);
+		windowWidth = LOWORD(lParam);
+		windowHeight = HIWORD(lParam);
 
 		// If DX is initialized, resize 
 		// our required buffers
@@ -823,6 +848,11 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_MOUSEWHEEL:
 		Input::GetInstance().SetWheelDelta(GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
 		return 0;
+
+	// Raw mouse input
+	case WM_INPUT:
+		Input::GetInstance().ProcessRawMouseInput(lParam);
+		break;
 	
 	// Is our focus state changing?
 	case WM_SETFOCUS:	hasFocus = true;	return 0;

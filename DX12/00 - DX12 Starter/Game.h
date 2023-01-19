@@ -21,8 +21,6 @@ public:
 
 private:
 
-	bool vsync;
-
 	// Initialization helper methods - feel free to customize, combine, etc.
 	void CreateRootSigAndPipelineState();
 	void CreateBasicGeometry();

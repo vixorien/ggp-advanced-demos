@@ -19,6 +19,7 @@ public:
 		const char* titleBarText,	// Text for the window's title bar
 		unsigned int windowWidth,	// Width of the window's client area
 		unsigned int windowHeight,	// Height of the window's client area
+		bool vsync,					// Sync the framerate to the monitor?
 		bool debugTitleBarStats);	// Show extra stats (fps) in title bar?
 	~DXCore();
 
@@ -36,7 +37,7 @@ public:
 
 	// Initialization and game-loop related methods
 	HRESULT InitWindow();
-	HRESULT InitDirectX();
+	HRESULT InitDirect3D();
 	HRESULT Run();
 	void Quit();
 	virtual void OnResize();
@@ -53,12 +54,18 @@ protected:
 	bool		titleBarStats;	// Show extra stats in title bar?
 
 	// Size of the window's client area
-	unsigned int width;
-	unsigned int height;
+	unsigned int windowWidth;
+	unsigned int windowHeight;
 
 	// Does our window currently have focus?
 	// Helpful if we want to pause while not the active window
 	bool hasFocus;
+
+	// Should our framerate sync to the vertical refresh
+	// of the monitor (true) or run as fast as possible (false)?
+	bool vsync;
+	bool deviceSupportsTearing;
+	BOOL isFullscreen; // Due to alt+enter key combination (must be BOOL typedef)
 
 	// Swap chain buffer tracking
 	static const unsigned int numBackBuffers = 2;
@@ -73,7 +80,7 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue>			commandQueue; 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>	commandList;
 	
-	unsigned int rtvDescriptorSize;
+	size_t rtvDescriptorSize;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvHeap;
 

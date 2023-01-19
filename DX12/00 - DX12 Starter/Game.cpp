@@ -20,12 +20,14 @@ using namespace DirectX;
 // --------------------------------------------------------
 Game::Game(HINSTANCE hInstance)
 	: DXCore(
-		hInstance,		   // The application's handle
-		"DirectX Game",	   // Text for the window's title bar
-		1280,			   // Width of the window's client area
-		720,			   // Height of the window's client area
-		true),			   // Show extra stats (fps) in title bar?
-	vsync(false)
+		hInstance,		// The application's handle
+		"DirectX Game",	// Text for the window's title bar
+		1280,			// Width of the window's client area
+		720,			// Height of the window's client area
+		false,			// Sync the framerate to the monitor refresh? (lock framerate)
+		true),			// Show extra stats (fps) in title bar?
+	ibView{},
+	vbView{}
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -34,8 +36,6 @@ Game::Game(HINSTANCE hInstance)
 	printf("Console window created successfully.  Feel free to printf() here.\n");
 #endif
 
-	ibView = {};
-	vbView = {};
 }
 
 // --------------------------------------------------------
@@ -358,7 +358,10 @@ void Game::Draw(float deltaTime, float totalTime)
 		DX12Helper::GetInstance().CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
-		swapChain->Present(vsync ? 1 : 0, 0);
+		bool vsyncNecessary = vsync || !deviceSupportsTearing || isFullscreen;
+		swapChain->Present(
+			vsyncNecessary ? 1 : 0,
+			vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 
 		// Figure out which buffer is next
 		currentSwapBuffer++;
