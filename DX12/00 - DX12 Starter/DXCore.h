@@ -16,7 +16,7 @@ class DXCore
 public:
 	DXCore(
 		HINSTANCE hInstance,		// The application's handle
-		const char* titleBarText,	// Text for the window's title bar
+		const wchar_t* titleBarText,// Text for the window's title bar
 		unsigned int windowWidth,	// Width of the window's client area
 		unsigned int windowHeight,	// Height of the window's client area
 		bool vsync,					// Sync the framerate to the monitor?
@@ -48,10 +48,10 @@ public:
 	virtual void Draw(float deltaTime, float totalTime) = 0;
 
 protected:
-	HINSTANCE	hInstance;		// The handle to the application
-	HWND		hWnd;			// The handle to the window itself
-	std::string titleBarText;	// Custom text in window's title bar
-	bool		titleBarStats;	// Show extra stats in title bar?
+	HINSTANCE		hInstance;		// The handle to the application
+	HWND			hWnd;			// The handle to the window itself
+	std::wstring	titleBarText;	// Custom text in window's title bar
+	bool			titleBarStats;	// Show extra stats in title bar?
 
 	// Size of the window's client area
 	unsigned int windowWidth;
@@ -95,13 +95,6 @@ protected:
 
 	// Helper function for allocating a console window
 	void CreateConsoleWindow(int bufferLines, int bufferColumns, int windowLines, int windowColumns);
-
-	// Helpers for determining the actual path to the executable
-	std::string GetExePath();
-	std::wstring GetExePath_Wide();
-
-	std::string GetFullPathTo(std::string relativeFilePath);
-	std::wstring GetFullPathTo_Wide(std::wstring relativeFilePath);
 
 
 private:

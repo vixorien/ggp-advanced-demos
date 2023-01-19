@@ -2,6 +2,7 @@
 #include "Vertex.h"
 #include "Input.h"
 #include "DX12Helper.h"
+#include "Helpers.h"
 
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
@@ -21,7 +22,7 @@ using namespace DirectX;
 Game::Game(HINSTANCE hInstance)
 	: DXCore(
 		hInstance,		// The application's handle
-		"DirectX Game",	// Text for the window's title bar
+		L"DirectX Game",// Text for the window's title bar
 		1280,			// Width of the window's client area
 		720,			// Height of the window's client area
 		false,			// Sync the framerate to the monitor refresh? (lock framerate)
@@ -83,8 +84,8 @@ void Game::CreateRootSigAndPipelineState()
 	{
 		// Read our compiled vertex shader code into a blob
 		// - Essentially just "open the file and plop its contents here"
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
 	}
 
 	// Input layout
@@ -146,7 +147,7 @@ void Game::CreateRootSigAndPipelineState()
 		// Check for errors during serialization
 		if (errors != 0)
 		{
-			OutputDebugString((char*)errors->GetBufferPointer());
+			OutputDebugString((wchar_t*)errors->GetBufferPointer());
 		}
 
 		// Actually create the root sig
