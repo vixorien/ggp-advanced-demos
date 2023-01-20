@@ -56,8 +56,8 @@ DXCore::DXCore(
 	totalTime(0),
 	hWnd(0),
 	currentSwapBuffer(0), // D3D12-specific stuff starts here
+	rtvDescriptorSize(0),
 	dsvHandle{},
-	rtvDescriptorSize{},
 	rtvHandles{},
 	scissorRect{}
 {
