@@ -144,16 +144,20 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DX12Helper::GetCBVSRVDescriptorHeap
 // --------------------------------------------------------
 D3D12_GPU_DESCRIPTOR_HANDLE DX12Helper::FillNextConstantBufferAndGetGPUDescriptorHandle(void* data, unsigned int dataSizeInBytes)
 {
-	// Where in the upload heap will this data go?
-	D3D12_GPU_VIRTUAL_ADDRESS virtualGPUAddress =
-		cbUploadHeap->GetGPUVirtualAddress() + cbUploadHeapOffsetInBytes;
-
 	// How much space will we need?  Each CBV must point to a chunk of
 	// the upload heap that is a multiple of 256 bytes, so we need to 
 	// calculate and reserve that amount.
 	SIZE_T reservationSize = (SIZE_T)dataSizeInBytes;
 	reservationSize = (reservationSize + 255); // Add 255 so we can drop last few bits
 	reservationSize = reservationSize & ~255;  // Flip 255 and then use it to mask 
+
+	// Ensure this upload will fit in the remaining space.  If not, reset to beginning.
+	if (cbUploadHeapOffsetInBytes + reservationSize >= cbUploadHeapSizeInBytes)
+		cbUploadHeapOffsetInBytes = 0;
+
+	// Where in the upload heap will this data go?
+	D3D12_GPU_VIRTUAL_ADDRESS virtualGPUAddress =
+		cbUploadHeap->GetGPUVirtualAddress() + cbUploadHeapOffsetInBytes;
 
 	// === Copy data to the upload heap ===
 	{

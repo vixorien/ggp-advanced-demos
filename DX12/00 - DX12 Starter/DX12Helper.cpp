@@ -155,7 +155,7 @@ void DX12Helper::WaitForGPU()
 	if (waitFence->GetCompletedValue() < waitFenceCounter)
 	{
 		// Tell the fence to let us know when it's hit, and then
-		// sit an wait until that fence is hit.
+		// sit and wait until that fence is hit.
 		waitFence->SetEventOnCompletion(waitFenceCounter, waitFenceEvent);
 		WaitForSingleObject(waitFenceEvent, INFINITE);
 	}
