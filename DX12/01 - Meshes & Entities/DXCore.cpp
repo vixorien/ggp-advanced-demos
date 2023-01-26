@@ -31,10 +31,35 @@ LRESULT DXCore::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 // --------------------------------------------------------
 DXCore::DXCore(
 	HINSTANCE hInstance,		// The application's handle
-	const char* titleBarText,	// Text for the window's title bar
+	const wchar_t* titleBarText,// Text for the window's title bar
 	unsigned int windowWidth,	// Width of the window's client area
 	unsigned int windowHeight,	// Height of the window's client area
+	bool vsync,					// Sync the framerate to the monitor?
 	bool debugTitleBarStats)	// Show extra stats (fps) in title bar?
+	:
+	hInstance(hInstance),
+	titleBarText(titleBarText),
+	windowWidth(windowWidth),
+	windowHeight(windowHeight),
+	vsync(vsync),
+	isFullscreen(false),
+	deviceSupportsTearing(false),
+	titleBarStats(debugTitleBarStats),
+	dxFeatureLevel(D3D_FEATURE_LEVEL_12_0), // 12 now!
+	fpsTimeElapsed(0),
+	fpsFrameCount(0),
+	previousTime(0),
+	currentTime(0),
+	hasFocus(true),
+	deltaTime(0),
+	startTime(0),
+	totalTime(0),
+	hWnd(0),
+	currentSwapBuffer(0), // D3D12-specific stuff starts here
+	rtvDescriptorSize(0),
+	dsvHandle{},
+	rtvHandles{},
+	scissorRect{}
 {
 	// Save a static reference to this object.
 	//  - Since the OS-level message function must be a non-member (global) function, 
@@ -42,40 +67,21 @@ DXCore::DXCore(
 	//  - (Yes, a singleton might be a safer choice here).
 	DXCoreInstance = this;
 
-	// Save params
-	this->hInstance = hInstance;
-	this->titleBarText = titleBarText;
-	this->width = windowWidth;
-	this->height = windowHeight;
-	this->titleBarStats = debugTitleBarStats;
-
-	// Initialize fields
-	this->hasFocus = true; 
-	
-	this->fpsFrameCount = 0;
-	this->fpsTimeElapsed = 0.0f;
-	this->currentTime = 0;
-	this->deltaTime = 0;
-	this->startTime = 0;
-	this->totalTime = 0;
-
-	currentSwapBuffer = 0;
-
 	// Query performance counter for accurate timing information
-	__int64 perfFreq;
+	__int64 perfFreq(0);
 	QueryPerformanceFrequency((LARGE_INTEGER*)&perfFreq);
 	perfCounterSeconds = 1.0 / (double)perfFreq;
 }
 
 // --------------------------------------------------------
-// Destructor - Clean up (release) all DirectX references
+// Destructor - Clean up (release) all Direct3D references
 // --------------------------------------------------------
 DXCore::~DXCore()
 {
 	// Note: Since we're using smart pointers (ComPtr),
-	// we don't need to explicitly clean up those DirectX objects
+	// we don't need to explicitly clean up those Direct3D objects
 	// - If we weren't using smart pointers, we'd need
-	//   to call Release() on each DirectX object created in DXCore
+	//   to call Release() on each Direct3D object created in DXCore
 
 	// Delete singletons
 	delete& Input::GetInstance();
@@ -89,17 +95,17 @@ HRESULT DXCore::InitWindow()
 {
 	// Start window creation by filling out the
 	// appropriate window class struct
-	WNDCLASS wndClass		= {}; // Zero out the memory
-	wndClass.style			= CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
-	wndClass.lpfnWndProc	= DXCore::WindowProc;
-	wndClass.cbClsExtra		= 0;
-	wndClass.cbWndExtra		= 0;
-	wndClass.hInstance		= hInstance;						// Our app's handle
-	wndClass.hIcon			= LoadIcon(NULL, IDI_APPLICATION);	// Default icon
-	wndClass.hCursor		= LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
-	wndClass.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wndClass.lpszMenuName	= NULL;
-	wndClass.lpszClassName	= "Direct3DWindowClass";
+	WNDCLASS wndClass = {}; // Zero out the memory
+	wndClass.style = CS_HREDRAW | CS_VREDRAW;	// Redraw on horizontal or vertical movement/adjustment
+	wndClass.lpfnWndProc = DXCore::WindowProc;
+	wndClass.cbClsExtra = 0;
+	wndClass.cbWndExtra = 0;
+	wndClass.hInstance = hInstance;						// Our app's handle
+	wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);	// Default icon
+	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
+	wndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wndClass.lpszMenuName = NULL;
+	wndClass.lpszClassName = L"Direct3DWindowClass";
 
 	// Attempt to register the window class we've defined
 	if (!RegisterClass(&wndClass))
@@ -116,7 +122,7 @@ HRESULT DXCore::InitWindow()
 	// Adjust the width and height so the "client size" matches
 	// the width and height given (the inner-area of the window)
 	RECT clientRect;
-	SetRect(&clientRect, 0, 0, width, height);
+	SetRect(&clientRect, 0, 0, windowWidth, windowHeight);
 	AdjustWindowRect(
 		&clientRect,
 		WS_OVERLAPPEDWINDOW,	// Has a title bar, border, min and max buttons, etc.
@@ -164,11 +170,11 @@ HRESULT DXCore::InitWindow()
 
 
 // --------------------------------------------------------
-// Initializes DirectX, which requires a window.  This method
-// also creates several DirectX objects we'll need to start
+// Initializes Direct3D, which requires a window.  This method
+// also creates several Direct3D objects we'll need to start
 // drawing things to the screen.
 // --------------------------------------------------------
-HRESULT DXCore::InitDirectX()
+HRESULT DXCore::InitDirect3D()
 {
 #if defined(DEBUG) || defined(_DEBUG)
 	// If we're in debug mode in visual studio, we also
@@ -179,7 +185,23 @@ HRESULT DXCore::InitDirectX()
 	D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 	debugController->EnableDebugLayer();
 #endif
-	
+
+	// Determine if screen tearing ("vsync off") is available
+	// - This is necessary due to variable refresh rate displays
+	Microsoft::WRL::ComPtr<IDXGIFactory5> factory;
+	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+	{
+		// Check for this specific feature (must use BOOL typedef here!)
+		BOOL tearingSupported = false;
+		HRESULT featureCheck = factory->CheckFeatureSupport(
+			DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+			&tearingSupported,
+			sizeof(tearingSupported));
+
+		// Final determination of support
+		deviceSupportsTearing = SUCCEEDED(featureCheck) && tearingSupported;
+	}
+
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
 
@@ -233,8 +255,9 @@ HRESULT DXCore::InitDirectX()
 			IID_PPV_ARGS(commandList.GetAddressOf()));
 	}
 
-	// Now that we have a device and a command list stuff,
-	// we can initialize the DX12 helper singleton
+	// Now that we have a device and a command list,
+	// we can initialize the DX12 helper singleton, which will
+	// also create a fence for synchronization
 	{
 		DX12Helper::GetInstance().Initialize(
 			device,
@@ -248,15 +271,15 @@ HRESULT DXCore::InitDirectX()
 		// Create a description of how our swap chain should work
 		DXGI_SWAP_CHAIN_DESC swapDesc = {};
 		swapDesc.BufferCount = numBackBuffers;
-		swapDesc.BufferDesc.Width = width;
-		swapDesc.BufferDesc.Height = height;
+		swapDesc.BufferDesc.Width = windowWidth;
+		swapDesc.BufferDesc.Height = windowHeight;
 		swapDesc.BufferDesc.RefreshRate.Numerator = 60;
 		swapDesc.BufferDesc.RefreshRate.Denominator = 1;
 		swapDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		swapDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		swapDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 		swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		swapDesc.Flags = 0; // DX12: Do we need DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH?
+		swapDesc.Flags = deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 		swapDesc.OutputWindow = hWnd;
 		swapDesc.SampleDesc.Count = 1;
 		swapDesc.SampleDesc.Quality = 0;
@@ -312,12 +335,12 @@ HRESULT DXCore::InitDirectX()
 		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthBufferDesc.Height = height;
+		depthBufferDesc.Height = windowHeight;
 		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		depthBufferDesc.MipLevels = 1;
 		depthBufferDesc.SampleDesc.Count = 1;
 		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Width = width;
+		depthBufferDesc.Width = windowWidth;
 
 		// Describe the clear value that will most often be used
 		// for this buffer (which optimizes the clearing of the buffer)
@@ -361,8 +384,8 @@ HRESULT DXCore::InitDirectX()
 	viewport = {};
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Width = (float)width;
-	viewport.Height = (float)height;
+	viewport.Width = (float)windowWidth;
+	viewport.Height = (float)windowHeight;
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
 
@@ -374,8 +397,8 @@ HRESULT DXCore::InitDirectX()
 	scissorRect = {};
 	scissorRect.left = 0;
 	scissorRect.top = 0;
-	scissorRect.right = width;
-	scissorRect.bottom = height;
+	scissorRect.right = windowWidth;
+	scissorRect.bottom = windowHeight;
 
 	// Wait for the GPU before we proceed
 	DX12Helper::GetInstance().WaitForGPU();
@@ -406,7 +429,12 @@ void DXCore::OnResize()
 		backBuffers[i].Reset();
 
 	// Resize the swap chain (assuming a basic color format here)
-	swapChain->ResizeBuffers(numBackBuffers, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+	swapChain->ResizeBuffers(
+		numBackBuffers,
+		windowWidth,
+		windowHeight,
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 
 	// Go through the steps to setup the back buffers again
 	// Note: This assumes the descriptor heap already exists
@@ -418,7 +446,7 @@ void DXCore::OnResize()
 
 		// Make a handle for it
 		rtvHandles[i] = rtvHeap->GetCPUDescriptorHandleForHeapStart();
-		rtvHandles[i].ptr += rtvDescriptorSize * i;
+		rtvHandles[i].ptr += rtvDescriptorSize * (size_t)i;
 
 		// Create the render target view
 		device->CreateRenderTargetView(backBuffers[i].Get(), 0, rtvHandles[i]);
@@ -438,12 +466,12 @@ void DXCore::OnResize()
 		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthBufferDesc.Height = height;
+		depthBufferDesc.Height = windowHeight;
 		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		depthBufferDesc.MipLevels = 1;
 		depthBufferDesc.SampleDesc.Count = 1;
 		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Width = width;
+		depthBufferDesc.Width = windowWidth;
 
 		// Describe the clear value that will most often be used
 		// for this buffer (which optimizes the clearing of the buffer)
@@ -483,25 +511,20 @@ void DXCore::OnResize()
 	{
 		// Set up the viewport so we render into the correct
 		// portion of the render target
-		viewport = {};
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.Width = (float)width;
-		viewport.Height = (float)height;
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
+		viewport.Width = (float)windowWidth;
+		viewport.Height = (float)windowHeight;
 
 		// Define a scissor rectangle that defines a portion of
 		// the render target for clipping.  This is different from
 		// a viewport in that it is applied after the pixel shader.
 		// We need at least one of these, but we're rendering to 
 		// the entire window, so it'll be the same size.
-		scissorRect = {};
-		scissorRect.left = 0;
-		scissorRect.top = 0;
-		scissorRect.right = width;
-		scissorRect.bottom = height;
+		scissorRect.right = windowWidth;
+		scissorRect.bottom = windowHeight;
 	}
+
+	// Are we in a fullscreen state?
+	swapChain->GetFullscreenState(&isFullscreen, 0);
 
 	// Wait for the GPU before we proceed
 	dx12Helper.WaitForGPU();
@@ -517,7 +540,7 @@ HRESULT DXCore::Run()
 {
 	// Grab the start time now that
 	// the game loop is running
-	__int64 now;
+	__int64 now(0);
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	startTime = now;
 	currentTime = now;
@@ -542,7 +565,7 @@ HRESULT DXCore::Run()
 		{
 			// Update timer and title bar (if necessary)
 			UpdateTimer();
-			if(titleBarStats)
+			if (titleBarStats)
 				UpdateTitleBarStats();
 
 			// Update the input manager
@@ -580,7 +603,7 @@ void DXCore::Quit()
 void DXCore::UpdateTimer()
 {
 	// Grab the current time
-	__int64 now;
+	__int64 now(0);
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	currentTime = now;
 
@@ -602,7 +625,7 @@ void DXCore::UpdateTimer()
 // per second, including:
 //  - The window's width & height
 //  - The current FPS and ms/frame
-//  - The version of DirectX actually being used (usually 11)
+//  - The version of Direct3D actually being used (usually 11)
 // --------------------------------------------------------
 void DXCore::UpdateTitleBarStats()
 {
@@ -617,15 +640,15 @@ void DXCore::UpdateTitleBarStats()
 	float mspf = 1000.0f / (float)fpsFrameCount;
 
 	// Quick and dirty title bar text (mostly for debugging)
-	std::ostringstream output;
+	std::wostringstream output;
 	output.precision(6);
 	output << titleBarText <<
-		"    Width: "		<< width <<
-		"    Height: "		<< height <<
-		"    FPS: "			<< fpsFrameCount <<
-		"    Frame Time: "	<< mspf << "ms";
+		"    Width: " << windowWidth <<
+		"    Height: " << windowHeight <<
+		"    FPS: " << fpsFrameCount <<
+		"    Frame Time: " << mspf << "ms";
 
-	// Append the version of DirectX the app is using
+	// Append the version of Direct3D the app is using
 	switch (dxFeatureLevel)
 	{
 	case D3D_FEATURE_LEVEL_12_1: output << "    DX 12.1"; break;
@@ -666,14 +689,14 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	coninfo.dwSize.X = bufferColumns;
 	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coninfo.dwSize);
 
-	SMALL_RECT rect;
+	SMALL_RECT rect = {};
 	rect.Left = 0;
 	rect.Top = 0;
 	rect.Right = windowColumns;
 	rect.Bottom = windowLines;
 	SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), TRUE, &rect);
 
-	FILE *stream;
+	FILE* stream;
 	freopen_s(&stream, "CONIN$", "r", stdin);
 	freopen_s(&stream, "CONOUT$", "w", stdout);
 	freopen_s(&stream, "CONOUT$", "w", stderr);
@@ -683,94 +706,6 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	HMENU hmenu = GetSystemMenu(consoleHandle, FALSE);
 	EnableMenuItem(hmenu, SC_CLOSE, MF_GRAYED);
 }
-
-// --------------------------------------------------------------------------
-// Gets the actual path to this executable
-//
-// - As it turns out, the relative path for a program is different when 
-//    running through VS and when running the .exe directly, which makes 
-//    it a pain to properly load external files (like textures)
-//    - Running through VS: Current Dir is the *project folder*
-//    - Running from .exe:  Current Dir is the .exe's folder
-// - This has nothing to do with DEBUG and RELEASE modes - it's purely a 
-//    Visual Studio "thing", and isn't obvious unless you know to look 
-//    for it.  In fact, it could be fixed by changing a setting in VS, but
-//    the option is stored in a user file (.suo), which is ignored by most
-//    version control packages by default.  Meaning: the option must be
-//    changed on every PC.  Ugh.  So instead, here's a helper.
-// --------------------------------------------------------------------------
-std::string DXCore::GetExePath()
-{
-	// Assume the path is just the "current directory" for now
-	std::string path = ".\\";
-
-	// Get the real, full path to this executable
-	char currentDir[1024] = {};
-	GetModuleFileName(0, currentDir, 1024);
-
-	// Find the location of the last slash charaacter
-	char* lastSlash = strrchr(currentDir, '\\');
-	if (lastSlash)
-	{
-		// End the string at the last slash character, essentially
-		// chopping off the exe's file name.  Remember, c-strings
-		// are null-terminated, so putting a "zero" character in 
-		// there simply denotes the end of the string.
-		*lastSlash = 0;
-		
-		// Set the remainder as the path
-		path = currentDir;
-	}
-
-	// Toss back whatever we've found
-	return path;
-}
-
-
-// ---------------------------------------------------
-//  Same as GetExePath(), except it returns a wide character
-//  string, which most of the Windows API requires.
-// ---------------------------------------------------
-std::wstring DXCore::GetExePath_Wide()
-{
-	// Grab the path as a standard string
-	std::string path = GetExePath();
-
-	// Convert to a wide string
-	wchar_t widePath[1024] = {};
-	mbstowcs_s(0, widePath, path.c_str(), 1024);
-
-	// Create a wstring for it and return
-	return std::wstring(widePath);
-}
-
-
-// ----------------------------------------------------
-//  Gets the full path to a given file.  NOTE: This does 
-//  NOT "find" the file, it simply concatenates the given
-//  relative file path onto the executable's path
-// ----------------------------------------------------
-std::string DXCore::GetFullPathTo(std::string relativeFilePath)
-{
-	return GetExePath() + "\\" + relativeFilePath;
-}
-
-
-
-// ----------------------------------------------------
-//  Same as GetFullPathTo, but with wide char strings.
-// 
-//  Gets the full path to a given file.  NOTE: This does 
-//  NOT "find" the file, it simply concatenates the given
-//  relative file path onto the executable's path
-// ----------------------------------------------------
-std::wstring DXCore::GetFullPathTo_Wide(std::wstring relativeFilePath)
-{
-	return GetExePath_Wide() + L"\\" + relativeFilePath;
-}
-
-
-
 
 
 // --------------------------------------------------------
@@ -784,46 +719,51 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	// Check the incoming message and handle any we care about
 	switch (uMsg)
 	{
-	// This is the message that signifies the window closing
+		// This is the message that signifies the window closing
 	case WM_DESTROY:
 		PostQuitMessage(0); // Send a quit message to our own program
 		return 0;
 
-	// Prevent beeping when we "alt-enter" into fullscreen
-	case WM_MENUCHAR: 
+		// Prevent beeping when we "alt-enter" into fullscreen
+	case WM_MENUCHAR:
 		return MAKELRESULT(0, MNC_CLOSE);
 
-	// Prevent the overall window from becoming too small
+		// Prevent the overall window from becoming too small
 	case WM_GETMINMAXINFO:
 		((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
 		((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
 		return 0;
 
-	// Sent when the window size changes
+		// Sent when the window size changes
 	case WM_SIZE:
 		// Don't adjust anything when minimizing,
 		// since we end up with a width/height of zero
 		// and that doesn't play well with the GPU
 		if (wParam == SIZE_MINIMIZED)
 			return 0;
-		
+
 		// Save the new client area dimensions.
-		width = LOWORD(lParam);
-		height = HIWORD(lParam);
+		windowWidth = LOWORD(lParam);
+		windowHeight = HIWORD(lParam);
 
 		// If DX is initialized, resize 
 		// our required buffers
-		if (device) 
+		if (device)
 			OnResize();
 
 		return 0;
 
-	// Has the mouse wheel been scrolled?
+		// Has the mouse wheel been scrolled?
 	case WM_MOUSEWHEEL:
 		Input::GetInstance().SetWheelDelta(GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
 		return 0;
-	
-	// Is our focus state changing?
+
+		// Raw mouse input
+	case WM_INPUT:
+		Input::GetInstance().ProcessRawMouseInput(lParam);
+		break;
+
+		// Is our focus state changing?
 	case WM_SETFOCUS:	hasFocus = true;	return 0;
 	case WM_KILLFOCUS:	hasFocus = false;	return 0;
 	case WM_ACTIVATE:	hasFocus = (LOWORD(wParam) != WA_INACTIVE); return 0;

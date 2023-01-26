@@ -82,8 +82,8 @@ void Camera::Update(float dt)
 	if (input.MouseLeftDown())
 	{
 		// Calculate cursor change
-		float xDiff = dt * mouseLookSpeed * input.GetMouseXDelta();
-		float yDiff = dt * mouseLookSpeed * input.GetMouseYDelta();
+		float xDiff = mouseLookSpeed * input.GetMouseXDelta();
+		float yDiff = mouseLookSpeed * input.GetMouseYDelta();
 		transform.Rotate(yDiff, xDiff, 0);
 
 		// Clamp the X rotation
