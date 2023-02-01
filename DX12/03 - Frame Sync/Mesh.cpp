@@ -13,7 +13,7 @@ Mesh::Mesh(Vertex* vertArray, int numVerts, unsigned int* indexArray, int numInd
 	CreateBuffers(vertArray, numVerts, indexArray, numIndices);
 }
 
-Mesh::Mesh(const char* objFile)
+Mesh::Mesh(const wchar_t* objFile)
 {
 	// Initialize in the event the load fails
 	numIndices = 0;

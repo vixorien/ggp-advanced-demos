@@ -4,6 +4,7 @@
 #include "BufferStructs.h"
 #include "DX12Helper.h"
 #include "Material.h"
+#include "Helpers.h"
 
 #include <stdlib.h>     // For seeding random and rand()
 #include <time.h>       // For grabbing time (to seed random)
@@ -28,12 +29,12 @@ using namespace DirectX;
 // --------------------------------------------------------
 Game::Game(HINSTANCE hInstance)
 	: DXCore(
-		hInstance,		   // The application's handle
-		"DirectX Game",	   // Text for the window's title bar
-		1280,			   // Width of the window's client area
-		720,			   // Height of the window's client area
-		true),			   // Show extra stats (fps) in title bar?
-	vsync(false),
+		hInstance,		// The application's handle
+		L"DirectX Game",// Text for the window's title bar
+		1280,			// Width of the window's client area
+		720,			// Height of the window's client area
+		false,			// Sync the framerate to the monitor refresh? (lock framerate)
+		true),			// Show extra stats (fps) in title bar?
 	lightCount(32)
 {
 
@@ -78,7 +79,12 @@ void Game::Init()
 	CreateBasicGeometry();
 	GenerateLights();
 
-	camera = std::make_shared<Camera>(0.0f, 0.0f, -5.0f, 5.0f, 1.0f, XM_PIDIV4, width / (float)height);
+	camera = std::make_shared<Camera>(
+		XMFLOAT3(0.0f, 0.0f, -5.0f),	// Position
+		5.0f,							// Move speed
+		0.002f,							// Look speed
+		XM_PIDIV4,						// Field of view
+		windowWidth / (float)windowHeight);	// Aspect ratio
 }
 
 
@@ -96,8 +102,8 @@ void Game::CreateRootSigAndPipelineState()
 	{
 		// Read our compiled vertex shader code into a blob
 		// - Essentially just "open the file and plop its contents here"
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
 	}
 
 	// Input layout
@@ -215,7 +221,7 @@ void Game::CreateRootSigAndPipelineState()
 		// Check for errors during serialization
 		if (errors != 0)
 		{
-			OutputDebugString((char*)errors->GetBufferPointer());
+			OutputDebugString((wchar_t*)errors->GetBufferPointer());
 		}
 
 		// Actually create the root sig
@@ -284,7 +290,7 @@ void Game::CreateRootSigAndPipelineState()
 void Game::CreateBasicGeometry()
 {
 	// Quick macro to simplify texture loading lines below
-#define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(x).c_str())
+#define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(FixPath(x).c_str())
 
 	// Load textures
 	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = LoadTexture(L"../../../../Assets/Textures/cobblestone_albedo.png");
@@ -327,11 +333,11 @@ void Game::CreateBasicGeometry()
 	scratchedMat->FinalizeTextures();
 
 	// Load meshes
-	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
-	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/sphere.obj").c_str());
-	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/helix.obj").c_str());
-	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/torus.obj").c_str());
-	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cylinder.obj").c_str());
+	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
+	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/sphere.obj").c_str());
+	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/helix.obj").c_str());
+	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
 	// Create entities
 	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
@@ -411,7 +417,7 @@ void Game::OnResize()
 	// Update the camera's projection to match the new size
 	if (camera)
 	{
-		camera->UpdateProjectionMatrix((float)width / height);
+		camera->UpdateProjectionMatrix((float)windowWidth / windowHeight);
 	}
 }
 
@@ -580,7 +586,10 @@ void Game::Draw(float deltaTime, float totalTime)
 		dx12Helper.CloseExecuteAndResetCommandList();
 
 		// Present the current back buffer
-		swapChain->Present(vsync ? 1 : 0, 0);
+		bool vsyncNecessary = vsync || !deviceSupportsTearing || isFullscreen;
+		swapChain->Present(
+			vsyncNecessary ? 1 : 0,
+			vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 
 		// Figure out which buffer is next
 		currentSwapBuffer++;

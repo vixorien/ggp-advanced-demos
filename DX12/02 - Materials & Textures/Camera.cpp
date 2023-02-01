@@ -5,13 +5,13 @@ using namespace DirectX;
 
 
 Camera::Camera(
-	float x, 
-	float y, 
-	float z, 
-	float moveSpeed, 
-	float mouseLookSpeed, 
-	float fieldOfView, 
-	float aspectRatio, 
+	float x,
+	float y,
+	float z,
+	float moveSpeed,
+	float mouseLookSpeed,
+	float fieldOfView,
+	float aspectRatio,
 	float nearClip,
 	float farClip,
 	CameraProjectionType projType) :
@@ -40,7 +40,7 @@ Camera::Camera(
 	CameraProjectionType projType) :
 	movementSpeed(moveSpeed),
 	mouseLookSpeed(mouseLookSpeed),
-	fieldOfView(fieldOfView), 
+	fieldOfView(fieldOfView),
 	aspectRatio(aspectRatio),
 	nearClip(nearClip),
 	farClip(farClip),
@@ -82,8 +82,8 @@ void Camera::Update(float dt)
 	if (input.MouseLeftDown())
 	{
 		// Calculate cursor change
-		float xDiff = dt * mouseLookSpeed * input.GetMouseXDelta();
-		float yDiff = dt * mouseLookSpeed * input.GetMouseYDelta();
+		float xDiff = mouseLookSpeed * input.GetMouseXDelta();
+		float yDiff = mouseLookSpeed * input.GetMouseYDelta();
 		transform.Rotate(yDiff, xDiff, 0);
 
 		// Clamp the X rotation
