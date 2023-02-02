@@ -32,7 +32,7 @@ int WINAPI WinMain(
 
 	// Attempt to initialize DirectX, and exit
 	// early if something failed
-	hr = dxGame.InitDirectX();
+	hr = dxGame.InitDirect3D();
 	if(FAILED(hr)) return hr;
 
 	// Begin the message and game loop, and then return

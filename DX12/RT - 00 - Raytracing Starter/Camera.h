@@ -13,23 +13,23 @@ class Camera
 {
 public:
 	Camera(
-		DirectX::XMFLOAT3 position, 
-		float moveSpeed, 
-		float mouseLookSpeed, 
-		float fieldOfView, 
-		float aspectRatio, 
-		float nearClip = 0.01f, 
-		float farClip = 100.0f, 
+		DirectX::XMFLOAT3 position,
+		float moveSpeed,
+		float mouseLookSpeed,
+		float fieldOfView,
+		float aspectRatio,
+		float nearClip = 0.01f,
+		float farClip = 100.0f,
 		CameraProjectionType projType = CameraProjectionType::Perspective);
 
 	Camera(
-		float x, float y, float z, 
-		float moveSpeed, 
-		float mouseLookSpeed, 
+		float x, float y, float z,
+		float moveSpeed,
+		float mouseLookSpeed,
 		float fieldOfView,
-		float aspectRatio, 
-		float nearClip = 0.01f, 
-		float farClip = 100.0f, 
+		float aspectRatio,
+		float nearClip = 0.01f,
+		float farClip = 100.0f,
 		CameraProjectionType projType = CameraProjectionType::Perspective);
 
 	~Camera();

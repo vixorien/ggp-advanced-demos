@@ -4,6 +4,7 @@
 #include "BufferStructs.h"
 #include "DX12Helper.h"
 #include "Material.h"
+#include "Helpers.h"
 #include "RaytracingHelper.h"
 
 #include <stdlib.h>     // For seeding random and rand()
@@ -29,12 +30,12 @@ using namespace DirectX;
 // --------------------------------------------------------
 Game::Game(HINSTANCE hInstance)
 	: DXCore(
-		hInstance,		   // The application's handle
-		"DirectX Game",	   // Text for the window's title bar
-		1280,			   // Width of the window's client area
-		720,			   // Height of the window's client area
-		true),			   // Show extra stats (fps) in title bar?
-	vsync(false),
+		hInstance,		// The application's handle
+		L"DirectX Game",// Text for the window's title bar
+		1280,			// Width of the window's client area
+		720,			// Height of the window's client area
+		false,			// Sync the framerate to the monitor refresh? (lock framerate)
+		true),			// Show extra stats (fps) in title bar?
 	lightCount(32)
 {
 
@@ -74,12 +75,12 @@ void Game::Init()
 {
 	// Attempt to initialize DXR
 	RaytracingHelper::GetInstance().Initialize(
-		width,
-		height,
+		windowWidth,
+		windowHeight,
 		device, 
 		commandQueue, 
 		commandList, 
-		GetFullPathTo_Wide(L"Raytracing.cso"));
+		FixPath(L"Raytracing.cso"));
 
 	// Seed random
 	srand((unsigned int)time(0));
@@ -91,7 +92,12 @@ void Game::Init()
 	CreateBasicGeometry();
 	GenerateLights();
 
-	camera = std::make_shared<Camera>(0.0f, 0.0f, -5.0f, 5.0f, 1.0f, XM_PIDIV4, width / (float)height);
+	camera = std::make_shared<Camera>(
+		XMFLOAT3(0.0f, 0.0f, -5.0f),	// Position
+		5.0f,							// Move speed
+		0.002f,							// Look speed
+		XM_PIDIV4,						// Field of view
+		windowWidth / (float)windowHeight);	// Aspect ratio
 
 	// Ensure the command list is closed going into Draw for the first time
 	commandList->Close();
@@ -112,8 +118,8 @@ void Game::CreateRootSigAndPipelineState()
 	{
 		// Read our compiled vertex shader code into a blob
 		// - Essentially just "open the file and plop its contents here"
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
-		D3DReadFileToBlob(GetFullPathTo_Wide(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
+		D3DReadFileToBlob(FixPath(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
 	}
 
 	// Input layout
@@ -231,7 +237,7 @@ void Game::CreateRootSigAndPipelineState()
 		// Check for errors during serialization
 		if (errors != 0)
 		{
-			OutputDebugString((char*)errors->GetBufferPointer());
+			OutputDebugString((wchar_t*)errors->GetBufferPointer());
 		}
 
 		// Actually create the root sig
@@ -300,7 +306,7 @@ void Game::CreateRootSigAndPipelineState()
 void Game::CreateBasicGeometry()
 {
 	// Quick macro to simplify texture loading lines below
-#define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(GetFullPathTo_Wide(x).c_str())
+#define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(FixPath(x).c_str())
 
 	// Load textures
 	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = LoadTexture(L"../../../../Assets/Textures/cobblestone_albedo.png");
@@ -343,11 +349,11 @@ void Game::CreateBasicGeometry()
 	scratchedMat->FinalizeTextures();
 
 	// Load meshes
-	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cube.obj").c_str());
-	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/sphere.obj").c_str());
-	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/helix.obj").c_str());
-	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/torus.obj").c_str());
-	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(GetFullPathTo("../../../../Assets/Models/cylinder.obj").c_str());
+	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
+	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/sphere.obj").c_str());
+	std::shared_ptr<Mesh> helix		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/helix.obj").c_str());
+	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
 	// Create entities
 	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
@@ -431,10 +437,10 @@ void Game::OnResize()
 	// Update the camera's projection to match the new size
 	if (camera)
 	{
-		camera->UpdateProjectionMatrix((float)width / height);
+		camera->UpdateProjectionMatrix((float)windowWidth / windowHeight);
 	}
 
-	RaytracingHelper::GetInstance().ResizeOutputUAV(width, height);
+	RaytracingHelper::GetInstance().ResizeOutputUAV(windowWidth, windowHeight);
 }
 
 // --------------------------------------------------------
@@ -472,139 +478,18 @@ void Game::Draw(float deltaTime, float totalTime)
 	// Grab the current back buffer for this frame
 	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = backBuffers[currentSwapBuffer];
 
-	//// Clearing the render target
-	//{
-	//	// Transition the back buffer from present to render target
-	//	D3D12_RESOURCE_BARRIER rb = {};
-	//	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//	rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	//	rb.Transition.pResource = currentBackBuffer.Get();
-	//	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-	//	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	//	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	//	commandList->ResourceBarrier(1, &rb);
-
-	//	// Background color for clearing
-	//	float color[] = { 0, 0, 0, 1.0f };
-
-	//	// Clear the RTV
-	//	commandList->ClearRenderTargetView(
-	//		rtvHandles[currentSwapBuffer],
-	//		color,
-	//		0, 0); // No scissor rectangles
-
-	//	// Clear the depth buffer, too
-	//	commandList->ClearDepthStencilView(
-	//		dsvHandle,
-	//		D3D12_CLEAR_FLAG_DEPTH,
-	//		1.0f,	// Max depth = 1.0f
-	//		0,		// Not clearing stencil, but need a value
-	//		0, 0);	// No scissor rects
-	//}
-
-	//// Rendering here!
-	//{
-	//	// Root sig (must happen before root descriptor table)
-	//	commandList->SetGraphicsRootSignature(rootSignature.Get());
-
-	//	// Set constant buffer
-	//	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetCBVSRVDescriptorHeap();
-	//	commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
-
-	//	// Set up other commands for rendering
-	//	commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
-	//	commandList->RSSetViewports(1, &viewport);
-	//	commandList->RSSetScissorRects(1, &scissorRect);
-	//	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	//	// Loop through the meshes
-	//	for (auto& e : entities)
-	//	{
-	//		// Grab the material for this entity
-	//		std::shared_ptr<Material> mat = e->GetMaterial();
-
-	//		// Set the pipeline state for this material
-	//		commandList->SetPipelineState(mat->GetPipelineState().Get());
-
-	//		// Set up the vertex shader data we intend to use for drawing this entity
-	//		{
-	//			VertexShaderExternalData vsData = {};
-	//			vsData.world = e->GetTransform()->GetWorldMatrix();
-	//			vsData.worldInverseTranspose = e->GetTransform()->GetWorldInverseTransposeMatrix();
-	//			vsData.view = camera->GetView();
-	//			vsData.projection = camera->GetProjection();
-
-	//			// Send this to a chunk of the constant buffer heap
-	//			// and grab the GPU handle for it so we can set it for this draw
-	//			D3D12_GPU_DESCRIPTOR_HANDLE cbHandleVS = dx12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
-	//				(void*)(&vsData), sizeof(VertexShaderExternalData));
-
-	//			// Set this constant buffer handle
-	//			// Note: This assumes that descriptor table 0 is the
-	//			//       place to put this particular descriptor.  This
-	//			//       is based on how we set up our root signature.
-	//			commandList->SetGraphicsRootDescriptorTable(0, cbHandleVS);
-	//		}
-
-	//		// Pixel shader data and cbuffer setup
-	//		{
-	//			PixelShaderExternalData psData = {};
-	//			psData.uvScale = mat->GetUVScale();
-	//			psData.uvOffset = mat->GetUVOffset();
-	//			psData.cameraPosition = camera->GetTransform()->GetPosition();
-	//			psData.lightCount = lightCount;
-	//			memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
-
-	//			// Send this to a chunk of the constant buffer heap
-	//			// and grab the GPU handle for it so we can set it for this draw
-	//			D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = dx12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
-	//				(void*)(&psData), sizeof(PixelShaderExternalData));
-
-	//			// Set this constant buffer handle
-	//			// Note: This assumes that descriptor table 1 is the
-	//			//       place to put this particular descriptor.  This
-	//			//       is based on how we set up our root signature.
-	//			commandList->SetGraphicsRootDescriptorTable(1, cbHandlePS);
-	//		}
-
-	//		// Set the SRV descriptor handle for this material's textures
-	//		// Note: This assumes that descriptor table 2 is for textures (as per our root sig)
-	//		commandList->SetGraphicsRootDescriptorTable(2, mat->GetFinalGPUHandleForTextures());
-
-	//		// Grab the mesh and its buffer views
-	//		std::shared_ptr<Mesh> mesh = e->GetMesh();
-	//		D3D12_VERTEX_BUFFER_VIEW vbv = mesh->GetVB();
-	//		D3D12_INDEX_BUFFER_VIEW  ibv = mesh->GetIB();
-
-	//		// Set the geometry
-	//		commandList->IASetVertexBuffers(0, 1, &vbv);
-	//		commandList->IASetIndexBuffer(&ibv);
-
-	//		// Draw
-	//		commandList->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
-	//	}
-	//}
+	// Raytracing here!
+	{
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
+	}
 
 	// Finish the frame
 	{
-		//// Transition back to present
-		//D3D12_RESOURCE_BARRIER rb = {};
-		//rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		//rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		//rb.Transition.pResource = currentBackBuffer.Get();
-		//rb.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		//rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-		//rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		//commandList->ResourceBarrier(1, &rb);
-
-		// Finally perform all the work we've added to the command list
-		//dx12Helper.ExecuteCommandList();
-
-		// RAYTRACING HERE
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
-
 		// Present the current back buffer
-		swapChain->Present(vsync ? 1 : 0, 0);
+		bool vsyncNecessary = vsync || !deviceSupportsTearing || isFullscreen;
+		swapChain->Present(
+			vsyncNecessary ? 1 : 0,
+			vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 
 		// Wait to proceed to the next frame until the associated buffer is ready
 		currentSwapBuffer = dx12Helper.SyncSwapChain(currentSwapBuffer);
