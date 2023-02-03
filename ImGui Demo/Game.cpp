@@ -522,7 +522,7 @@ void Game::CreateUI(float dt)
 	// All entity transforms
 	if (ImGui::CollapsingHeader("Lights"))
 	{
-		if (ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS))
+		ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS);
 
 		while (lightCount >= lights.size())
 		{

@@ -6,6 +6,7 @@ cbuffer externalData : register(b0)
 	matrix world;
 	matrix view;
 	matrix projection;
+	float lifetime;
 };
 
 StructuredBuffer<Particle>		ParticlePool	: register(t0);
@@ -53,8 +54,12 @@ VStoPS main(uint id : SV_VertexID)
 	uvs[2] = float2(1, 1);  // BR
 	uvs[3] = float2(0, 1);  // BL
 
+	// Age percentage => color ramp fade in/out
+	float agePercent = saturate(particle.Age / lifetime); // 0 - 1
+	float colorRamp = pow(-((2 * agePercent - 1) * (2 * agePercent - 1)) + 1, 0.5f);
+
 	// Pass through
-	output.color = particle.Color;
+	output.color = particle.Color * colorRamp;
 	output.uv = saturate(uvs[cornerID]);
 
 	return output;

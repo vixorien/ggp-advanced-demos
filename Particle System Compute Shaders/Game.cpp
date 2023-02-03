@@ -121,7 +121,7 @@ void Game::Init()
 		XM_PIDIV4,			// Field of view
 		(float)windowWidth / windowHeight,  // Aspect ratio
 		0.01f,				// Near clip
-		100.0f,				// Far clip
+		1000.0f,				// Far clip
 		CameraProjectionType::Perspective);
 }
 
@@ -157,7 +157,6 @@ void Game::LoadAssetsAndCreateEntities()
 		particleCopyDrawCountCS,
 		particleVS,
 		particlePS);
-	gridEmitter->SetEnabled(false);
 
 	// Describe and create our sampler state
 	D3D11_SAMPLER_DESC sampDesc = {};

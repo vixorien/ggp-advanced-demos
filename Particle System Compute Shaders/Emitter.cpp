@@ -320,6 +320,7 @@ void Emitter::Draw(std::shared_ptr<Camera> camera, bool additive)
 	particleVS->SetMatrix4x4("world", XMFLOAT4X4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)); // Identity
 	particleVS->SetMatrix4x4("view", camera->GetView());
 	particleVS->SetMatrix4x4("projection", camera->GetProjection());
+	particleVS->SetFloat("lifetime", lifetime);
 	particleVS->CopyAllBufferData();
 
 	particlePS->SetShader();
@@ -349,7 +350,7 @@ void Emitter::EmitterUI()
 		enabled = !enabled;
 
 	ImGui::Text("Max particles: %d", maxParticles);
-	ImGui::DragFloat("Particle Lifetime", &lifetime, 0.1f, 0.001f, 1000.0f);
+	ImGui::DragFloat("Particle Lifetime", &lifetime, 1.0f, 0.0f, 1000.0f);
 
 	ImGui::Spacing();
 }
