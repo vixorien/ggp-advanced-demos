@@ -145,7 +145,7 @@ void Game::LoadAssetsAndCreateEntities()
 	std::shared_ptr<SimplePixelShader> particlePS					= LoadShader(SimplePixelShader, L"ParticlePS.cso");
 	
 	// Set up particles
-	particleEmitter = std::make_shared<Emitter>(
+	gridEmitter = std::make_shared<Emitter>(
 		1000000,
 		1000000.0f, // Particles per second
 		1000.0f, // Particle lifetime
@@ -157,6 +157,7 @@ void Game::LoadAssetsAndCreateEntities()
 		particleCopyDrawCountCS,
 		particleVS,
 		particlePS);
+	gridEmitter->SetEnabled(false);
 
 	// Describe and create our sampler state
 	D3D11_SAMPLER_DESC sampDesc = {};
@@ -250,7 +251,7 @@ void Game::Update(float deltaTime, float totalTime)
 	camera->Update(deltaTime);
 
 	// Particles
-	particleEmitter->Update(deltaTime, totalTime);
+	gridEmitter->Update(deltaTime, totalTime);
 
 	// Check individual input
 	Input& input = Input::GetInstance();
@@ -276,7 +277,7 @@ void Game::Draw(float deltaTime, float totalTime)
 	}
 
 	// Draw particles
-	particleEmitter->Draw(camera, true);
+	gridEmitter->Draw(camera, true);
 
 	// Frame END
 	// - These should happen exactly ONCE PER FRAME
@@ -449,6 +450,15 @@ void Game::BuildUI()
 		{
 			// Show UI for current camera
 			CameraUI(camera);
+
+			// Finalize the tree node
+			ImGui::TreePop();
+		}
+
+		// === Emitter details ===
+		if (ImGui::TreeNode("Particle Emitters"))
+		{
+			gridEmitter->EmitterUI();
 
 			// Finalize the tree node
 			ImGui::TreePop();

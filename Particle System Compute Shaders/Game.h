@@ -33,7 +33,7 @@ private:
 	// Our scene
 	std::vector<std::shared_ptr<GameEntity>> entities;
 	std::shared_ptr<Camera> camera;
-	std::shared_ptr<Emitter> particleEmitter;
+	std::shared_ptr<Emitter> gridEmitter;
 
 	// Lights
 	std::vector<Light> lights;

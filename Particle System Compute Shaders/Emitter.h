@@ -45,6 +45,11 @@ public:
 	void Update(float dt, float tt);
 	void Draw(std::shared_ptr<Camera> camera, bool additive);
 
+	void SetEnabled(bool enabled);
+	bool GetEnabled();
+
+	void EmitterUI();
+
 private:
 
 	// Emitter settings
@@ -53,6 +58,8 @@ private:
 	float emissionRate;
 	float timeBetweenEmit;
 	float emitTimeCounter;
+
+	bool enabled;
 
 	// Drawing
 	Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;

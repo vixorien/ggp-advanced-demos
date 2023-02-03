@@ -1,4 +1,5 @@
 #include "Emitter.h"
+#include "../Common/ImGui/imgui.h"
 
 using namespace DirectX;
 
@@ -15,6 +16,7 @@ Emitter::Emitter(
 	std::shared_ptr<SimpleVertexShader> particleVS,
 	std::shared_ptr<SimplePixelShader> particlePS) 
 	:
+	enabled(true),
 	maxParticles(maxParticles),
 	lifetime(lifetime),
 	emissionRate(emissionRate),
@@ -226,39 +228,44 @@ Emitter::~Emitter()
 
 void Emitter::Update(float dt, float tt)
 {
+	if (!enabled)
+		return;
+
 	// Reset UAVs (potential issue with setting the following ones)
 	ID3D11UnorderedAccessView* none[8] = {};
 	context->CSSetUnorderedAccessViews(0, 8, none, 0);
 
 	// Track time
 	emitTimeCounter += dt;
-	while (emitTimeCounter >= timeBetweenEmit)
+	if (emitTimeCounter >= timeBetweenEmit)
 	{
 		// How many to emit?
 		int emitCount = (int)(emitTimeCounter / timeBetweenEmit);
 
-		// Max to emit in a single batch is 65,535
-		emitCount = min(emitCount, 65535);
+		// Divide the count up into batches of 65K
+		int numBatches = (emitCount / 65535) + 1;
+		for (int b = 0; b < numBatches; b++)
+		{
+			// Max to emit in a single batch is 65,535
+			int batchCount = min(emitCount, 65535);
+			emitCount -= batchCount;
+
+			// Emit an appropriate amount of particles
+			emitCS->SetShader();
+			emitCS->SetFloat("TotalTime", tt);
+			emitCS->SetInt("EmitCount", batchCount);
+			emitCS->SetInt("MaxParticles", (int)maxParticles);
+			emitCS->SetInt("GridSize", 100);
+			emitCS->SetUnorderedAccessView("ParticlePool", particlePoolUAV);
+			emitCS->SetUnorderedAccessView("DeadList", particleDeadUAV);
+			context->CSSetConstantBuffers(1, 1, deadListCounterBuffer.GetAddressOf()); // Manually setting a whole cbuffer here
+			emitCS->CopyAllBufferData();
+			emitCS->DispatchByThreads(batchCount, 1, 1);
+		}
 
 		// Adjust time counter
 		emitTimeCounter = fmod(emitTimeCounter, timeBetweenEmit);
-
-		// Emit an appropriate amount of particles
-		emitCS->SetShader();
-		emitCS->SetFloat("TotalTime", tt);
-		emitCS->SetInt("EmitCount", emitCount);
-		emitCS->SetInt("MaxParticles", (int)maxParticles);
-		emitCS->SetInt("GridSize", 100);
-		emitCS->SetUnorderedAccessView("ParticlePool", particlePoolUAV);
-		emitCS->SetUnorderedAccessView("DeadList", particleDeadUAV);
-		context->CSSetConstantBuffers(1, 1, deadListCounterBuffer.GetAddressOf()); // Manually setting a whole cbuffer here
-		emitCS->CopyAllBufferData();
-		emitCS->DispatchByThreads(emitCount, 1, 1);
 	}
-
-
-	context->CSSetUnorderedAccessViews(0, 8, none, 0);
-
 
 	// Update
 	updateCS->SetShader();
@@ -328,4 +335,21 @@ void Emitter::Draw(std::shared_ptr<Camera> camera, bool additive)
 		context->OMSetBlendState(0, 0, 0xFFFFFFFF);
 		context->OMSetDepthStencilState(0, 0);
 	}
+}
+
+void Emitter::SetEnabled(bool enabled) { this->enabled = enabled; }
+bool Emitter::GetEnabled() { return enabled; }
+
+void Emitter::EmitterUI()
+{
+	ImGui::Spacing();
+	ImGui::Text("=== Emitter ===");
+
+	if (ImGui::Button(enabled ? "Pause" : "Start"))
+		enabled = !enabled;
+
+	ImGui::Text("Max particles: %d", maxParticles);
+	ImGui::DragFloat("Particle Lifetime", &lifetime, 0.1f, 0.001f, 1000.0f);
+
+	ImGui::Spacing();
 }
