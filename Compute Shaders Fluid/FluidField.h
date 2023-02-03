@@ -5,6 +5,7 @@
 #include <DirectXMath.h>
 
 #include "Camera.h"
+#include "GameEntity.h"
 
 enum class FLUID_RENDER_BUFFER
 {
@@ -57,6 +58,8 @@ public:
 	void UpdateFluid(float deltaTime);
 	void OneTimeStep();
 	void RenderFluid(Camera* camera);
+
+	void VoxelizeObstacle(GameEntity* entity);
 
 	// Publically accessible data
 	bool pause;
@@ -122,6 +125,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11BlendState> blendState;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthState;
 	Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterState;
+
+	// Obstacle voxelization
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> voxelizationDepthStencilState;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> voxelizationDepthStencilView; // Texture array!
+	DirectX::XMFLOAT4X4 voxelizationViewMatrix;
+	DirectX::XMFLOAT4X4* voxelizationProjectionMatrices;
 
 	// Helper methods
 	void SwapBuffers(VolumeResource volumes[2]);

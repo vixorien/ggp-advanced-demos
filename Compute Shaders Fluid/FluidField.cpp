@@ -178,6 +178,41 @@ void FluidField::RecreateGPUResources()
 	obstacleBuffer = CreateVolumeResource(gridSizeX, gridSizeY, gridSizeZ, DXGI_FORMAT_R8_UNORM, obData);
 	delete[] obData;
 
+	// Should we make voxelization resources?
+	if (obstaclesEnabled)
+	{
+		// Create array of depth stencil buffers for object voxelization if necessary
+		D3D11_TEXTURE2D_DESC stencilDesc = {};
+		{	// Size
+			stencilDesc.Width = gridSizeX;
+			stencilDesc.Height = gridSizeY;
+			stencilDesc.ArraySize = gridSizeZ; // Forward-facing for now, but might change to "smallest dimension"
+		}
+		stencilDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_DEPTH_STENCIL;
+		stencilDesc.CPUAccessFlags = 0;
+		stencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		stencilDesc.MipLevels = 1;
+		stencilDesc.MiscFlags = 0;
+		stencilDesc.SampleDesc.Count = 1;
+		stencilDesc.SampleDesc.Quality = 0;
+		stencilDesc.Usage = D3D11_USAGE_DEFAULT;
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> stencilBuffer;
+		device->CreateTexture2D(&stencilDesc, 0, stencilBuffer.GetAddressOf());
+
+		// Create the view
+		D3D11_DEPTH_STENCIL_VIEW_DESC viewDesc = {};
+		viewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+		viewDesc.Texture2DArray.ArraySize = stencilDesc.ArraySize;
+		viewDesc.Texture2DArray.FirstArraySlice = 0;
+		viewDesc.Texture2DArray.MipSlice = 0;
+		viewDesc.Format = stencilDesc.Format;
+		device->CreateDepthStencilView(stencilBuffer.Get(), &viewDesc, voxelizationDepthStencilView.GetAddressOf());
+		
+		// Create the array of projection matrices
+
+	}
+
+
 	// Unused, but for reference...
 
 	// Note the usage of PackedVector::XMUBYTEN4, which corresponds to R8G8B8A8.  The constructor
@@ -262,7 +297,7 @@ void FluidField::RenderFluid(Camera* camera)
 	context->RSSetState(rasterState.Get());
 
 	// Get smallest dimension and use that for scaling
-	float smallestDimension = min(gridSizeX, min(gridSizeY, gridSizeZ));
+	float smallestDimension = (float)min(gridSizeX, min(gridSizeY, gridSizeZ));
 	XMFLOAT3 scale = {
 		2 * gridSizeX / smallestDimension,
 		2 * gridSizeY / smallestDimension,
@@ -333,6 +368,32 @@ void FluidField::RenderFluid(Camera* camera)
 	context->RSSetState(0);
 }
 
+
+void FluidField::VoxelizeObstacle(GameEntity* entity)
+{
+	// Able to use obstacles?
+	if (!obstaclesEnabled)
+		return;
+
+	// Set up stencil states and proper stencil buffer
+	
+	
+	// Turn on proper vertex shader and disable pixel shader
+
+
+	// Set entity's matrix and custom view/projection matrices
+	// - See this article for info on infinite far planes: https://ubm-twvideo01.s3.amazonaws.com/o1/vault/gdc07/slides/S3730i1.pdf
+
+	// Draw the entity using instance rendering (one instance per "slice")
+
+
+	// Copy results to obstacle buffer
+
+
+	// Reset states
+
+}
+
 unsigned int FluidField::GetGridSizeX() { return gridSizeX; }
 unsigned int FluidField::GetGridSizeY() { return gridSizeY; }
 unsigned int FluidField::GetGridSizeZ() { return gridSizeZ; }
@@ -360,7 +421,7 @@ void FluidField::SetInjectPosition(DirectX::XMFLOAT3 newPos, bool applyVelocityI
 		// it's way too small and the scale is required to be massive
 		XMStoreFloat3(&injectVelocityImpulse, 
 			XMLoadFloat3(&injectVelocityImpulse) + 
-			(XMLoadFloat3(&newPos) - XMLoadFloat3(&injectPosition)) * XMVectorSet(gridSizeX, gridSizeY, gridSizeZ, 0) * injectVelocityImpulseScale);
+			(XMLoadFloat3(&newPos) - XMLoadFloat3(&injectPosition)) * XMVectorSet((float)gridSizeX, (float)gridSizeY, (float)gridSizeZ, 0) * injectVelocityImpulseScale);
 	}
 
 	// Update position
