@@ -141,6 +141,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SimpleShader.cpp" />
     <ClCompile Include="Sky.cpp" />
     <ClCompile Include="Transform.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="Lights.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Scene.h" />
     <ClInclude Include="SimpleShader.h" />
     <ClInclude Include="Sky.h" />
     <ClInclude Include="Transform.h" />
