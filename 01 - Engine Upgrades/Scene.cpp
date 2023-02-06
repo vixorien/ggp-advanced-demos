@@ -18,7 +18,7 @@ void Scene::AddCamera(std::shared_ptr<Camera> camera)
 	cameras.push_back(camera);
 
 	// Make this the current camera if we have none
-	if (currentCamera == 0)
+	if (!currentCamera)
 		currentCamera = camera;
 }
 
@@ -29,12 +29,13 @@ void Scene::AddLight(Light light)
 
 void Scene::SetSky(std::shared_ptr<Sky> sky)
 {
+	this->sky = sky;
 }
 
 void Scene::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
 {
 	// Ensure we have something to do
-	if (currentCamera == 0)
+	if (!currentCamera)
 		return;
 
 	// Draw entities

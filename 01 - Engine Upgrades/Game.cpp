@@ -127,6 +127,13 @@ void Game::Init()
 		0.01f,				// Near clip
 		100.0f,				// Far clip
 		CameraProjectionType::Perspective);
+
+
+	scene = std::make_shared<Scene>();
+	scene->SetSky(sky);
+	scene->AddCamera(camera);
+	for (auto& l : lights) scene->AddLight(l);
+	for (auto& e : entities) scene->AddEntity(e);
 }
 
 
@@ -337,31 +344,12 @@ void Game::Draw(float deltaTime, float totalTime)
 		context->ClearDepthStencilView(depthBufferDSV.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 	}
 
-
-	// Draw all of the entities
-	for (auto& ge : entities)
-	{
-		// Set the "per frame" data
-		// Note that this should literally be set once PER FRAME, before
-		// the draw loop, but we're currently setting it per entity since 
-		// we are just using whichever shader the current entity has.  
-		// Inefficient!!!
-		std::shared_ptr<SimplePixelShader> ps = ge->GetMaterial()->GetPixelShader();
-		ps->SetData("lights", (void*)(&lights[0]), sizeof(Light) * lightCount);
-		ps->SetInt("lightCount", lightCount);
-		ps->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
-		ps->CopyBufferData("perFrame");
-
-		// Draw the entity
-		ge->Draw(context, camera);
-	}
+	// Draw the scene
+	scene->Draw(context);
 
 	// Draw the light sources?
 	if(showPointLights)
 		DrawPointLights();
-
-	// Draw the sky
-	sky->Draw(camera);
 
 	// Frame END
 	// - These should happen exactly ONCE PER FRAME

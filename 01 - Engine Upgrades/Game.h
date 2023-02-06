@@ -7,6 +7,7 @@
 #include "SimpleShader.h"
 #include "Lights.h"
 #include "Sky.h"
+#include "Scene.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h>
@@ -30,6 +31,8 @@ public:
 private:
 
 	// Our scene
+	std::shared_ptr<Scene> scene;
+
 	std::vector<std::shared_ptr<GameEntity>> entities;
 	std::shared_ptr<Camera> camera;
 
