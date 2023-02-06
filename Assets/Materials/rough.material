@@ -1,0 +1,33 @@
+{
+	"shaders": {
+		"pixel": "PixelShader",
+		"vertex": "VertexShader"
+	},
+	"tint": [1.0, 1.0, 1.0],
+	"uvScale": [2.0, 2.0],
+	"uvOffset": [2.0, 2.0],
+	"samplers": [
+		{
+			"name": "Samplers/anisotropic16Wrap",
+			"shaderName": "BasicSampler"
+		}
+	],
+	"textures": [
+		{
+			"name": "Textures/rough_albedo",
+			"shaderName": "Albedo"
+		},
+		{
+			"name": "Textures/rough_normals",
+			"shaderName": "NormalMap"
+		},
+		{
+			"name": "Textures/rough_roughness",
+			"shaderName": "RoughnessMap"
+		},
+		{
+			"name": "Textures/rough_metal",
+			"shaderName": "MetalMap"
+		}
+	]
+}

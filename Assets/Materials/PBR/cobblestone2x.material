@@ -1,0 +1,33 @@
+{
+	"shaders": {
+		"pixel": "PixelShaderPBR",
+		"vertex": "VertexShader"
+	},
+	"tint": [1.0, 1.0, 1.0],
+	"uvScale": [2.0, 2.0],
+	"uvOffset": [2.0, 2.0],
+	"samplers": [
+		{
+			"name": "Samplers/anisotropic16Wrap",
+			"shaderName": "BasicSampler"
+		}
+	],
+	"textures": [
+		{
+			"name": "Textures/cobblestone_albedo",
+			"shaderName": "Albedo"
+		},
+		{
+			"name": "Textures/cobblestone_normals",
+			"shaderName": "NormalMap"
+		},
+		{
+			"name": "Textures/cobblestone_roughness",
+			"shaderName": "RoughnessMap"
+		},
+		{
+			"name": "Textures/cobblestone_metal",
+			"shaderName": "MetalMap"
+		}
+	]
+}
