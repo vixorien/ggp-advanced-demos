@@ -1,11 +1,29 @@
 #include "Scene.h"
 
+#undef max
+#include "../Common/rapidjson/document.h"
+#include "../Common/rapidjson/filereadstream.h"
+#include "../Common/rapidjson/istreamwrapper.h"
+
+#include <fstream>
+
 Scene::Scene()
 {
 }
 
 Scene::~Scene()
 {
+}
+
+void Scene::Clear()
+{
+	// Clean up any resources we have
+	lights.clear();
+	cameras.clear();
+	entities.clear();
+
+	currentCamera.reset();
+	sky.reset();
 }
 
 void Scene::AddEntity(std::shared_ptr<GameEntity> entity)
@@ -61,4 +79,25 @@ void Scene::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
 	{
 		sky->Draw(currentCamera);
 	}
+}
+
+void Scene::Load(std::wstring sceneFile)
+{
+	// Clear existing scene
+	Clear();
+
+	// Open the file and parse with rapidjson
+	std::ifstream fileIn(sceneFile.c_str());
+	rapidjson::IStreamWrapper stream(fileIn);
+
+	rapidjson::Document d;
+	rapidjson::ParseResult parseRes = d.ParseStream(stream);
+
+	if (!parseRes)
+	{
+		wprintf((L"Failed to load or parse scene: " + sceneFile).c_str());
+		return;
+	}
+
+	// NOTE: Look into replacing rapidjson with https://github.com/nlohmann/json
 }

@@ -18,6 +18,9 @@ public:
 	Scene();
 	~Scene();
 
+	void Clear();
+	void Load(std::wstring sceneFile);
+
 	void AddEntity(std::shared_ptr<GameEntity> entity);
 	void AddCamera(std::shared_ptr<Camera> camera);
 	void AddLight(Light light);

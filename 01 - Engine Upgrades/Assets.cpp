@@ -518,7 +518,7 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 		printf("\n");
 	}
 
-	// Open the file and parse with rapidjson, using UTF16 (wide character) mode
+	// Open the file and parse with rapidjson
 	std::ifstream fileIn(path.c_str());
 	rapidjson::IStreamWrapper stream(fileIn);
 
