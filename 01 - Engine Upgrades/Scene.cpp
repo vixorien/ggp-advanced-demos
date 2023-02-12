@@ -57,6 +57,12 @@ void Scene::SetSky(std::shared_ptr<Sky> sky)
 	this->sky = sky;
 }
 
+void Scene::UpdateAspectRatio(float aspectRatio)
+{
+	for(auto& c : cameras)
+		c->UpdateProjectionMatrix(aspectRatio);
+}
+
 void Scene::Update(float deltaTime)
 {
 	if (currentCamera)
@@ -95,6 +101,8 @@ void Scene::Draw()
 }
 
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
+
+std::vector<std::shared_ptr<GameEntity>> Scene::GetEntities() { return entities; }
 
 void Scene::Load(std::wstring sceneFile)
 {
@@ -168,7 +176,7 @@ std::shared_ptr<Camera> Scene::ParseCamera(json j)
 	float fov = XM_PIDIV4;
 	float nearClip = 0.01f;
 	float farClip = 1000.0f;
-	XMFLOAT3 pos = { 0,0,-5 };
+	XMFLOAT3 pos = { 0, 0, -5 };
 	XMFLOAT3 rot = { 0, 0, 0 };
 
 	// Check for each type of data

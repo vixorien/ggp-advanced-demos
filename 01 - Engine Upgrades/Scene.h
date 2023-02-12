@@ -31,10 +31,13 @@ public:
 
 	void SetSky(std::shared_ptr<Sky> sky);
 	
+	void UpdateAspectRatio(float aspectRatio);
+
 	void Update(float deltaTime);
 	void Draw();
 
 	std::shared_ptr<Camera> GetCurrentCamera();
+	std::vector<std::shared_ptr<GameEntity>> GetEntities();
 
 private:
 

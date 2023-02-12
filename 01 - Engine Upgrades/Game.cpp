@@ -45,8 +45,6 @@ Game::Game(HINSTANCE hInstance)
 		720,				// Height of the window's client area
 		false,				// Sync the framerate to the monitor refresh? (lock framerate)
 		true),				// Show extra stats (fps) in title bar?
-	camera(0),
-	sky(0),
 	lightCount(0),
 	showUIDemoWindow(false),
 	showPointLights(false)
@@ -116,27 +114,6 @@ void Game::Init()
 		// Essentially: "What kind of shape should the GPU draw with our vertices?"
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	}
-
-	// Create the camera
-	camera = std::make_shared<Camera>(
-		0.0f, 0.0f, -15.0f,	// Position
-		5.0f,				// Move speed (world units)
-		0.002f,				// Look speed (cursor movement pixels --> radians for rotation)
-		XM_PIDIV4,			// Field of view
-		(float)windowWidth / windowHeight,  // Aspect ratio
-		0.01f,				// Near clip
-		100.0f,				// Far clip
-		CameraProjectionType::Perspective);
-
-
-	scene = std::make_shared<Scene>(device, context);
-	/*scene->SetSky(sky);
-	scene->AddCamera(camera);
-	for (auto& l : lights) scene->AddLight(l);
-	for (auto& e : entities) scene->AddEntity(e);*/
-
-	scene->Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"));
-	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 }
 
 
@@ -150,98 +127,11 @@ void Game::LoadAssetsAndCreateEntities()
 	//       found in the asstes folder, but "load on demand" is more efficient
 	Assets& assets = Assets::GetInstance();
 	assets.Initialize(L"../../../Assets/", L"./", device, context, true, true);
-	
-	// Create the sky using 6 images
-	sky = std::make_shared<Sky>(
-		assets.GetTexture(L"Skies/Clouds Blue/right"),
-		assets.GetTexture(L"Skies/Clouds Blue/left"),
-		assets.GetTexture(L"Skies/Clouds Blue/up"),
-		assets.GetTexture(L"Skies/Clouds Blue/down"),
-		assets.GetTexture(L"Skies/Clouds Blue/front"),
-		assets.GetTexture(L"Skies/Clouds Blue/back"),
-		assets.GetMesh(L"Models/cube"),
-		assets.GetVertexShader(L"SkyVS"),
-		assets.GetPixelShader(L"SkyPS"),
-		assets.GetSampler(L"Samplers/anisotropic16Wrap"),
-		device,
-		context);
 
-	// Grab the sphere for entities
-	std::shared_ptr<Mesh> sphereMesh = assets.GetMesh(L"Models/sphere");
-
-	// === Create the PBR entities =====================================
-	std::shared_ptr<GameEntity> cobSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/cobblestone2x"));
-	cobSpherePBR->GetTransform()->SetPosition(-6, 2, 0);
-	cobSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> floorSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/floor"));
-	floorSpherePBR->GetTransform()->SetPosition(-4, 2, 0);
-	floorSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> paintSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/paint")); 
-	paintSpherePBR->GetTransform()->SetPosition(-2, 2, 0);
-	paintSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> scratchSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/scratched")); 
-	scratchSpherePBR->GetTransform()->SetPosition(0, 2, 0);
-	scratchSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> bronzeSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/bronze")); 
-	bronzeSpherePBR->GetTransform()->SetPosition(2, 2, 0);
-	bronzeSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> roughSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/rough")); 
-	roughSpherePBR->GetTransform()->SetPosition(4, 2, 0);
-	roughSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> woodSpherePBR = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/PBR/wood")); 
-	woodSpherePBR->GetTransform()->SetPosition(6, 2, 0);
-	woodSpherePBR->GetTransform()->SetScale(2, 2, 2);
-
-	entities.push_back(cobSpherePBR);
-	entities.push_back(floorSpherePBR);
-	entities.push_back(paintSpherePBR);
-	entities.push_back(scratchSpherePBR);
-	entities.push_back(bronzeSpherePBR);
-	entities.push_back(roughSpherePBR);
-	entities.push_back(woodSpherePBR);
-
-	// Create the non-PBR entities ==============================
-	std::shared_ptr<GameEntity> cobSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/cobblestone2x"));
-	cobSphere->GetTransform()->SetPosition(-6, -2, 0);
-	cobSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> floorSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/floor"));
-	floorSphere->GetTransform()->SetPosition(-4, -2, 0);
-	floorSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> paintSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/paint"));
-	paintSphere->GetTransform()->SetPosition(-2, -2, 0);
-	paintSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> scratchSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/scratched"));
-	scratchSphere->GetTransform()->SetPosition(0, -2, 0);
-	scratchSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> bronzeSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/bronze"));
-	bronzeSphere->GetTransform()->SetPosition(2, -2, 0);
-	bronzeSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> roughSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/rough"));
-	roughSphere->GetTransform()->SetPosition(4, -2, 0);
-	roughSphere->GetTransform()->SetScale(2, 2, 2);
-
-	std::shared_ptr<GameEntity> woodSphere = std::make_shared<GameEntity>(sphereMesh, assets.GetMaterial(L"Materials/wood"));
-	woodSphere->GetTransform()->SetPosition(6, -2, 0);
-	woodSphere->GetTransform()->SetScale(2, 2, 2);
-
-	entities.push_back(cobSphere);
-	entities.push_back(floorSphere);
-	entities.push_back(paintSphere);
-	entities.push_back(scratchSphere);
-	entities.push_back(bronzeSphere);
-	entities.push_back(roughSphere);
-	entities.push_back(woodSphere);
+	// Load a scene json file
+	scene = std::make_shared<Scene>(device, context);
+	scene->Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"));
+	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 }
 
 
@@ -306,8 +196,7 @@ void Game::OnResize()
 	DXCore::OnResize();
 
 	// Update our projection matrix to match the new aspect ratio
-	if (camera)
-		camera->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
+	scene->UpdateAspectRatio((float)windowWidth / windowHeight);
 }
 
 // --------------------------------------------------------
@@ -393,8 +282,8 @@ void Game::DrawPointLights()
 	lightPS->SetShader();
 
 	// Set up vertex shader
-	lightVS->SetMatrix4x4("view", camera->GetView());
-	lightVS->SetMatrix4x4("projection", camera->GetProjection());
+	lightVS->SetMatrix4x4("view", scene->GetCurrentCamera()->GetView());
+	lightVS->SetMatrix4x4("projection", scene->GetCurrentCamera()->GetProjection());
 
 	for (int i = 0; i < lightCount; i++)
 	{
@@ -531,7 +420,7 @@ void Game::BuildUI()
 		if (ImGui::TreeNode("Camera"))
 		{
 			// Show UI for current camera
-			CameraUI(camera);
+			CameraUI(scene->GetCurrentCamera());
 
 			// Finalize the tree node
 			ImGui::TreePop();
@@ -541,7 +430,7 @@ void Game::BuildUI()
 		if (ImGui::TreeNode("Scene Entities"))
 		{
 			// Loop and show the details for each entity
-			for (int i = 0; i < entities.size(); i++)
+			for (int i = 0; i < scene->GetEntities().size(); i++)
 			{
 				// New node for each entity
 				// Note the use of PushID(), so that each tree node and its widgets
@@ -550,7 +439,7 @@ void Game::BuildUI()
 				if (ImGui::TreeNode("Entity Node", "Entity %d", i))
 				{
 					// Build UI for one entity at a time
-					EntityUI(entities[i]);
+					EntityUI(scene->GetEntities()[i]);
 
 					ImGui::TreePop();
 				}

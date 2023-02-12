@@ -26,7 +26,7 @@
 			"fov": 0.7853975,
 			"near": 0.01,
 			"far": 1000.0,
-			"position": [0, 0, -5],
+			"position": [0, 0, -15],
 			"rotation": [0, 0, 0]
 		}
 	],
@@ -56,6 +56,123 @@
 			"material": "Materials/PBR/cobblestone2x",
 			"transform": {
 				"position": [ -6, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/floor",
+			"transform": {
+				"position": [ -4, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/paint",
+			"transform": {
+				"position": [ -2, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/scratched",
+			"transform": {
+				"position": [ 0, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/bronze",
+			"transform": {
+				"position": [ 2, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/rough",
+			"transform": {
+				"position": [ 4, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/wood",
+			"transform": {
+				"position": [ 6, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/cobblestone2x",
+			"transform": {
+				"position": [ -6, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/floor",
+			"transform": {
+				"position": [ -4, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/paint",
+			"transform": {
+				"position": [ -2, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/scratched",
+			"transform": {
+				"position": [ 0, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/bronze",
+			"transform": {
+				"position": [ 2, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/rough",
+			"transform": {
+				"position": [ 4, -2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/wood",
+			"transform": {
+				"position": [ 6, -2, 0 ],
 				"rotation": [ 0, 0, 0 ],
 				"scale": [ 2, 2, 2 ]
 			}

@@ -2,7 +2,8 @@
 #include "Helpers.h"
 
 #include <fstream>
-#include <cstdio>
+#include "../Common/json/json.hpp"
+using json = nlohmann::json;
 
 #define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
 #include <experimental/filesystem>
@@ -10,11 +11,6 @@
 
 #include <DDSTextureLoader.h>
 #include <WICTextureLoader.h>
-
-#undef max
-#include "../Common/rapidjson/document.h"
-#include "../Common/rapidjson/filereadstream.h"
-#include "../Common/rapidjson/istreamwrapper.h"
 
 
 // Singleton requirement
@@ -518,21 +514,19 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 		printf("\n");
 	}
 
-	// Open the file and parse with rapidjson
-	std::ifstream fileIn(path.c_str());
-	rapidjson::IStreamWrapper stream(fileIn);
-
-	rapidjson::Document d;
-	rapidjson::ParseResult parseRes = d.ParseStream(stream);
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
 
 	// Remove the file extension the end of the filename before using as a key
 	filename = RemoveFileExtension(filename);
 	
 	// Verify required members (shaders for now)
-	if (!parseRes ||
-		!d.HasMember("shaders") ||
-		!d["shaders"].HasMember("pixel") ||
-		!d["shaders"].HasMember("vertex"))
+	if (d.is_discarded() ||
+		!d.contains("shaders") ||
+		!d["shaders"].contains("pixel") ||
+		!d["shaders"].contains("vertex"))
 	{
 		std::shared_ptr<SimplePixelShader> psInvalid = 0;
 		std::shared_ptr<SimpleVertexShader> vsInvalid = 0;
@@ -542,8 +536,8 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 	}
 
 	// Check to see if the requested shaders exist
-	std::wstring psName = NarrowToWide(d["shaders"]["pixel"].GetString());
-	std::wstring vsName = NarrowToWide(d["shaders"]["vertex"].GetString());
+	std::wstring psName = NarrowToWide(d["shaders"]["pixel"].get<std::string>());
+	std::wstring vsName = NarrowToWide(d["shaders"]["vertex"].get<std::string>());
 
 	std::shared_ptr<SimplePixelShader> ps = GetPixelShader(psName);
 	std::shared_ptr<SimpleVertexShader> vs = GetVertexShader(vsName);
@@ -552,59 +546,59 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 	std::shared_ptr<Material> mat = std::make_shared<Material>(ps, vs);
 	
 	// Check for 3-component tint
-	if (d.HasMember("tint") && d["tint"].IsArray() && d["tint"].GetArray().Size() == 3)
+	if (d.contains("tint") && d["tint"].size() == 3)
 	{
 		DirectX::XMFLOAT3 tint(0, 0, 0);
-		tint.x = d["tint"][0].GetFloat();
-		tint.y = d["tint"][1].GetFloat();
-		tint.z = d["tint"][2].GetFloat();
+		tint.x = d["tint"][0].get<float>();
+		tint.y = d["tint"][1].get<float>();
+		tint.z = d["tint"][2].get<float>();
 		mat->SetColorTint(tint);
 	}
 
 	// 2-component uvScale
-	if (d.HasMember("uvScale") && d["uvScale"].IsArray() && d["uvScale"].Size() == 2)
+	if (d.contains("uvScale") && d["uvScale"].size() == 2)
 	{
 		DirectX::XMFLOAT2 uvScale(0, 0);
-		uvScale.x = d["uvScale"][0].GetFloat();
-		uvScale.y = d["uvScale"][1].GetFloat();
+		uvScale.x = d["uvScale"][0].get<float>();
+		uvScale.y = d["uvScale"][1].get<float>();
 		mat->SetUVScale(uvScale);
 	}
 
 	// 2-component uvOffset
-	if (d.HasMember("uvOffset") && d["uvOffset"].IsArray() && d["uvOffset"].Size() == 2)
+	if (d.contains("uvOffset") && d["uvOffset"].size() == 2)
 	{
 		DirectX::XMFLOAT2 uvOffset(0, 0);
-		uvOffset.x = d["uvOffset"][0].GetFloat();
-		uvOffset.y = d["uvOffset"][1].GetFloat();
+		uvOffset.x = d["uvOffset"][0].get<float>();
+		uvOffset.y = d["uvOffset"][1].get<float>();
 		mat->SetUVOffset(uvOffset);
 	}
 
 	// Check for samplers
-	if (d.HasMember("samplers") && d["samplers"].IsArray())
+	if (d.contains("samplers"))
 	{
-		for (unsigned int s = 0; s < d["samplers"].GetArray().Size(); s++)
+		for (unsigned int s = 0; s < d["samplers"].size(); s++)
 		{
 			// Do we know about this sampler?
-			std::wstring samplerName = NarrowToWide(d["samplers"][s]["name"].GetString());
+			std::wstring samplerName = NarrowToWide(d["samplers"][s]["name"].get<std::string>());
 			Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler = GetSampler(samplerName);
 			if (sampler)
 			{
-				mat->AddSampler(d["samplers"][s]["shaderName"].GetString(), sampler);
+				mat->AddSampler(d["samplers"][s]["shaderName"].get<std::string>(), sampler);
 			}
 		}
 	}
 
 	// Check for textures
-	if (d.HasMember("textures") && d["textures"].IsArray())
+	if (d.contains("textures"))
 	{
-		for (unsigned int t = 0; t < d["textures"].GetArray().Size(); t++)
+		for (unsigned int t = 0; t < d["textures"].size(); t++)
 		{
 			// Do we know about this texture?
-			std::wstring textureName = NarrowToWide(d["textures"][t]["name"].GetString());
+			std::wstring textureName = NarrowToWide(d["textures"][t]["name"].get<std::string>());
 			Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture = GetTexture(textureName);
 			if (texture)
 			{
-				mat->AddTextureSRV(d["textures"][t]["shaderName"].GetString(), texture);
+				mat->AddTextureSRV(d["textures"][t]["shaderName"].get<std::string>(), texture);
 			}
 		}
 	}
@@ -662,17 +656,15 @@ Microsoft::WRL::ComPtr<ID3D11SamplerState> Assets::LoadSampler(std::wstring path
 		printf("\n");
 	}
 
-	// Open the file and parse with rapidjson, using UTF16 (wide character) mode
-	std::ifstream fileIn(path.c_str());
-	rapidjson::IStreamWrapper stream(fileIn);
-
-	rapidjson::Document d;
-	rapidjson::ParseResult parseRes = d.ParseStream(stream);
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
 
 	// Remove the file extension the end of the filename before using as a key
 	filename = RemoveFileExtension(filename);
 
-	if (!parseRes)
+	if (d.is_discarded())
 	{
 		// Set a null sampler
 		samplers.insert({ filename, 0 });
@@ -694,9 +686,9 @@ Microsoft::WRL::ComPtr<ID3D11SamplerState> Assets::LoadSampler(std::wstring path
 	sampDesc.BorderColor[2] = 1.0f;
 	sampDesc.BorderColor[3] = 1.0f;
 
-	if (d.HasMember("filter") && d["filter"].IsString())
+	if (d.contains("filter") && d["filter"].is_string())
 	{
-		std::string filter = d["filter"].GetString();
+		std::string filter = d["filter"].get<std::string>();
 		if (filter == "point") sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
 		else if (filter == "linear") sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		else if (filter == "anisotropic") sampDesc.Filter = D3D11_FILTER_ANISOTROPIC;
@@ -705,9 +697,9 @@ Microsoft::WRL::ComPtr<ID3D11SamplerState> Assets::LoadSampler(std::wstring path
 		else if (filter == "comparisonAnisotropic") sampDesc.Filter = D3D11_FILTER_COMPARISON_ANISOTROPIC;
 	}
 
-	if (d.HasMember("addressMode") && d["addressMode"].IsString())
+	if (d.contains("addressMode") && d["addressMode"].is_string())
 	{
-		std::string addr = d["addressMode"].GetString();
+		std::string addr = d["addressMode"].get<std::string>();
 
 		D3D11_TEXTURE_ADDRESS_MODE mode = D3D11_TEXTURE_ADDRESS_WRAP;
 		if (addr == "wrap") mode = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -721,22 +713,22 @@ Microsoft::WRL::ComPtr<ID3D11SamplerState> Assets::LoadSampler(std::wstring path
 		sampDesc.AddressW = mode;
 	}
 
-	if (d.HasMember("maxAnisotropy") && d["maxAnisotropy"].IsInt())
+	if (d.contains("maxAnisotropy") && d["maxAnisotropy"].is_number_integer())
 	{
-		sampDesc.MaxAnisotropy = d["maxAnisotropy"].GetInt();
+		sampDesc.MaxAnisotropy = d["maxAnisotropy"].get<int>();
 	}
 
-	if (d.HasMember("borderColor") && d["borderColor"].IsArray() && d["borderColor"].Size() == 4)
+	if (d.contains("borderColor") && d["borderColor"].size() == 4)
 	{
-		sampDesc.BorderColor[0] = d["borderColor"][0].GetFloat();
-		sampDesc.BorderColor[1] = d["borderColor"][1].GetFloat();
-		sampDesc.BorderColor[2] = d["borderColor"][2].GetFloat();
-		sampDesc.BorderColor[3] = d["borderColor"][3].GetFloat();
+		sampDesc.BorderColor[0] = d["borderColor"][0].get<float>();
+		sampDesc.BorderColor[1] = d["borderColor"][1].get<float>();
+		sampDesc.BorderColor[2] = d["borderColor"][2].get<float>();
+		sampDesc.BorderColor[3] = d["borderColor"][3].get<float>();
 	}
 
-	if (d.HasMember("comparison") && d["comparison"].IsString())
+	if (d.contains("comparison") && d["comparison"].is_string())
 	{
-		std::string comp = d["comparison"].GetString();
+		std::string comp = d["comparison"].get<std::string>();
 		if (comp == "never") sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 		else if (comp == "less") sampDesc.ComparisonFunc = D3D11_COMPARISON_LESS;
 		else if (comp == "equal") sampDesc.ComparisonFunc = D3D11_COMPARISON_EQUAL;

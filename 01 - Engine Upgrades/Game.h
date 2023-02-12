@@ -33,19 +33,10 @@ private:
 	// Our scene
 	std::shared_ptr<Scene> scene;
 
-	std::vector<std::shared_ptr<GameEntity>> entities;
-	std::shared_ptr<Camera> camera;
-
 	// Lights
 	std::vector<Light> lights;
 	int lightCount;
 	bool showPointLights;
-
-	// Texture related resources
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions;
-
-	// Skybox
-	std::shared_ptr<Sky> sky;
 
 	// General helpers for setup and drawing
 	void LoadAssetsAndCreateEntities();
