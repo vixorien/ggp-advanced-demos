@@ -155,6 +155,7 @@
     <ClInclude Include="..\Common\ImGui\imstb_rectpack.h" />
     <ClInclude Include="..\Common\ImGui\imstb_textedit.h" />
     <ClInclude Include="..\Common\ImGui\imstb_truetype.h" />
+    <ClInclude Include="..\Common\json\json.hpp" />
     <ClInclude Include="..\Common\rapidjson\allocators.h" />
     <ClInclude Include="..\Common\rapidjson\cursorstreamwrapper.h" />
     <ClInclude Include="..\Common\rapidjson\document.h" />

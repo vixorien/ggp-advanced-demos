@@ -25,6 +25,9 @@
     <Filter Include="Common\rapidjson">
       <UniqueIdentifier>{c8270f8d-a3c8-4da4-bb73-690c2bc62933}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Common\json">
+      <UniqueIdentifier>{36232658-3498-47c4-bf89-8a192a7087c6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DXCore.cpp">
@@ -274,6 +277,9 @@
     </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\json\json.hpp">
+      <Filter>Common\json</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

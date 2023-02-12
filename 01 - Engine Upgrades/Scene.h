@@ -6,6 +6,8 @@
 #include "Lights.h"
 #include "Sky.h"
 
+#include "..\Common\json\json.hpp"
+
 #include <d3d11.h>
 #include <vector>
 #include <memory>
@@ -15,7 +17,9 @@ class Scene
 {
 public:
 
-	Scene();
+	Scene(
+		Microsoft::WRL::ComPtr<ID3D11Device> device,
+		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
 	~Scene();
 
 	void Clear();
@@ -27,9 +31,15 @@ public:
 
 	void SetSky(std::shared_ptr<Sky> sky);
 	
-	void Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
+	void Update(float deltaTime);
+	void Draw();
+
+	std::shared_ptr<Camera> GetCurrentCamera();
 
 private:
+
+	Microsoft::WRL::ComPtr<ID3D11Device> device;
+	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 
 	// Vectors of various scene objects
 	std::vector<std::shared_ptr<GameEntity>> entities;
@@ -38,5 +48,11 @@ private:
 
 	std::shared_ptr<Camera> currentCamera;
 	std::shared_ptr<Sky> sky;
+
+	// Helpers for json parsing
+	std::shared_ptr<Sky> ParseSky(nlohmann::json j);
+	std::shared_ptr<Camera> ParseCamera(nlohmann::json j);
+	std::shared_ptr<GameEntity> ParseEntity(nlohmann::json j);
+	Light ParseLight(nlohmann::json j);
 };
 

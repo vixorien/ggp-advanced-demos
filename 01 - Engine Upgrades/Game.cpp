@@ -129,11 +129,14 @@ void Game::Init()
 		CameraProjectionType::Perspective);
 
 
-	scene = std::make_shared<Scene>();
-	scene->SetSky(sky);
+	scene = std::make_shared<Scene>(device, context);
+	/*scene->SetSky(sky);
 	scene->AddCamera(camera);
 	for (auto& l : lights) scene->AddLight(l);
-	for (auto& e : entities) scene->AddEntity(e);
+	for (auto& e : entities) scene->AddEntity(e);*/
+
+	scene->Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"));
+	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 }
 
 
@@ -319,7 +322,8 @@ void Game::Update(float deltaTime, float totalTime)
 	BuildUI();
 
 	// Update the camera
-	camera->Update(deltaTime);
+	//camera->Update(deltaTime);
+	scene->Update(deltaTime);
 
 	// Check individual input
 	Input& input = Input::GetInstance();
@@ -345,7 +349,7 @@ void Game::Draw(float deltaTime, float totalTime)
 	}
 
 	// Draw the scene
-	scene->Draw(context);
+	scene->Draw();
 
 	// Draw the light sources?
 	if(showPointLights)

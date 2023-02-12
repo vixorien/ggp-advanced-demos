@@ -22,7 +22,7 @@
 		{
 			"type": "perspective",
 			"moveSpeed": 5.0,
-			"mouseLookSpeed": 0.002,
+			"lookSpeed": 0.002,
 			"fov": 0.7853975,
 			"near": 0.01,
 			"far": 1000.0,
