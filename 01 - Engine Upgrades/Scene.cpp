@@ -47,62 +47,34 @@ void Scene::AddCamera(std::shared_ptr<Camera> camera)
 		currentCamera = camera;
 }
 
-void Scene::AddLight(Light light)
-{
-	lights.push_back(light);
-}
+void Scene::AddLight(Light light) { lights.push_back(light); }
 
-void Scene::SetSky(std::shared_ptr<Sky> sky)
-{
-	this->sky = sky;
-}
+void Scene::SetSky(std::shared_ptr<Sky> sky) { this->sky = sky; }
 
-void Scene::UpdateAspectRatio(float aspectRatio)
-{
-	for(auto& c : cameras)
-		c->UpdateProjectionMatrix(aspectRatio);
-}
 
-void Scene::Update(float deltaTime)
+void Scene::SetCurrentCamera(std::shared_ptr<Camera> camera)
 {
-	if (currentCamera)
-		currentCamera->Update(deltaTime);
-}
-
-void Scene::Draw()
-{
-	// Ensure we have something to do
-	if (!currentCamera)
+	if (std::find(cameras.begin(), cameras.end(), camera) == cameras.end())
 		return;
 
-	// Draw entities
-	for (auto& ge : entities)
-	{
-		// Set the "per frame" data
-		// Note that this should literally be set once PER FRAME, before
-		// the draw loop, but we're currently setting it per entity since 
-		// we are just using whichever shader the current entity has.  
-		// Inefficient!!!
-		std::shared_ptr<SimplePixelShader> ps = ge->GetMaterial()->GetPixelShader();
-		ps->SetData("lights", (void*)(&lights[0]), sizeof(Light) * (unsigned int)lights.size());
-		ps->SetInt("lightCount", (unsigned int)lights.size());
-		ps->SetFloat3("cameraPosition", currentCamera->GetTransform()->GetPosition());
-		ps->CopyBufferData("perFrame");
-
-		// Draw the entity
-		ge->Draw(context, currentCamera);
-	}
-
-	// Draw the sky if necessary
-	if (sky)
-	{
-		sky->Draw(currentCamera);
-	}
+	currentCamera = camera;
 }
 
+void Scene::SetCurrentCamera(unsigned int cameraIndex)
+{
+	if (cameraIndex >= cameras.size())
+		return;
+
+	currentCamera = cameras[cameraIndex];
+}
+
+
+std::vector<Light>& Scene::GetLights() { return lights; }
+std::vector<std::shared_ptr<Camera>>& Scene::GetCameras() { return cameras; }
+std::vector<std::shared_ptr<GameEntity>>& Scene::GetEntities() { return entities; }
+std::shared_ptr<Sky> Scene::GetSky() { return sky; }
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
 
-std::vector<std::shared_ptr<GameEntity>> Scene::GetEntities() { return entities; }
 
 void Scene::Load(std::wstring sceneFile)
 {

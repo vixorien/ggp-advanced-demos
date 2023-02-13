@@ -96,11 +96,6 @@ void Game::Init()
 
 	// Asset loading and entity creation
 	LoadAssetsAndCreateEntities();
-	
-	// Tell the input assembler stage of the pipeline what kind of
-	// geometric primitives (points, lines or triangles) we want to draw.  
-	// Essentially: "What kind of shape should the GPU draw with our data?"
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// Set up lights initially
 	lightCount = 64;
@@ -141,35 +136,35 @@ void Game::LoadAssetsAndCreateEntities()
 // --------------------------------------------------------
 void Game::GenerateLights()
 {
-	// Reset
-	lights.clear();
+	//// Reset
+	//lights.clear();
 
-	// Setup directional lights
-	Light dir1 = {};
-	dir1.Type = LIGHT_TYPE_DIRECTIONAL;
-	dir1.Direction = XMFLOAT3(1, -1, 1);
-	dir1.Color = XMFLOAT3(0.8f, 0.8f, 0.8f);
-	dir1.Intensity = 1.0f;
+	//// Setup directional lights
+	//Light dir1 = {};
+	//dir1.Type = LIGHT_TYPE_DIRECTIONAL;
+	//dir1.Direction = XMFLOAT3(1, -1, 1);
+	//dir1.Color = XMFLOAT3(0.8f, 0.8f, 0.8f);
+	//dir1.Intensity = 1.0f;
 
-	Light dir2 = {};
-	dir2.Type = LIGHT_TYPE_DIRECTIONAL;
-	dir2.Direction = XMFLOAT3(-1, -0.25f, 0);
-	dir2.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
-	dir2.Intensity = 1.0f;
+	//Light dir2 = {};
+	//dir2.Type = LIGHT_TYPE_DIRECTIONAL;
+	//dir2.Direction = XMFLOAT3(-1, -0.25f, 0);
+	//dir2.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	//dir2.Intensity = 1.0f;
 
-	Light dir3 = {};
-	dir3.Type = LIGHT_TYPE_DIRECTIONAL;
-	dir3.Direction = XMFLOAT3(0, -1, 1);
-	dir3.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
-	dir3.Intensity = 1.0f;
+	//Light dir3 = {};
+	//dir3.Type = LIGHT_TYPE_DIRECTIONAL;
+	//dir3.Direction = XMFLOAT3(0, -1, 1);
+	//dir3.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	//dir3.Intensity = 1.0f;
 
-	// Add light to the list
-	lights.push_back(dir1);
-	lights.push_back(dir2);
-	lights.push_back(dir3);
+	//// Add light to the list
+	//lights.push_back(dir1);
+	//lights.push_back(dir2);
+	//lights.push_back(dir3);
 
 	// Create the rest of the lights
-	while (lights.size() < MAX_LIGHTS)
+	while (scene->GetLights().size() < MAX_LIGHTS)
 	{
 		Light point = {};
 		point.Type = LIGHT_TYPE_POINT;
@@ -179,7 +174,7 @@ void Game::GenerateLights()
 		point.Intensity = RandomRange(0.1f, 3.0f);
 
 		// Add to the list
-		lights.push_back(point);
+		scene->AddLight(point);
 	}
 
 }
@@ -196,7 +191,8 @@ void Game::OnResize()
 	DXCore::OnResize();
 
 	// Update our projection matrix to match the new aspect ratio
-	scene->UpdateAspectRatio((float)windowWidth / windowHeight);
+	for (auto& c : scene->GetCameras())
+		c->UpdateProjectionMatrix((float)windowWidth / windowHeight);
 }
 
 // --------------------------------------------------------
@@ -211,8 +207,7 @@ void Game::Update(float deltaTime, float totalTime)
 	BuildUI();
 
 	// Update the camera
-	//camera->Update(deltaTime);
-	scene->Update(deltaTime);
+	scene->GetCurrentCamera()->Update(deltaTime);
 
 	// Check individual input
 	Input& input = Input::GetInstance();
@@ -237,8 +232,26 @@ void Game::Draw(float deltaTime, float totalTime)
 		context->ClearDepthStencilView(depthBufferDSV.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 	}
 
-	// Draw the scene
-	scene->Draw();
+	// Draw entities
+	for (auto& ge : scene->GetEntities())
+	{
+		// Set the "per frame" data
+		// Note that this should literally be set once PER FRAME, before
+		// the draw loop, but we're currently setting it per entity since 
+		// we are just using whichever shader the current entity has.  
+		// Inefficient!!!
+		std::shared_ptr<SimplePixelShader> ps = ge->GetMaterial()->GetPixelShader();
+		ps->SetData("lights", (void*)(&scene->GetLights()[0]), sizeof(Light) * (unsigned int)scene->GetLights().size());
+		ps->SetInt("lightCount", lightCount);
+		ps->SetFloat3("cameraPosition", scene->GetCurrentCamera()->GetTransform()->GetPosition());
+		ps->CopyBufferData("perFrame");
+
+		// Draw the entity
+		ge->Draw(context, scene->GetCurrentCamera());
+	}
+
+	// Draw the sky
+	scene->GetSky()->Draw(scene->GetCurrentCamera());
 
 	// Draw the light sources?
 	if(showPointLights)
@@ -285,9 +298,9 @@ void Game::DrawPointLights()
 	lightVS->SetMatrix4x4("view", scene->GetCurrentCamera()->GetView());
 	lightVS->SetMatrix4x4("projection", scene->GetCurrentCamera()->GetProjection());
 
-	for (int i = 0; i < lightCount; i++)
+	for (int i = 0; i < lightCount && i < scene->GetLights().size(); i++)
 	{
-		Light light = lights[i];
+		Light light = scene->GetLights()[i];
 
 		// Only drawing points, so skip others
 		if (light.Type != LIGHT_TYPE_POINT)
@@ -460,11 +473,11 @@ void Game::BuildUI()
 			ImGui::Spacing();
 
 			// Loop and show the details for each entity
-			for (int i = 0; i < lightCount; i++)
+			for (int i = 0; i < lightCount && i < scene->GetLights().size(); i++)
 			{
 				// Name of this light based on type
 				std::string lightName = "Light %d";
-				switch (lights[i].Type)
+				switch (scene->GetLights()[i].Type)
 				{
 				case LIGHT_TYPE_DIRECTIONAL: lightName += " (Directional)"; break;
 				case LIGHT_TYPE_POINT: lightName += " (Point)"; break;
@@ -478,7 +491,7 @@ void Game::BuildUI()
 				if (ImGui::TreeNode("Light Node", lightName.c_str(), i))
 				{
 					// Build UI for one entity at a time
-					LightUI(lights[i]);
+					LightUI(scene->GetLights()[i]);
 
 					ImGui::TreePop();
 				}

@@ -34,7 +34,6 @@ private:
 	std::shared_ptr<Scene> scene;
 
 	// Lights
-	std::vector<Light> lights;
 	int lightCount;
 	bool showPointLights;
 

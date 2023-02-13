@@ -28,16 +28,16 @@ public:
 	void AddEntity(std::shared_ptr<GameEntity> entity);
 	void AddCamera(std::shared_ptr<Camera> camera);
 	void AddLight(Light light);
-
 	void SetSky(std::shared_ptr<Sky> sky);
-	
-	void UpdateAspectRatio(float aspectRatio);
+	void SetCurrentCamera(std::shared_ptr<Camera> camera);
+	void SetCurrentCamera(unsigned int cameraIndex);
 
-	void Update(float deltaTime);
-	void Draw();
+	std::vector<Light>& GetLights();
+	std::vector<std::shared_ptr<Camera>>& GetCameras();
+	std::vector<std::shared_ptr<GameEntity>>& GetEntities();
 
+	std::shared_ptr<Sky> GetSky();
 	std::shared_ptr<Camera> GetCurrentCamera();
-	std::vector<std::shared_ptr<GameEntity>> GetEntities();
 
 private:
 
