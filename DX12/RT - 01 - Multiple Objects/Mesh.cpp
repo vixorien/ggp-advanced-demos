@@ -1,5 +1,6 @@
 #include "Mesh.h"
 #include "DX12Helper.h"
+#include "RaytracingHelper.h"
 
 #include <DirectXMath.h>
 #include <vector>
@@ -278,4 +279,106 @@ void Mesh::CalculateTangents(Vertex* verts, int numVerts, unsigned int* indices,
 		// Store the tangent
 		XMStoreFloat3(&verts[i].Tangent, tangent);
 	}
+}
+
+// Quick alignment macro adjusted from: https://github.com/acmarrs/IntroToDXR/blob/master/include/Common.h
+// Makes use of integer division to ensure we are aligned to the proper multiple of "alignment"
+#define ALIGN(value, alignment) (((value + alignment - 1) / alignment) * alignment)
+
+void Mesh::CreateRaytracingBLAS()
+{
+	// Describe the geometry data we intend to store in this BLAS
+	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc;
+	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer->GetGPUVirtualAddress();
+	geometryDesc.Triangles.VertexBuffer.StrideInBytes = vbView.StrideInBytes;
+	geometryDesc.Triangles.VertexCount = static_cast<UINT>(numVertices);
+	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	geometryDesc.Triangles.IndexBuffer = indexBuffer->GetGPUVirtualAddress();
+	geometryDesc.Triangles.IndexFormat = ibView.Format;
+	geometryDesc.Triangles.IndexCount = static_cast<UINT>(numIndices);
+	geometryDesc.Triangles.Transform3x4 = 0;
+	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE; // Performance boost when dealing with opaque geometry
+
+	// Describe our overall input so we can get sizing info
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS accelStructInputs = {};
+	accelStructInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	accelStructInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	accelStructInputs.pGeometryDescs = &geometryDesc;
+	accelStructInputs.NumDescs = 1;
+	accelStructInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO accelStructPrebuildInfo = {};
+	RaytracingHelper::GetInstance().GetDXRDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&accelStructInputs, &accelStructPrebuildInfo);
+
+	// Handle alignment requirements ourselves
+	accelStructPrebuildInfo.ScratchDataSizeInBytes = ALIGN(accelStructPrebuildInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+	accelStructPrebuildInfo.ResultDataMaxSizeInBytes = ALIGN(accelStructPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+
+	// Create a scratch buffer so the device has a place to temporarily store data
+	Microsoft::WRL::ComPtr<ID3D12Resource> blasScratchBuffer = DX12Helper::GetInstance().CreateBuffer(
+		accelStructPrebuildInfo.ScratchDataSizeInBytes,
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+
+	// Create the final buffer for the BLAS
+	raytracingData.blas = DX12Helper::GetInstance().CreateBuffer(
+		accelStructPrebuildInfo.ResultDataMaxSizeInBytes,
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+
+	// Describe the final BLAS and set up the build
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+	buildDesc.Inputs = accelStructInputs;
+	buildDesc.ScratchAccelerationStructureData = blasScratchBuffer->GetGPUVirtualAddress();
+	buildDesc.DestAccelerationStructureData = raytracingData.blas->GetGPUVirtualAddress();
+	RaytracingHelper::GetInstance().GetDXRCommandList()->BuildRaytracingAccelerationStructure(&buildDesc, 0, 0);
+
+	// Set up a barrier to wait until the BLAS is actually built to proceed
+	D3D12_RESOURCE_BARRIER blasBarrier = {};
+	blasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	blasBarrier.UAV.pResource = raytracingData.blas.Get();
+	blasBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	RaytracingHelper::GetInstance().GetDXRCommandList()->ResourceBarrier(1, &blasBarrier);
+
+	// Create two SRVs for the index and vertex buffers
+	// Note: These must come one after the other in the descriptor heap, and index must come first
+	//       This is due to the way we've set up the root signature (expects a table of these)
+	D3D12_CPU_DESCRIPTOR_HANDLE ib_cpu, vb_cpu;
+	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&ib_cpu, &raytracingData.indexbufferSRV);
+	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&vb_cpu, &raytracingData.vertexBufferSRV);
+
+	// Index buffer SRV
+	D3D12_SHADER_RESOURCE_VIEW_DESC indexSRVDesc = {};
+	indexSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	indexSRVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	indexSRVDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+	indexSRVDesc.Buffer.StructureByteStride = 0;
+	indexSRVDesc.Buffer.FirstElement = 0;
+	indexSRVDesc.Buffer.NumElements = numIndices;
+	indexSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	RaytracingHelper::GetInstance().GetDXRDevice()->CreateShaderResourceView(indexBuffer.Get(), &indexSRVDesc, ib_cpu);
+
+	// Vertex buffer SRV
+	D3D12_SHADER_RESOURCE_VIEW_DESC vertexSRVDesc = {};
+	vertexSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	vertexSRVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	vertexSRVDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+	vertexSRVDesc.Buffer.StructureByteStride = 0;
+	vertexSRVDesc.Buffer.FirstElement = 0;
+	vertexSRVDesc.Buffer.NumElements = (numVertices * sizeof(Vertex)) / sizeof(float); // How many floats total?
+	vertexSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	RaytracingHelper::GetInstance().GetDXRDevice()->CreateShaderResourceView(vertexBuffer.Get(), &vertexSRVDesc, vb_cpu);
+
+	// All done - execute, wait and reset command list
+	RaytracingHelper::GetInstance().GetDXRCommandList()->Close();
+	ID3D12CommandList* lists[] = { RaytracingHelper::GetInstance().GetDXRCommandList().Get() };
+	RaytracingHelper::GetInstance().GetDXRCommandQueue()->ExecuteCommandLists(1, lists);
+
+	DX12Helper::GetInstance().WaitForGPU();
+	RaytracingHelper::GetInstance().GetDXRCommandList()->Reset(DX12Helper::GetInstance().GetDefaultAllocator().Get(), 0);
 }

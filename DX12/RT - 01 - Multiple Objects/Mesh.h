@@ -39,5 +39,6 @@ private:
 
 	void CalculateTangents(Vertex* verts, int numVerts, unsigned int* indices, int numIndices);
 	void CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArray, int numIndices);
+	void CreateRaytracingBLAS();
 };
 

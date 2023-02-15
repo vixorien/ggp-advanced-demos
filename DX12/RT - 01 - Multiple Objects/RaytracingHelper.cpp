@@ -300,6 +300,10 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 	// Assuming the frame sync and command list reset will happen over in Game!
 }
 
+Microsoft::WRL::ComPtr<ID3D12Device5> RaytracingHelper::GetDXRDevice() { return dxrDevice; }
+Microsoft::WRL::ComPtr<ID3D12CommandQueue> RaytracingHelper::GetDXRCommandQueue() { return commandQueue; }
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> RaytracingHelper::GetDXRCommandList() { return dxrCommandList; }
+
 
 
 void RaytracingHelper::CreateTopLevelAccelerationStructure()

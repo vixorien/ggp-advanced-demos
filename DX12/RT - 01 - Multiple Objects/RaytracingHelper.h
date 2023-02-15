@@ -60,6 +60,11 @@ public:
 
 	void Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex);
 
+	Microsoft::WRL::ComPtr<ID3D12Device5> GetDXRDevice();
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetDXRCommandQueue();
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetDXRCommandList();
+
+
 private:
 
 	unsigned int screenWidth;
