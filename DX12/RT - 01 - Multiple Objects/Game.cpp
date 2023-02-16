@@ -357,23 +357,25 @@ void Game::CreateBasicGeometry()
 
 	// Create entities
 	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
-	entityCube->GetTransform()->SetPosition(3, 0, 0);
+	entityCube->GetTransform()->SetPosition(-3, 0, 0);
 
 	std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix, cobbleMat);
-	entityHelix->GetTransform()->SetPosition(0, 0, 0);
+	entityHelix->GetTransform()->SetPosition(0, -3, 0);
 
 	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, bronzeMat);
 	entitySphere->GetTransform()->SetPosition(0, 0, 0);
+
+	std::shared_ptr<GameEntity> entitySphere2 = std::make_shared<GameEntity>(sphere, bronzeMat);
+	entitySphere2->GetTransform()->SetPosition(3, 0, 0);
 	
 	// Add to list
 	entities.push_back(entitySphere);
+	entities.push_back(entitySphere2);
 	entities.push_back(entityCube);
-	//entities.push_back(entityHelix);
+	entities.push_back(entityHelix);
 
-	// Last step in raytracing setup is to create the accel structures,
-	// which requires mesh data.  Currently just a single mesh is handled!
-	//RaytracingHelper::GetInstance().CreateAccelerationStructures(sphere);
-	RaytracingHelper::GetInstance().CreateAccelerationStructuresForScene(entities);
+	// Since meshes create their own BLAS's, we just need to create the TLAS for the scene
+	RaytracingHelper::GetInstance().CreateAccelerationStructureForScene(entities);
 }
 
 

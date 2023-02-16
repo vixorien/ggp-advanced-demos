@@ -7,8 +7,8 @@
 
 struct MeshRaytracingData
 {
-	D3D12_GPU_DESCRIPTOR_HANDLE IndexbufferSRV;
-	D3D12_GPU_DESCRIPTOR_HANDLE VertexBufferSRV;
+	D3D12_GPU_DESCRIPTOR_HANDLE IndexbufferSRV { };
+	D3D12_GPU_DESCRIPTOR_HANDLE VertexBufferSRV { };
 	Microsoft::WRL::ComPtr<ID3D12Resource> BLAS;
 };
 
@@ -40,6 +40,5 @@ private:
 
 	void CalculateTangents(Vertex* verts, int numVerts, unsigned int* indices, int numIndices);
 	void CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArray, int numIndices);
-	void CreateRaytracingBLAS();
 };
 

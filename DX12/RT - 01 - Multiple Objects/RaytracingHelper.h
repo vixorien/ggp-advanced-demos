@@ -38,7 +38,6 @@ private:
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
 		screenWidth(1),
-		shaderTableRecordSize(0),
 		topLevelAccelStructureSize(0)
 	{};
 #pragma endregion
@@ -56,16 +55,12 @@ public:
 		std::wstring raytracingShaderLibraryFile
 	);
 
-	void CreateAccelerationStructuresForScene(std::vector<std::shared_ptr<GameEntity>> scene);
+	void CreateAccelerationStructureForScene(std::vector<std::shared_ptr<GameEntity>> scene);
+	MeshRaytracingData CreateAccelerationStructureForMesh(Mesh* mesh);
 
-	void CreateAccelerationStructures(std::shared_ptr<Mesh> mesh);
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
 
 	void Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex);
-
-	Microsoft::WRL::ComPtr<ID3D12Device5> GetDXRDevice();
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetDXRCommandQueue();
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetDXRCommandList();
 
 
 private:
@@ -98,7 +93,12 @@ private:
 
 	// Shader table holding shaders for use during raytracing
 	Microsoft::WRL::ComPtr<ID3D12Resource> shaderTable;
-	UINT shaderTableRecordSize;
+	UINT shaderTableRayGenRecordSize;
+	UINT shaderTableMissRecordSize;
+	UINT shaderTableHitGroupRecordSize;
+	UINT shaderTableSize;
+
+	std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> indexBufferHandles;
 
 	// Accel structure requirements
 	UINT64 topLevelAccelStructureSize;
@@ -113,15 +113,10 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE raytracingOutputUAV_CPU;
 	D3D12_GPU_DESCRIPTOR_HANDLE raytracingOutputUAV_GPU;
 
-	// Other SRVs
-	D3D12_GPU_DESCRIPTOR_HANDLE indexBufferSRV;
-	D3D12_GPU_DESCRIPTOR_HANDLE vertexBufferSRV;
-
 	// Helper functions for each initalization step
 	void CreateRaytracingRootSignatures();
 	void CreateRaytracingPipelineState(std::wstring raytracingShaderLibraryFile);
 	void CreateShaderTable();
 	void CreateRaytracingOutputUAV(unsigned int width, unsigned int height);
-	void CreateTopLevelAccelerationStructure();
 };
 
