@@ -203,7 +203,8 @@ void Mesh::CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArr
 	ibView.SizeInBytes = sizeof(unsigned int) * numIndices;
 	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
 
-	// TODO: Use raytracing helper to generate RT data
+	// Create the raytracing acceleration structure for this mesh
+	CreateRaytracingBLAS();
 }
 
 
@@ -324,7 +325,7 @@ void Mesh::CreateRaytracingBLAS()
 		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
 
 	// Create the final buffer for the BLAS
-	raytracingData.blas = DX12Helper::GetInstance().CreateBuffer(
+	raytracingData.BLAS = DX12Helper::GetInstance().CreateBuffer(
 		accelStructPrebuildInfo.ResultDataMaxSizeInBytes,
 		D3D12_HEAP_TYPE_DEFAULT,
 		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
@@ -335,13 +336,13 @@ void Mesh::CreateRaytracingBLAS()
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
 	buildDesc.Inputs = accelStructInputs;
 	buildDesc.ScratchAccelerationStructureData = blasScratchBuffer->GetGPUVirtualAddress();
-	buildDesc.DestAccelerationStructureData = raytracingData.blas->GetGPUVirtualAddress();
+	buildDesc.DestAccelerationStructureData = raytracingData.BLAS->GetGPUVirtualAddress();
 	RaytracingHelper::GetInstance().GetDXRCommandList()->BuildRaytracingAccelerationStructure(&buildDesc, 0, 0);
 
 	// Set up a barrier to wait until the BLAS is actually built to proceed
 	D3D12_RESOURCE_BARRIER blasBarrier = {};
 	blasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	blasBarrier.UAV.pResource = raytracingData.blas.Get();
+	blasBarrier.UAV.pResource = raytracingData.BLAS.Get();
 	blasBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	RaytracingHelper::GetInstance().GetDXRCommandList()->ResourceBarrier(1, &blasBarrier);
 
@@ -349,8 +350,8 @@ void Mesh::CreateRaytracingBLAS()
 	// Note: These must come one after the other in the descriptor heap, and index must come first
 	//       This is due to the way we've set up the root signature (expects a table of these)
 	D3D12_CPU_DESCRIPTOR_HANDLE ib_cpu, vb_cpu;
-	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&ib_cpu, &raytracingData.indexbufferSRV);
-	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&vb_cpu, &raytracingData.vertexBufferSRV);
+	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&ib_cpu, &raytracingData.IndexbufferSRV);
+	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&vb_cpu, &raytracingData.VertexBufferSRV);
 
 	// Index buffer SRV
 	D3D12_SHADER_RESOURCE_VIEW_DESC indexSRVDesc = {};

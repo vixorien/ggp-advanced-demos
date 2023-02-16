@@ -8,6 +8,7 @@
 
 #include "Mesh.h"
 #include "Camera.h"
+#include "GameEntity.h"
 
 class RaytracingHelper
 {
@@ -54,6 +55,8 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
 		std::wstring raytracingShaderLibraryFile
 	);
+
+	void CreateAccelerationStructuresForScene(std::vector<std::shared_ptr<GameEntity>> scene);
 
 	void CreateAccelerationStructures(std::shared_ptr<Mesh> mesh);
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);

@@ -4,6 +4,7 @@
 
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
+#include <algorithm>
 
 // Useful raytracing links!
 // https://github.com/NVIDIAGameWorks/DxrTutorials // Has word docs with decent explanations in each folder
@@ -70,6 +71,134 @@ void RaytracingHelper::Initialize(
 	CreateRaytracingOutputUAV(screenWidth, screenHeight);
 
 	helperInitialized = true;
+}
+
+void RaytracingHelper::CreateAccelerationStructuresForScene(std::vector<std::shared_ptr<GameEntity>> scene)
+{
+	// One instance per game entity
+	unsigned int blasInstances = (unsigned int)scene.size();
+	if (blasInstances == 0)
+		return;
+
+	// Create vector of instance descriptions
+	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDesc;
+
+	// Sort the vector by the type of mesh
+	std::sort(scene.begin(), scene.end(),
+		[](const std::shared_ptr<GameEntity>& a, const std::shared_ptr<GameEntity>& b) -> bool
+		{
+			return a->GetMesh().get() < b->GetMesh().get();
+		}
+	);
+
+	indexBufferSRV = scene[0]->GetMesh()->GetRaytracingData().IndexbufferSRV;
+
+	// Loop through entities and track current mesh
+	std::shared_ptr<Mesh> currentMesh = scene[0]->GetMesh();
+	unsigned int currentMeshInstanceID = 0;
+	for (size_t i = 0; i < scene.size(); i++)
+	{
+		// Check current mesh
+		if (scene[i]->GetMesh() != currentMesh)
+		{
+			currentMesh = scene[i]->GetMesh();
+			currentMeshInstanceID = 0;
+		}
+
+		// Grab this entity's transform
+		DirectX::XMFLOAT4X4 transform = scene[i]->GetTransform()->GetWorldMatrix();
+
+		// Create this description
+		D3D12_RAYTRACING_INSTANCE_DESC id = {};
+		id.InstanceID = currentMeshInstanceID;
+		id.InstanceContributionToHitGroupIndex = 0;
+		id.InstanceMask = 0xFF;
+		memcpy(&id.Transform, &transform, sizeof(float) * 3 * 4); // Copy first [3][4] elements
+		id.AccelerationStructure = scene[0]->GetMesh()->GetRaytracingData().BLAS->GetGPUVirtualAddress();
+		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+
+		instanceDesc.push_back(id);
+
+		// On to the next id
+		currentMeshInstanceID++;
+	}
+
+	// The instance description actually needs to be in a buffer
+	// on the GPU, so we need to make that buffer and toss it in
+	// there ourselves (and keep the pointer long enough to finish the work)
+	tlasInstanceDescBuffer = DX12Helper::GetInstance().CreateBuffer(
+		sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDesc.size(),
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_RESOURCE_STATE_GENERIC_READ);
+
+	// Copy the description into the new buffer
+	unsigned char* mapped;
+	tlasInstanceDescBuffer->Map(0, 0, (void**)&mapped);
+	memcpy(mapped, &instanceDesc[0], sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDesc.size());
+	tlasInstanceDescBuffer->Unmap(0, 0);
+
+	// Describe our overall input so we can get sizing info
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS accelStructInputs = {};
+	accelStructInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	accelStructInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	accelStructInputs.InstanceDescs = tlasInstanceDescBuffer->GetGPUVirtualAddress();
+	accelStructInputs.NumDescs = instanceDesc.size();
+	accelStructInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO accelStructPrebuildInfo = {};
+	dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&accelStructInputs, &accelStructPrebuildInfo);
+
+	// Handle alignment requirements ourselves
+	accelStructPrebuildInfo.ScratchDataSizeInBytes = ALIGN(accelStructPrebuildInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+	accelStructPrebuildInfo.ResultDataMaxSizeInBytes = ALIGN(accelStructPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+
+	// Save the TLAS size
+	// TODO: Determine if we actually need this anywhere else?  One tutorial saved it...
+	topLevelAccelStructureSize = accelStructPrebuildInfo.ResultDataMaxSizeInBytes;
+
+	// Create a scratch buffer so the device has a place to temporarily store data
+	tlasScratchBuffer = DX12Helper::GetInstance().CreateBuffer(
+		accelStructPrebuildInfo.ScratchDataSizeInBytes,
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+
+	// Create the final buffer for the TLAS
+	topLevelAccelerationStructure = DX12Helper::GetInstance().CreateBuffer(
+		accelStructPrebuildInfo.ResultDataMaxSizeInBytes,
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+
+	// Describe the final TLAS and set up the build
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+	buildDesc.Inputs = accelStructInputs;
+	buildDesc.ScratchAccelerationStructureData = tlasScratchBuffer->GetGPUVirtualAddress();
+	buildDesc.DestAccelerationStructureData = topLevelAccelerationStructure->GetGPUVirtualAddress();
+	dxrCommandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, 0);
+
+	// Set up a barrier to wait until the TLAS is actually built to proceed
+	// Note: Probably unnecessary because we're about to execute and wait below,
+	//       but keeping this here in the event we adjust when we execute.
+	D3D12_RESOURCE_BARRIER tlasBarrier = {};
+	tlasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	tlasBarrier.UAV.pResource = topLevelAccelerationStructure.Get();
+	tlasBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	dxrCommandList->ResourceBarrier(1, &tlasBarrier);
+
+
+	// All done - execute, wait and reset command list
+	dxrCommandList->Close();
+
+	ID3D12CommandList* lists[] = { dxrCommandList.Get() };
+	commandQueue->ExecuteCommandLists(1, lists);
+
+	DX12Helper::GetInstance().WaitForGPU();
+	dxrCommandList->Reset(DX12Helper::GetInstance().GetDefaultAllocator().Get(), 0);
+
+	accelerationStructureFinalized = true;
 }
 
 

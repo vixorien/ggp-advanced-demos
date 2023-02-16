@@ -363,16 +363,17 @@ void Game::CreateBasicGeometry()
 	entityHelix->GetTransform()->SetPosition(0, 0, 0);
 
 	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, bronzeMat);
-	entitySphere->GetTransform()->SetPosition(-3, 0, 0);
+	entitySphere->GetTransform()->SetPosition(0, 0, 0);
 	
 	// Add to list
-	entities.push_back(entityCube);
-	entities.push_back(entityHelix);
 	entities.push_back(entitySphere);
+	entities.push_back(entityCube);
+	//entities.push_back(entityHelix);
 
 	// Last step in raytracing setup is to create the accel structures,
 	// which requires mesh data.  Currently just a single mesh is handled!
-	RaytracingHelper::GetInstance().CreateAccelerationStructures(sphere);
+	//RaytracingHelper::GetInstance().CreateAccelerationStructures(sphere);
+	RaytracingHelper::GetInstance().CreateAccelerationStructuresForScene(entities);
 }
 
 

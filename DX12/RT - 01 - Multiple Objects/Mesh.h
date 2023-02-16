@@ -7,9 +7,9 @@
 
 struct MeshRaytracingData
 {
-	D3D12_GPU_DESCRIPTOR_HANDLE indexbufferSRV;
-	D3D12_GPU_DESCRIPTOR_HANDLE vertexBufferSRV;
-	Microsoft::WRL::ComPtr<ID3D12Resource> blas;
+	D3D12_GPU_DESCRIPTOR_HANDLE IndexbufferSRV;
+	D3D12_GPU_DESCRIPTOR_HANDLE VertexBufferSRV;
+	Microsoft::WRL::ComPtr<ID3D12Resource> BLAS;
 };
 
 class Mesh
@@ -24,6 +24,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetIBResource() { return indexBuffer; }
 	int GetIndexCount() { return numIndices; }
 	int GetVertexCount() { return numVertices; }
+	MeshRaytracingData GetRaytracingData() { return raytracingData; }
 
 private:
 	int numIndices; 
