@@ -204,7 +204,7 @@ void Mesh::CreateBuffers(Vertex* vertArray, int numVerts, unsigned int* indexArr
 	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
 
 	// Create the raytracing acceleration structure for this mesh
-	raytracingData = RaytracingHelper::GetInstance().CreateAccelerationStructureForMesh(this);
+	raytracingData = RaytracingHelper::GetInstance().CreateBottomLevelAccelerationStructureForMesh(this);
 }
 
 

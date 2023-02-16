@@ -55,8 +55,9 @@ public:
 		std::wstring raytracingShaderLibraryFile
 	);
 
-	void CreateAccelerationStructureForScene(std::vector<std::shared_ptr<GameEntity>> scene);
-	MeshRaytracingData CreateAccelerationStructureForMesh(Mesh* mesh);
+	MeshRaytracingData CreateBottomLevelAccelerationStructureForMesh(Mesh* mesh);
+	void FinalizeBottomLevelAccelerationStructuresForScene(std::vector<std::shared_ptr<GameEntity>> scene);
+	void CreateTopLevelAccelerationStructureForScene(std::vector<std::shared_ptr<GameEntity>> scene);
 
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
 
@@ -72,6 +73,13 @@ private:
 	bool dxrAvailable;
 	bool helperInitialized;
 	bool accelerationStructureFinalized;
+
+	// This represents the maximum number of hit groups
+	// in our shader table, each of which corresponds to
+	// a unique combination of geometry & hit shader.
+	// In a simple demo, this is effectively the maximum
+	// number of unique mesh BLAS's.
+	const unsigned int MAX_HIT_GROUPS_IN_SHADER_TABLE = 1000;
 
 	// Command queue for processing raytracing commands
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
@@ -103,10 +111,8 @@ private:
 	// Accel structure requirements
 	UINT64 topLevelAccelStructureSize;
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasScratchBuffer; 
-	Microsoft::WRL::ComPtr<ID3D12Resource> blasScratchBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasInstanceDescBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> topLevelAccelerationStructure;
-	Microsoft::WRL::ComPtr<ID3D12Resource> bottomLevelAccelerationStructure;
 
 	// Actual output resource
 	Microsoft::WRL::ComPtr<ID3D12Resource> raytracingOutput;

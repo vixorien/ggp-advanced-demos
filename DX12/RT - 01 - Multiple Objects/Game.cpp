@@ -375,7 +375,7 @@ void Game::CreateBasicGeometry()
 	entities.push_back(entityHelix);
 
 	// Since meshes create their own BLAS's, we just need to create the TLAS for the scene
-	RaytracingHelper::GetInstance().CreateAccelerationStructureForScene(entities);
+	RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 }
 
 
