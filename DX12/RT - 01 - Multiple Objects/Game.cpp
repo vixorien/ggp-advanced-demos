@@ -334,14 +334,14 @@ void Game::CreateBasicGeometry()
 	cobbleMat->AddTexture(cobblestoneMetal, 3);
 	cobbleMat->FinalizeTextures();
 
-	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 1, 0.5f));
 	bronzeMat->AddTexture(bronzeAlbedo, 0);
 	bronzeMat->AddTexture(bronzeNormals, 1);
 	bronzeMat->AddTexture(bronzeRoughness, 2);
 	bronzeMat->AddTexture(bronzeMetal, 3);
 	bronzeMat->FinalizeTextures();
 
-	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 1));
 	scratchedMat->AddTexture(scratchedAlbedo, 0);
 	scratchedMat->AddTexture(scratchedNormals, 1);
 	scratchedMat->AddTexture(scratchedRoughness, 2);

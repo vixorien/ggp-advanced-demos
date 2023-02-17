@@ -440,8 +440,8 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 		dispatchDesc.Width = screenWidth;
 		dispatchDesc.Height = screenHeight;
 
-		// Max recursion depth (just 1 for this simple demo)
-		dispatchDesc.Depth = 1;
+		// Max recursion depth
+		dispatchDesc.Depth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
 
 		// GO!
 		dxrCommandList->DispatchRays(&dispatchDesc);
@@ -766,7 +766,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 	{
 		// Add a state subobject for the ray tracing pipeline config
 		D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-		pipelineConfig.MaxTraceRecursionDepth = 1;
+		pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
 
 		D3D12_STATE_SUBOBJECT pipelineConfigSubObj = {};
 		pipelineConfigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;

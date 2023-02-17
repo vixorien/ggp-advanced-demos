@@ -17,7 +17,8 @@ static const uint VertexSizeInBytes = 11 * 4; // 11 floats total per vertex * 4 
 // Note: This should be as small as possible (maybe float3 instead?  Alignment issues?)
 struct RayPayload
 {
-	float4 color;
+	float3 color;
+	uint recursionDepth;
 };
 
 // Note: We'll be using the built-in BuiltInTriangleIntersectionAttributes struct
@@ -149,7 +150,8 @@ void RayGen()
 
 	// Set up the payload for the ray
 	RayPayload payload;
-	payload.color = float4(0, 0, 0, 1);
+	payload.color = float3(1, 1, 1);
+	payload.recursionDepth = 0;
 
 	// Perform the ray trace for this ray
 	TraceRay(
@@ -163,7 +165,7 @@ void RayGen()
 		payload);
 
 	// Set the final color of the buffer
-	OutputColor[rayIndices] = payload.color;
+	OutputColor[rayIndices] = float4(payload.color, 1);
 }
 
 
@@ -173,7 +175,7 @@ void Miss(inout RayPayload payload)
 {
 	// Nothing was hit, so return black for now.
 	// Ideally this is where we would do skybox stuff!
-	payload.color = float4(0, 0, 0, 1);
+	payload.color *= float3(1, 1, 1);
 }
 
 
@@ -195,9 +197,33 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 
 	// Get the data for this entity
 	uint instanceID = InstanceID();
-	payload.color = entityColor[instanceID];
+	payload.color *= entityColor[instanceID].rgb;
 
-	// Use the resulting data to set the final color
-	// Note: Here is where we would do actual shading!
-	//payload.color = float4(interpolatedVert.normal, 1);
+	// Can we go again?
+	if (payload.recursionDepth < 5)
+	{
+		payload.recursionDepth++;
+
+		// Convert the normal to world space
+		float3 normal_WS = mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3());
+
+		// Create the new recursive ray
+		RayDesc ray;
+		ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+		ray.Direction = reflect(WorldRayDirection(), normal_WS);
+		ray.TMin = 0.01f;
+		ray.TMax = 1000.0f;
+
+
+		// Recursive ray trace
+		TraceRay(
+			SceneTLAS,
+			RAY_FLAG_NONE,
+			0xFF,
+			0,
+			0,
+			0,
+			ray,
+			payload);
+	}
 }
