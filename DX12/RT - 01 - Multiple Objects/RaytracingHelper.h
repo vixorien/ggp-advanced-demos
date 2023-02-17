@@ -33,12 +33,10 @@ private:
 	static RaytracingHelper* instance;
 	RaytracingHelper() :
 		dxrAvailable(false),
-		accelerationStructureFinalized(false),
 		raytracingOutputUAV_CPU{},
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
-		screenWidth(1),
-		topLevelAccelStructureSize(0)
+		screenWidth(1)
 	{};
 #pragma endregion
 
@@ -71,7 +69,6 @@ private:
 	// Is raytracing (DirectX Raytracing - DXR) available on this hardware?
 	bool dxrAvailable;
 	bool helperInitialized;
-	bool accelerationStructureFinalized;
 
 	// This represents the maximum number of hit groups
 	// in our shader table, each of which corresponds to
@@ -108,7 +105,9 @@ private:
 	UINT blasCount;
 
 	// Accel structure requirements
-	UINT64 topLevelAccelStructureSize;
+	UINT64 tlasBufferSizeInBytes;
+	UINT64 tlasScratchSizeInBytes;
+	UINT64 tlasInstanceDataSizeInBytes;
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasScratchBuffer; 
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasInstanceDescBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> topLevelAccelerationStructure;

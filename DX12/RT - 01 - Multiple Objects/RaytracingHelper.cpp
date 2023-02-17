@@ -72,8 +72,11 @@ void RaytracingHelper::Initialize(
 	CreateShaderTable();
 	CreateRaytracingOutputUAV(screenWidth, screenHeight);
 
-	helperInitialized = true;
+	tlasBufferSizeInBytes = 0;
+	tlasScratchSizeInBytes = 0;
+	tlasInstanceDataSizeInBytes = 0;
 	blasCount = 0;
+	helperInitialized = true;
 }
 
 MeshRaytracingData RaytracingHelper::CreateBottomLevelAccelerationStructureForMesh(Mesh* mesh)
@@ -231,15 +234,24 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		instanceDescs.push_back(id);
 	}
 
-	// The instance description actually needs to be in a buffer
-	// on the GPU, so we need to make that buffer and toss it in
-	// there ourselves (and keep the pointer long enough to finish the work)
-	tlasInstanceDescBuffer = DX12Helper::GetInstance().CreateBuffer(
-		sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size(),
-		D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_RESOURCE_STATE_GENERIC_READ);
+	// Is our current description buffer too small?
+	if (sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size() > tlasInstanceDataSizeInBytes)
+	{
+		// Create a new buffer to hold instance descriptions, since they
+		// need to actually be on the GPU
+		tlasInstanceDescBuffer.Reset();
+		tlasInstanceDataSizeInBytes = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size();
 
-	// Copy the description into the new buffer
+		tlasInstanceDescBuffer = DX12Helper::GetInstance().CreateBuffer(
+			tlasInstanceDataSizeInBytes,
+			D3D12_HEAP_TYPE_UPLOAD,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
+	// TODO: Probably make a small ring buffer (exactly 3) of these buffers
+	//       to coincide with our frame sync stuff!
+	// 
+	// Copy the descriptions into the buffer
 	unsigned char* mapped = 0;
 	tlasInstanceDescBuffer->Map(0, 0, (void**)&mapped);
 	memcpy(mapped, &instanceDescs[0], sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size());
@@ -260,25 +272,35 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	accelStructPrebuildInfo.ScratchDataSizeInBytes = ALIGN(accelStructPrebuildInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
 	accelStructPrebuildInfo.ResultDataMaxSizeInBytes = ALIGN(accelStructPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
 
-	// Save the TLAS size
-	// TODO: Determine if we actually need this anywhere else?  One tutorial saved it...
-	topLevelAccelStructureSize = accelStructPrebuildInfo.ResultDataMaxSizeInBytes;
+	// Is our current scratch size too small?
+	if (accelStructPrebuildInfo.ScratchDataSizeInBytes > tlasScratchSizeInBytes)
+	{
+		// Create a new scratch buffer
+		tlasScratchBuffer.Reset();
+		tlasScratchSizeInBytes = accelStructPrebuildInfo.ScratchDataSizeInBytes;
 
-	// Create a scratch buffer so the device has a place to temporarily store data
-	tlasScratchBuffer = DX12Helper::GetInstance().CreateBuffer(
-		accelStructPrebuildInfo.ScratchDataSizeInBytes,
-		D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+		tlasScratchBuffer = DX12Helper::GetInstance().CreateBuffer(
+			tlasScratchSizeInBytes,
+			D3D12_HEAP_TYPE_DEFAULT,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+			max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+	}
 
-	// Create the final buffer for the TLAS
-	topLevelAccelerationStructure = DX12Helper::GetInstance().CreateBuffer(
-		accelStructPrebuildInfo.ResultDataMaxSizeInBytes,
-		D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-		max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+	// Is our current tlas too small?
+	if (accelStructPrebuildInfo.ResultDataMaxSizeInBytes > tlasBufferSizeInBytes)
+	{
+		// Create a new tlas buffer
+		topLevelAccelerationStructure.Reset();
+		tlasBufferSizeInBytes = accelStructPrebuildInfo.ResultDataMaxSizeInBytes;
+
+		topLevelAccelerationStructure = DX12Helper::GetInstance().CreateBuffer(
+			accelStructPrebuildInfo.ResultDataMaxSizeInBytes,
+			D3D12_HEAP_TYPE_DEFAULT,
+			D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+			max(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT));
+	}
 
 	// Describe the final TLAS and set up the build
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
@@ -296,17 +318,6 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	tlasBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	dxrCommandList->ResourceBarrier(1, &tlasBarrier);
 
-
-	// All done - execute, wait and reset command list
-	dxrCommandList->Close();
-
-	ID3D12CommandList* lists[] = { dxrCommandList.Get() };
-	commandQueue->ExecuteCommandLists(1, lists);
-
-	DX12Helper::GetInstance().WaitForGPU();
-	dxrCommandList->Reset(DX12Helper::GetInstance().GetDefaultAllocator().Get(), 0);
-
-	accelerationStructureFinalized = true;
 }
 
 

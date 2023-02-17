@@ -461,6 +461,7 @@ void Game::Update(float deltaTime, float totalTime)
 		e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
 	}
 
+
 	// Update other objects
 	camera->Update(deltaTime);
 }
@@ -483,6 +484,10 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Raytracing here!
 	{
+		// Update raytracing accel structure
+		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
+
+		// Perform raytrace
 		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
 	}
 
