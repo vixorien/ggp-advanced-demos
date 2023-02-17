@@ -29,3 +29,10 @@ struct RaytracingSceneData
 	DirectX::XMFLOAT3 cameraPosition;
 	float pad;
 };
+
+// Ensure this matches Raytracing shader define!
+#define MAX_INSTANCES_PER_BLAS 100
+struct RaytracingEntityData
+{
+	DirectX::XMFLOAT4 color[MAX_INSTANCES_PER_BLAS];
+};

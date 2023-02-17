@@ -327,7 +327,7 @@ void Game::CreateBasicGeometry()
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
-	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 0.5f, 0.5f));
 	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
 	cobbleMat->AddTexture(cobblestoneNormals, 1);
 	cobbleMat->AddTexture(cobblestoneRoughness, 2);

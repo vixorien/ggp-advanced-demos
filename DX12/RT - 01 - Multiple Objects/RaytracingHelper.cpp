@@ -190,7 +190,7 @@ MeshRaytracingData RaytracingHelper::CreateBottomLevelAccelerationStructureForMe
 		tablePointer += shaderTableRayGenRecordSize + shaderTableMissRecordSize; // Get past raygen and miss shaders
 		tablePointer += shaderTableHitGroupRecordSize * raytracingData.HitGroupIndex; // Skip to this hit group
 		tablePointer += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES; // Get past the identifier
-		tablePointer += 8; // Skip first descriptor table, which is for a CBV
+		tablePointer += 8; // Skip first descriptor, which is for a CBV
 		memcpy(tablePointer, &raytracingData.IndexbufferSRV, 8); // Copy descriptor to table
 	}
 	shaderTable->Unmap(0, 0);
@@ -209,7 +209,9 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 
 	// Create a vector of instance IDs
 	std::vector<unsigned int> instanceIDs;
+	std::vector<RaytracingEntityData> entityData;
 	instanceIDs.resize(blasCount); // One per BLAS (mesh) - all starting at zero due to resize()
+	entityData.resize(blasCount);
 
 	// Create an instance description for each entity
 	for (size_t i = 0; i < scene.size(); i++)
@@ -222,16 +224,24 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		std::shared_ptr<Mesh> mesh = scene[i]->GetMesh();
 		unsigned int meshBlasIndex = mesh->GetRaytracingData().HitGroupIndex;
 
-		// Create this description
+		// Create this description and add to our overall set of descriptions
 		D3D12_RAYTRACING_INSTANCE_DESC id = {};
 		id.InstanceContributionToHitGroupIndex = meshBlasIndex;
-		id.InstanceID = instanceIDs[meshBlasIndex]++;
+		id.InstanceID = instanceIDs[meshBlasIndex];
 		id.InstanceMask = 0xFF;
 		memcpy(&id.Transform, &transform, sizeof(float) * 3 * 4); // Copy first [3][4] elements
 		id.AccelerationStructure = mesh->GetRaytracingData().BLAS->GetGPUVirtualAddress();
 		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
-
 		instanceDescs.push_back(id);
+
+		// Set up the entity data for this entity, too
+		// - mesh index tells us which cbuffer
+		// - instance ID tells us which instance in that cbuffer
+		XMFLOAT3 c = scene[i]->GetMaterial()->GetColorTint();
+		entityData[meshBlasIndex].color[id.InstanceID] = XMFLOAT4(c.x, c.y, c.z, 1);
+
+		// On to the next instance for this mesh
+		instanceIDs[meshBlasIndex]++;
 	}
 
 	// Is our current description buffer too small?
@@ -318,6 +328,21 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	tlasBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	dxrCommandList->ResourceBarrier(1, &tlasBarrier);
 
+	// Finalize the entity data cbuffer stuff and copy descriptors to shader table
+	unsigned char* tablePointer = 0;
+	shaderTable->Map(0, 0, (void**)&tablePointer);
+	tablePointer += shaderTableRayGenRecordSize + shaderTableMissRecordSize; // Get past raygen and miss shaders
+	for(int i = 0; i < entityData.size(); i++)
+	{
+		// Need to get to the first descriptor in this hit group's record
+		unsigned char* hitGroupPointer = tablePointer + shaderTableHitGroupRecordSize * i;
+		hitGroupPointer += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES; // Get past identifier
+
+		// Copy the data to the CB ring buffer and grab associated CBV to place in shader table
+		D3D12_GPU_DESCRIPTOR_HANDLE cbv = DX12Helper::GetInstance().FillNextConstantBufferAndGetGPUDescriptorHandle(&entityData[i], sizeof(RaytracingEntityData));
+		memcpy(hitGroupPointer, &cbv, sizeof(D3D12_GPU_DESCRIPTOR_HANDLE));
+	}
+	shaderTable->Unmap(0, 0);
 }
 
 
@@ -365,8 +390,6 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 		dxrCommandList->ResourceBarrier(2, outputBarriers);
 	}
 
-#define INVERT(m) DirectX::XMStoreFloat4x4(&m, DirectX::XMMatrixInverse(0, DirectX::XMLoadFloat4x4(&m)))
-
 	// Grab and fill a constant buffer
 	RaytracingSceneData sceneData = {};
 	sceneData.cameraPosition = camera->GetTransform()->GetPosition();
@@ -395,7 +418,6 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 		dxrCommandList->SetComputeRootDescriptorTable(0, raytracingOutputUAV_GPU);	// First table is just output UAV
 		dxrCommandList->SetComputeRootShaderResourceView(1, topLevelAccelerationStructure->GetGPUVirtualAddress());		// Second is SRV for accel structure (as root SRV, no table needed)
 		dxrCommandList->SetComputeRootDescriptorTable(2, cbuffer);					// Third is CBV
-		//dxrCommandList->SetComputeRootDescriptorTable(3, indexBufferSRV);			// Fourth is index buffer SRV (assuming vert buffer SRV immediately follows in heap!!!)
 
 		// Dispatch rays
 		D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
@@ -529,19 +551,31 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 
 	// Create a local root signature enabling shaders to have unique data from shader tables
 	{
-		// Two params: Constant buffer and table for geometry
-		D3D12_ROOT_PARAMETER rootParams[2] = {};
-		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		rootParams[0].Descriptor.ShaderRegister = 1;
-		rootParams[0].Descriptor.RegisterSpace = 0;
+		// cbuffer for hit group data
+		D3D12_DESCRIPTOR_RANGE cbufferRange = {};
+		cbufferRange.BaseShaderRegister = 1;
+		cbufferRange.NumDescriptors = 1;
+		cbufferRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		cbufferRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		cbufferRange.RegisterSpace = 0;
 
+		// Table of 2 starting at register(t1)
 		D3D12_DESCRIPTOR_RANGE geometrySRVRange = {};
 		geometrySRVRange.BaseShaderRegister = 1;
 		geometrySRVRange.NumDescriptors = 2;
 		geometrySRVRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 		geometrySRVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		geometrySRVRange.RegisterSpace = 0;
+
+		// Two params: Tables for constant buffer and geometry
+		D3D12_ROOT_PARAMETER rootParams[2] = {};
+
+		// Constant buffer at register(b1)
+		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[0].DescriptorTable.pDescriptorRanges = &cbufferRange;
+
 
 		// Range of SRVs for geometry (verts & indices)
 		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -768,12 +802,11 @@ void RaytracingHelper::CreateShaderTable()
 	// 2 - Closest hit shader
 	// Note: All records must have the same size, so we need to calculate
 	//       the size of the largest possible entry for our program
-	//       - This will be the default (32) + one descriptor table pointer (8)
 	//       - This also must be aligned up to D3D12_RAYTRACING_SHADER_BINDING_TABLE_RECORD_BYTE_ALIGNMENT
 
-	shaderTableRayGenRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8; // One descriptor table
-	shaderTableMissRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8; // One descriptor table
-	shaderTableHitGroupRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 + 8; // Two descriptor tables: CBV and index/vertex buffer
+	shaderTableRayGenRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8; // One descriptor
+	shaderTableMissRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8; // One descriptor
+	shaderTableHitGroupRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 + 8; // Two descriptors: CBV and index/vertex buffer
 
 	// Align them
 	shaderTableRayGenRecordSize = ALIGN(shaderTableRayGenRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);

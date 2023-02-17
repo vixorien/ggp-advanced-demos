@@ -34,10 +34,12 @@ cbuffer SceneData : register(b0)
 	float pad0;
 };
 
+
+// Ensure this matches C++ buffer struct define!
+#define MAX_INSTANCES_PER_BLAS 100
 cbuffer ObjectData : register(b1)
 {
-	float3 colorTint;
-	float pad1;
+	float4 entityColor[MAX_INSTANCES_PER_BLAS];
 };
 
 
@@ -191,7 +193,11 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	// Get the interpolated vertex data
 	Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
 
+	// Get the data for this entity
+	uint instanceID = InstanceID();
+	payload.color = entityColor[instanceID];
+
 	// Use the resulting data to set the final color
 	// Note: Here is where we would do actual shading!
-	payload.color = float4(interpolatedVert.normal, 1);
+	//payload.color = float4(interpolatedVert.normal, 1);
 }
