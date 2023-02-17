@@ -56,7 +56,6 @@ public:
 	);
 
 	MeshRaytracingData CreateBottomLevelAccelerationStructureForMesh(Mesh* mesh);
-	void FinalizeBottomLevelAccelerationStructuresForScene(std::vector<std::shared_ptr<GameEntity>> scene);
 	void CreateTopLevelAccelerationStructureForScene(std::vector<std::shared_ptr<GameEntity>> scene);
 
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
@@ -106,7 +105,7 @@ private:
 	UINT shaderTableHitGroupRecordSize;
 	UINT shaderTableSize;
 
-	std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> indexBufferHandles;
+	UINT blasCount;
 
 	// Accel structure requirements
 	UINT64 topLevelAccelStructureSize;
