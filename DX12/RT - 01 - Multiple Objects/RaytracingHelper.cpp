@@ -238,7 +238,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		// - mesh index tells us which cbuffer
 		// - instance ID tells us which instance in that cbuffer
 		XMFLOAT3 c = scene[i]->GetMaterial()->GetColorTint();
-		entityData[meshBlasIndex].color[id.InstanceID] = XMFLOAT4(c.x, c.y, c.z, 1);
+		entityData[meshBlasIndex].color[id.InstanceID] = XMFLOAT4(c.x, c.y, c.z, (i+1) % 2); // Using alpha channel as "roughness"
 
 		// On to the next instance for this mesh
 		instanceIDs[meshBlasIndex]++;
@@ -439,9 +439,7 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 		// Set number of rays to match screen size
 		dispatchDesc.Width = screenWidth;
 		dispatchDesc.Height = screenHeight;
-
-		// Max recursion depth
-		dispatchDesc.Depth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
+		dispatchDesc.Depth = 1;
 
 		// GO!
 		dxrCommandList->DispatchRays(&dispatchDesc);
@@ -699,7 +697,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 	// === Shader config (payload) ===
 	{
 		D3D12_RAYTRACING_SHADER_CONFIG shaderConfigDesc = {};
-		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT4);	// Assuming a float4 color for now
+		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT4) + sizeof(int);	// Assuming a float4 color for now
 		shaderConfigDesc.MaxAttributeSizeInBytes = sizeof(DirectX::XMFLOAT2); // Assuming a float2 for barycentric coords for now
 
 		D3D12_STATE_SUBOBJECT shaderConfigSubObj = {};

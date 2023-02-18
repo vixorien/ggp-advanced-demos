@@ -327,7 +327,7 @@ void Game::CreateBasicGeometry()
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
-	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 0.5f, 0.5f));
+	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 0.5f));
 	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
 	cobbleMat->AddTexture(cobblestoneNormals, 1);
 	cobbleMat->AddTexture(cobblestoneRoughness, 2);
@@ -355,41 +355,30 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/torus.obj").c_str());
 	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
-	//// Create entities
-	//std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
-	//entityCube->GetTransform()->SetPosition(-3, 0, 0);
-
-	//std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix, cobbleMat);
-	//entityHelix->GetTransform()->SetPosition(0, -3, 0);
-
-	//std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, bronzeMat);
-	//entitySphere->GetTransform()->SetPosition(0, 0, 0);
-
-	//std::shared_ptr<GameEntity> entitySphere2 = std::make_shared<GameEntity>(sphere, bronzeMat);
-	//entitySphere2->GetTransform()->SetPosition(3, 0, 0);
-
-	//// Add to list
-	//entities.push_back(entitySphere);
-	//entities.push_back(entitySphere2);
-	//entities.push_back(entityCube);
-	//entities.push_back(entityHelix);
+	// Floor
+	std::shared_ptr<GameEntity> floor = std::make_shared<GameEntity>(cube, cobbleMat);
+	floor->GetTransform()->SetScale(100);
+	floor->GetTransform()->SetPosition(0, -52, 0);
+	entities.push_back(floor);
 
 
-	for (int i = 0; i < 50; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState, XMFLOAT3(
 			RandomRange(0.0f, 1.0f),
 			RandomRange(0.0f, 1.0f),
 			RandomRange(0.0f, 1.0f)));
 
-		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
-		sphereEnt->GetTransform()->SetPosition(
-			RandomRange(-10, 10),
-			RandomRange(-10,10),
-			RandomRange(-10,10));
+		float scale = RandomRange(0.5f, 2.0f);
 
-		float scale = RandomRange(0.5f, 5.0f);
+		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
 		sphereEnt->GetTransform()->SetScale(scale);
+		sphereEnt->GetTransform()->SetPosition(
+			RandomRange(-6, 6),
+			-2 + scale / 2.0f,
+			RandomRange(-6,6));
+
+		
 
 		entities.push_back(sphereEnt);
 	}
@@ -479,24 +468,27 @@ void Game::Update(float deltaTime, float totalTime)
 	int i = 0;
 	for (auto& e : entities)
 	{
-		e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
+		// Skip floor
+		if (i == 0)
+		{
+			i++;
+			continue;
+		}
+
+		//e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
 		
 		XMFLOAT3 pos = e->GetTransform()->GetPosition();
-		switch (i % 3)
+		switch (i % 2)
 		{
 		case 0:
-			pos.x = sin(totalTime + i) * 5;
+			pos.x = sin((totalTime + i) * 0.4f) * 4;
 			break;
 
 		case 1:
-			pos.y = sin(totalTime + i) * 5;
-			break;
-
-		case 2:
-			pos.z = sin(totalTime + i) * 5;
+			pos.z = sin((totalTime + i) * 0.4f) * 4;
 			break;
 		}
-		//e->GetTransform()->SetPosition(pos);
+		e->GetTransform()->SetPosition(pos);
 
 		i++;
 	}
