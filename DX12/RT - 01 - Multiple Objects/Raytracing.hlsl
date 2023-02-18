@@ -1,4 +1,9 @@
 
+// === Defines ===
+
+#define PI 3.14159f
+
+
 
 // === Structs ===
 
@@ -126,6 +131,50 @@ void CalcRayFromCamera(uint2 rayIndices, out float3 origin, out float3 direction
 }
 
 
+// Sampling functions based on Chapter 16 of Raytracing Gems
+
+// params should be uniform between [0,1]
+float3 RandomVector(float u0, float u1)
+{
+	float a = u0 * 2 - 1;
+	float b = sqrt(1 - a * a);
+	float phi = 2.0f * PI * u1;
+
+	float x = b * cos(phi);
+	float y = b * sin(phi);
+	float z = a;
+
+	return float3(x, y, z);
+}
+
+float3 RandomCosineWeightedHemisphereOnZ(float u0, float u1)
+{
+	float s = sqrt(u0);
+	float phi = 2.0f * PI * u1;
+
+	float x = s * cos(phi);
+	float y = s * sin(phi);
+	float z = sqrt(1.0f - u0);
+
+	// float pdf = z / PI;
+	return float3(x, y, z);
+}
+
+float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
+{
+	float a = u0 * 2 - 1;
+	float b = sqrt(1.0f - a * a);
+	float phi = 2.0f * PI * u1;
+
+	float x = unitNormal.x + b * cos(phi);
+	float y = unitNormal.y + b * sin(phi);
+	float z = unitNormal.z + a;
+	
+	// float pdf = a / PI;
+	return float3(x, y, z);
+}
+
+
 // === Shaders ===
 
 // Ray generation shader - Launched once for each ray we want to generate
@@ -145,7 +194,7 @@ void RayGen()
 	RayDesc ray;
 	ray.Origin = rayOrigin;
 	ray.Direction = rayDirection;
-	ray.TMin = 0.01f;
+	ray.TMin = 0.0001f;
 	ray.TMax = 1000.0f;
 
 	// Set up the payload for the ray
@@ -211,16 +260,23 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	{
 		payload.recursionDepth++;
 
-		// Convert the normal to world space
-		float3 normal_WS = mul(interpolatedVert.normal, (float3x3)ObjectToWorld3x4());
+		// Get 0-1 values for this ray (basically screen UV)
+		float2 uv = (float2)DispatchRaysIndex() / DispatchRaysDimensions();
+		uv.x = frac(sin(uv.x * 100000.0f));
+		uv.y = frac(cos(uv.y * 100000.0f));
 
+		// Convert the normal to world space
+		float3 normal_WS = normalize(mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3()));
+		//float3 refl = reflect(WorldRayDirection(), normal_WS);
+
+		float3 dir = RandomCosineWeightedHemisphere(uv.x, uv.y, normal_WS);
+		
 		// Create the new recursive ray
 		RayDesc ray;
 		ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-		ray.Direction = reflect(WorldRayDirection(), normal_WS);
-		ray.TMin = 0.01f;
+		ray.Direction = dir;
+		ray.TMin = 0.0001f;
 		ray.TMax = 1000.0f;
-
 
 		// Recursive ray trace
 		TraceRay(

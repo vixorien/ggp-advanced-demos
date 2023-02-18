@@ -479,7 +479,7 @@ void Game::Update(float deltaTime, float totalTime)
 	int i = 0;
 	for (auto& e : entities)
 	{
-		//e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
+		e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
 		
 		XMFLOAT3 pos = e->GetTransform()->GetPosition();
 		switch (i % 3)
@@ -496,7 +496,7 @@ void Game::Update(float deltaTime, float totalTime)
 			pos.z = sin(totalTime + i) * 5;
 			break;
 		}
-		e->GetTransform()->SetPosition(pos);
+		//e->GetTransform()->SetPosition(pos);
 
 		i++;
 	}
