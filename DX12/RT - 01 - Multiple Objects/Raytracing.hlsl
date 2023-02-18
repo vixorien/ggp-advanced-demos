@@ -298,7 +298,7 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 
 		// Get 0-1 values for this ray (basically screen UV)
 		float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-		uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex) + RayTCurrent());
+		uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
 		// Convert the normal to world space
 		float3 normal_WS = normalize(mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3()));

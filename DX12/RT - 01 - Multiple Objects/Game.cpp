@@ -341,7 +341,7 @@ void Game::CreateBasicGeometry()
 	bronzeMat->AddTexture(bronzeMetal, 3);
 	bronzeMat->FinalizeTextures();
 
-	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 1));
+	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.9f, 0.9f, 1));
 	scratchedMat->AddTexture(scratchedAlbedo, 0);
 	scratchedMat->AddTexture(scratchedNormals, 1);
 	scratchedMat->AddTexture(scratchedRoughness, 2);
@@ -361,15 +361,20 @@ void Game::CreateBasicGeometry()
 	floor->GetTransform()->SetPosition(0, -52, 0);
 	entities.push_back(floor);
 
+	// spinning torus
+	std::shared_ptr<GameEntity> t = std::make_shared<GameEntity>(torus, scratchedMat);
+	t->GetTransform()->SetScale(2);
+	t->GetTransform()->SetPosition(0, 1, 0);
+	entities.push_back(t);
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 20; i++)
 	{
 		std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState, XMFLOAT3(
 			RandomRange(0.0f, 1.0f),
 			RandomRange(0.0f, 1.0f),
 			RandomRange(0.0f, 1.0f)));
 
-		float scale = RandomRange(0.5f, 2.0f);
+		float scale = RandomRange(0.5f, 1.5f);
 
 		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
 		sphereEnt->GetTransform()->SetScale(scale);
@@ -377,8 +382,6 @@ void Game::CreateBasicGeometry()
 			RandomRange(-6, 6),
 			-2 + scale / 2.0f,
 			RandomRange(-6,6));
-
-		
 
 		entities.push_back(sphereEnt);
 	}
@@ -464,20 +467,14 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	// Rotate entities
-	int i = 0;
-	for (auto& e : entities)
-	{
-		// Skip floor
-		if (i == 0)
-		{
-			i++;
-			continue;
-		}
+	entities[1]->GetTransform()->Rotate(deltaTime * 0.5f, deltaTime * 0.5f, deltaTime * 0.5f);
 
+	// Rotate entities (skip first two)
+	for(int i = 2; i < entities.size(); i++)
+	{
 		//e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
 		
-		XMFLOAT3 pos = e->GetTransform()->GetPosition();
+		XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
 		switch (i % 2)
 		{
 		case 0:
@@ -488,9 +485,7 @@ void Game::Update(float deltaTime, float totalTime)
 			pos.z = sin((totalTime + i) * 0.4f) * 4;
 			break;
 		}
-		e->GetTransform()->SetPosition(pos);
-
-		i++;
+		entities[i]->GetTransform()->SetPosition(pos);
 	}
 
 
