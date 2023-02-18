@@ -367,12 +367,26 @@ void Game::CreateBasicGeometry()
 
 	std::shared_ptr<GameEntity> entitySphere2 = std::make_shared<GameEntity>(sphere, bronzeMat);
 	entitySphere2->GetTransform()->SetPosition(3, 0, 0);
-	
+
 	// Add to list
 	entities.push_back(entitySphere);
 	entities.push_back(entitySphere2);
 	entities.push_back(entityCube);
 	entities.push_back(entityHelix);
+
+	for (int i = 0; i < 50; i++)
+	{
+		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, scratchedMat);
+		sphereEnt->GetTransform()->SetPosition(
+			RandomRange(-10, 10),
+			RandomRange(-10,10),
+			RandomRange(-10,10));
+
+		float scale = RandomRange(0.5f, 2.0f);
+		sphereEnt->GetTransform()->SetScale(scale);
+
+		entities.push_back(sphereEnt);
+	}
 
 	// Since meshes create their own BLAS's, we just need to create the TLAS for the scene
 	RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);

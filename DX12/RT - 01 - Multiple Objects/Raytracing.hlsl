@@ -173,9 +173,16 @@ void RayGen()
 [shader("miss")]
 void Miss(inout RayPayload payload)
 {
+	float3 upColor = float3(0.75f, 0.8f, 0.95f);
+	float3 downColor = float3(1, 1, 1);
+
+	float ratio = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
+
+	float3 color = lerp(downColor, upColor, ratio);
+
 	// Nothing was hit, so return black for now.
 	// Ideally this is where we would do skybox stuff!
-	payload.color *= float3(1, 1, 1);
+	payload.color *= color;
 }
 
 
