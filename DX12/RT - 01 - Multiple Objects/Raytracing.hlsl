@@ -173,7 +173,7 @@ void RayGen()
 [shader("miss")]
 void Miss(inout RayPayload payload)
 {
-	float3 upColor = float3(0.75f, 0.8f, 0.95f);
+	float3 upColor = float3(0.3f, 0.5f, 0.95f);
 	float3 downColor = float3(1, 1, 1);
 
 	float ratio = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
@@ -212,7 +212,7 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 		payload.recursionDepth++;
 
 		// Convert the normal to world space
-		float3 normal_WS = mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3());
+		float3 normal_WS = mul(interpolatedVert.normal, (float3x3)ObjectToWorld3x4());
 
 		// Create the new recursive ray
 		RayDesc ray;
