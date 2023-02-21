@@ -371,8 +371,11 @@ void Game::CreateBasicGeometry()
 	entities.push_back(entitySphere);
 
 	// Last step in raytracing setup is to create the accel structures,
-	// which requires mesh data.  Currently just a single mesh is handled!
-	RaytracingHelper::GetInstance().CreateAccelerationStructures(sphere);
+	// which require mesh data.  Currently just a single mesh is handled!
+	RaytracingHelper::GetInstance().CreateBottomLevelAccelerationStructure(sphere);
+
+	// Once we have all of the BLAS ready, we can make a TLAS
+	RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructure();
 }
 
 

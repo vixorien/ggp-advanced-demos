@@ -32,7 +32,6 @@ private:
 	static RaytracingHelper* instance;
 	RaytracingHelper() :
 		dxrAvailable(false),
-		accelerationStructureFinalized(false),
 		raytracingOutputUAV_CPU{},
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
@@ -55,9 +54,14 @@ public:
 		std::wstring raytracingShaderLibraryFile
 	);
 
-	void CreateAccelerationStructures(std::shared_ptr<Mesh> mesh);
+	// Resizing when window resizes
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
 
+	// Setup process requiring data from outside the helper
+	void CreateTopLevelAccelerationStructure();
+	void CreateBottomLevelAccelerationStructure(std::shared_ptr<Mesh> mesh);
+
+	// Actual work
 	void Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex);
 
 private:
@@ -68,7 +72,6 @@ private:
 	// Is raytracing (DirectX Raytracing - DXR) available on this hardware?
 	bool dxrAvailable;
 	bool helperInitialized;
-	bool accelerationStructureFinalized;
 
 	// Command queue for processing raytracing commands
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
@@ -105,7 +108,8 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE raytracingOutputUAV_CPU;
 	D3D12_GPU_DESCRIPTOR_HANDLE raytracingOutputUAV_GPU;
 
-	// Other SRVs
+	// Other SRVs for geometry
+	// - Larger application will need these FOR EACH MESH
 	D3D12_GPU_DESCRIPTOR_HANDLE indexBufferSRV;
 	D3D12_GPU_DESCRIPTOR_HANDLE vertexBufferSRV;
 
@@ -114,6 +118,5 @@ private:
 	void CreateRaytracingPipelineState(std::wstring raytracingShaderLibraryFile);
 	void CreateShaderTable();
 	void CreateRaytracingOutputUAV(unsigned int width, unsigned int height);
-	void CreateTopLevelAccelerationStructure();
 };
 

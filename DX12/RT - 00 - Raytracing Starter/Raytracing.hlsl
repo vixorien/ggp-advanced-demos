@@ -14,7 +14,7 @@ static const uint VertexSizeInBytes = 11 * 4; // 11 floats total per vertex * 4 
 
 
 // Payload for rays (data that is "sent along" with each ray during raytrace)
-// Note: This should be as small as possible (maybe float3 instead?  Alignment issues?)
+// Note: This should be as small as possible, and must match our C++ size definition
 struct RayPayload
 {
 	float4 color;

@@ -525,12 +525,6 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 			rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 			rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
 			rootParams[2].DescriptorTable.pDescriptorRanges = &cbufferRange;
-
-			// Fourth is a range of SRVs for geometry (verts & indices)
-			//rootParams[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			//rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-			//rootParams[3].DescriptorTable.NumDescriptorRanges = 1;
-			//rootParams[3].DescriptorTable.pDescriptorRanges = &geometrySRVRange;
 		}
 
 		// Create the global root signature
@@ -573,7 +567,6 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
 		rootParams[0].DescriptorTable.pDescriptorRanges = &cbufferRange;
-
 
 		// Range of SRVs for geometry (verts & indices)
 		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
