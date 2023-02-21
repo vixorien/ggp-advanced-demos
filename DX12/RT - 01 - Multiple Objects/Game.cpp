@@ -93,7 +93,7 @@ void Game::Init()
 	GenerateLights();
 
 	camera = std::make_shared<Camera>(
-		XMFLOAT3(0.0f, 0.0f, -5.0f),	// Position
+		XMFLOAT3(0.0f, 0.0f, -8.0f),	// Position
 		5.0f,							// Move speed
 		0.002f,							// Look speed
 		XM_PIDIV4,						// Field of view
@@ -334,7 +334,7 @@ void Game::CreateBasicGeometry()
 	cobbleMat->AddTexture(cobblestoneMetal, 3);
 	cobbleMat->FinalizeTextures();
 
-	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 1, 0.5f));
+	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1,1,1));
 	bronzeMat->AddTexture(bronzeAlbedo, 0);
 	bronzeMat->AddTexture(bronzeNormals, 1);
 	bronzeMat->AddTexture(bronzeRoughness, 2);
@@ -361,7 +361,7 @@ void Game::CreateBasicGeometry()
 	floor->GetTransform()->SetPosition(0, -52, 0);
 	entities.push_back(floor);
 
-	// spinning torus
+	// Spinning torus
 	std::shared_ptr<GameEntity> t = std::make_shared<GameEntity>(torus, scratchedMat);
 	t->GetTransform()->SetScale(2);
 	t->GetTransform()->SetPosition(0, 1, 0);
