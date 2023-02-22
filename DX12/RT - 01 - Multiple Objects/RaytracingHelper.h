@@ -33,10 +33,15 @@ private:
 	static RaytracingHelper* instance;
 	RaytracingHelper() :
 		dxrAvailable(false),
+		helperInitialized(false),
 		raytracingOutputUAV_CPU{},
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
-		screenWidth(1)
+		screenWidth(1),
+		tlasBufferSizeInBytes(0),
+		tlasScratchSizeInBytes(0),
+		tlasInstanceDataSizeInBytes(0),
+		blasCount(0)
 	{};
 #pragma endregion
 
@@ -52,12 +57,15 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
 		std::wstring raytracingShaderLibraryFile
 	);
+	
+	// Resizing when window resizes
+	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
 
+	// Setup process requiring data from outside the helper
 	MeshRaytracingData CreateBottomLevelAccelerationStructureForMesh(Mesh* mesh);
 	void CreateTopLevelAccelerationStructureForScene(std::vector<std::shared_ptr<GameEntity>> scene);
 
-	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
-
+	// Actual work
 	void Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex);
 
 
@@ -97,10 +105,10 @@ private:
 
 	// Shader table holding shaders for use during raytracing
 	Microsoft::WRL::ComPtr<ID3D12Resource> shaderTable;
-	UINT shaderTableRayGenRecordSize;
-	UINT shaderTableMissRecordSize;
-	UINT shaderTableHitGroupRecordSize;
-	UINT shaderTableSize;
+	UINT64 shaderTableRayGenRecordSize;
+	UINT64 shaderTableMissRecordSize;
+	UINT64 shaderTableHitGroupRecordSize;
+	UINT64 shaderTableSize;
 
 	UINT blasCount;
 

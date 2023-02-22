@@ -59,8 +59,8 @@ public:
 	void ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight);
 
 	// Setup process requiring data from outside the helper
-	void CreateTopLevelAccelerationStructure();
 	void CreateBottomLevelAccelerationStructure(std::shared_ptr<Mesh> mesh);
+	void CreateTopLevelAccelerationStructure();
 
 	// Actual work
 	void Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex);
