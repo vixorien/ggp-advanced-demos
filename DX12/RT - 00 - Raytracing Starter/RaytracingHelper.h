@@ -32,6 +32,7 @@ private:
 	static RaytracingHelper* instance;
 	RaytracingHelper() :
 		dxrAvailable(false),
+		helperInitialized(false),
 		raytracingOutputUAV_CPU{},
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
@@ -93,7 +94,7 @@ private:
 
 	// Shader table holding shaders for use during raytracing
 	Microsoft::WRL::ComPtr<ID3D12Resource> shaderTable;
-	UINT shaderTableRecordSize;
+	UINT64 shaderTableRecordSize;
 
 	// Accel structure requirements
 	UINT64 topLevelAccelStructureSize;

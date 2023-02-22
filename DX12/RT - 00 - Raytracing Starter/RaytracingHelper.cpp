@@ -28,7 +28,10 @@ RaytracingHelper::~RaytracingHelper()
 
 }
 
-
+// --------------------------------------------------------
+// Check for raytracing support and create all necessary
+// raytracing resources, pipeline states, etc.
+// --------------------------------------------------------
 void RaytracingHelper::Initialize(
 	unsigned int screenWidth,
 	unsigned int screenHeight,
@@ -51,18 +54,14 @@ void RaytracingHelper::Initialize(
 	if (FAILED(dxrDeviceResult)) { printf("DXR Device query failed - DirectX Raytracing unavailable on this hardware.\n"); anyFailure = true; }
 	if (FAILED(dxrCommandListResult)) { printf("DXR Command List query failed - DirectX Raytracing unavailable on this hardware.\n"); anyFailure = true; }
 
-	// Check for success
+	// Any reason to continue?
 	if (anyFailure)
-	{
-		// No sense in going any further
 		return;
-	}
-	else
-	{
-		dxrAvailable = true;
-		printf("DXR initialization success - DirectX Raytracing is available on this hardware!\n");
-	}
-
+	
+	// We have DXR support
+	dxrAvailable = true;
+	printf("DXR initialization success - DirectX Raytracing is available on this hardware!\n");
+	
 	// Proceed with setup
 	CreateRaytracingRootSignatures();
 	CreateRaytracingPipelineState(raytracingShaderLibraryFile);
@@ -73,6 +72,11 @@ void RaytracingHelper::Initialize(
 }
 
 
+// --------------------------------------------------------
+// Creates the root signatures necessary for raytracing:
+//  - A global signature used across all shaders
+//  - A local signature used for each ray hit
+// --------------------------------------------------------
 void RaytracingHelper::CreateRaytracingRootSignatures()
 {
 	// Don't bother if DXR isn't available
@@ -184,7 +188,10 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 }
 
 
-
+// --------------------------------------------------------
+// Creates the raytracing pipeline state, which holds
+// information about the shaders, payload, root signatures, etc.
+// --------------------------------------------------------
 void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShaderLibraryFile)
 {
 	// Don't bother if DXR isn't available
@@ -351,7 +358,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 	{
 		// Add a state subobject for the ray tracing pipeline config
 		D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-		pipelineConfig.MaxTraceRecursionDepth = 1;
+		pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
 
 		D3D12_STATE_SUBOBJECT pipelineConfigSubObj = {};
 		pipelineConfigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
@@ -374,6 +381,69 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 }
 
 
+// --------------------------------------------------------
+// Sets up the shader table, which holds shader identifiers
+// and local root signatures for all possible shaders
+// used during raytracing.  Note that this is just a big
+// chunk of GPU memory we need to manage ourselves.
+// --------------------------------------------------------
+void RaytracingHelper::CreateShaderTable()
+{
+	// Don't bother if DXR isn't available
+	if (!dxrAvailable)
+		return;
+
+	// Create the table of shaders and their data to use for rays
+	// 0 - Ray generation shader
+	// 1 - Miss shader
+	// 2 - Closest hit shader
+	// Note: All records must have the same size, so we need to calculate
+	//       the size of the largest possible entry for our program
+	//       - This will be the default (32) + one descriptor table pointer (8)
+	//       - This also must be aligned up to D3D12_RAYTRACING_SHADER_BINDING_TABLE_RECORD_BYTE_ALIGNMENT
+	UINT64 shaderTableRayGenRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	UINT64 shaderTableMissRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	UINT64 shaderTableHitGroupRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(D3D12_GPU_DESCRIPTOR_HANDLE) * 2; // CBV & SRV
+
+	// Align them
+	shaderTableRayGenRecordSize = ALIGN(shaderTableRayGenRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+	shaderTableMissRecordSize = ALIGN(shaderTableMissRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+	shaderTableHitGroupRecordSize = ALIGN(shaderTableHitGroupRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+
+	// Which is largest?
+	shaderTableRecordSize = max(shaderTableRayGenRecordSize, max(shaderTableMissRecordSize, shaderTableHitGroupRecordSize));
+
+	// How big should the table be?  Need a record for each of 3 shaders (in our simple demo)
+	UINT64 shaderTableSize = shaderTableRecordSize * 3;
+	shaderTableSize = ALIGN(shaderTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+	// Create the shader table buffer and map it so we can write to it
+	shaderTable = DX12Helper::GetInstance().CreateBuffer(shaderTableSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
+	unsigned char* shaderTableData = 0;
+	shaderTable->Map(0, 0, (void**)&shaderTableData);
+
+	// Mem copy each record in: ray gen, miss and the overall hit group (from CreateRaytracingPipelineState() above)
+	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"RayGen"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	shaderTableData += shaderTableRecordSize;
+
+	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"Miss"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	shaderTableData += shaderTableRecordSize;
+
+	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"HitGroup"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+	// We'll eventually need to memcpy per-object data to the shader table, but we don't have that yet
+
+	// Unmap
+	shaderTable->Unmap(0, 0);
+}
+
+
+// --------------------------------------------------------
+// Creates a texture & wraps it with an Unordered Access View,
+// allowing shaders to directly write into this memory.  The
+// data in this texture will later be directly copied to the
+// back buffer after raytracing is complete.
+// --------------------------------------------------------
 void RaytracingHelper::CreateRaytracingOutputUAV(unsigned int width, unsigned int height)
 {
 	// Default heap for output buffer
@@ -426,6 +496,9 @@ void RaytracingHelper::CreateRaytracingOutputUAV(unsigned int width, unsigned in
 }
 
 
+// --------------------------------------------------------
+// If the window size changes, so too should the output texture
+// --------------------------------------------------------
 void RaytracingHelper::ResizeOutputUAV(unsigned int screenWidth, unsigned int screenHeight)
 {
 	if (!dxrAvailable || !helperInitialized)
@@ -443,51 +516,12 @@ void RaytracingHelper::ResizeOutputUAV(unsigned int screenWidth, unsigned int sc
 }
 
 
-void RaytracingHelper::CreateShaderTable()
-{
-	// Don't bother if DXR isn't available
-	if (!dxrAvailable)
-		return;
-
-	// Create the table of shaders and their data to use for rays
-	// 0 - Ray generation shader
-	// 1 - Miss shader
-	// 2 - Closest hit shader
-	// Note: All records must have the same size, so we need to calculate
-	//       the size of the largest possible entry for our program
-	//       - This will be the default (32) + one descriptor table pointer (8)
-	//       - This also must be aligned up to D3D12_RAYTRACING_SHADER_BINDING_TABLE_RECORD_BYTE_ALIGNMENT
-
-	shaderTableRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8; // 8 for a descriptor table record
-	shaderTableRecordSize = ALIGN(shaderTableRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-
-	// How big should the table be?  Need a record for each of 3 shaders (in our simple demo)
-	UINT shaderTableSize = shaderTableRecordSize * 3;
-	shaderTableSize = ALIGN(shaderTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-	// Create the shader table buffer and map it so we can write to it
-	shaderTable = DX12Helper::GetInstance().CreateBuffer(shaderTableSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
-	unsigned char* shaderTableData = 0;
-	shaderTable->Map(0, 0, (void**)&shaderTableData);
-
-	// Mem copy each record in: ray gen, miss and the overall hit group (from CreateRaytracingPipelineState() above)
-	// TODO: Handle root param / descriptor heap data
-	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"RayGen"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-	shaderTableData += shaderTableRecordSize;
-
-	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"Miss"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-	shaderTableData += shaderTableRecordSize;
-
-	memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"HitGroup"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-	// We'll eventually need to memcpy per-object data to the shader table, but we don't have that yet
-
-	// Unmap
-	shaderTable->Unmap(0, 0);
-}
-
-
-
+// --------------------------------------------------------
+// Creates a BLAS for a particular mesh.  
+// 
+// NOTE: This demo assumes exactly one BLAS, so running this 
+// method more than once is not advised!
+// --------------------------------------------------------
 void RaytracingHelper::CreateBottomLevelAccelerationStructure(std::shared_ptr<Mesh> mesh)
 {
 	// Don't bother if DXR isn't available
@@ -610,7 +644,11 @@ void RaytracingHelper::CreateBottomLevelAccelerationStructure(std::shared_ptr<Me
 }
 
 
-
+// --------------------------------------------------------
+// Creates the top level accel structure, which can be made
+// up of one or more BLAS instances, each with their own
+// unique transform.  This demo uses exactly one BLAS instance.
+// --------------------------------------------------------
 void RaytracingHelper::CreateTopLevelAccelerationStructure()
 {
 	// Don't bother if DXR isn't available or the AS is finalized already
@@ -705,6 +743,9 @@ void RaytracingHelper::CreateTopLevelAccelerationStructure()
 }
 
 
+// --------------------------------------------------------
+// Performs the actual raytracing work
+// --------------------------------------------------------
 void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex)
 {
 	if (!dxrAvailable || !helperInitialized)
@@ -779,9 +820,7 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 		// Set number of rays to match screen size
 		dispatchDesc.Width = screenWidth;
 		dispatchDesc.Height = screenHeight;
-
-		// Max recursion depth (just 1 for this simple demo)
-		dispatchDesc.Depth = 1;
+		dispatchDesc.Depth = 1; // Can have a 3D grid, but we don't need that
 
 		// GO!
 		dxrCommandList->DispatchRays(&dispatchDesc);
@@ -812,22 +851,3 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 
 	// Assuming the frame sync and command list reset will happen over in Game!
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
