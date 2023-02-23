@@ -291,7 +291,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 	// === Shader config (payload) ===
 	{
 		D3D12_RAYTRACING_SHADER_CONFIG shaderConfigDesc = {};
-		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT4);	// Assuming a float4 color for now
+		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT3);	// Assuming a float3 color for now
 		shaderConfigDesc.MaxAttributeSizeInBytes = sizeof(DirectX::XMFLOAT2); // Assuming a float2 for barycentric coords for now
 
 		D3D12_STATE_SUBOBJECT shaderConfigSubObj = {};
@@ -535,11 +535,11 @@ void RaytracingHelper::CreateBottomLevelAccelerationStructure(std::shared_ptr<Me
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	geometryDesc.Triangles.VertexBuffer.StartAddress = mesh->GetVBResource()->GetGPUVirtualAddress();
-	geometryDesc.Triangles.VertexBuffer.StrideInBytes = mesh->GetVB().StrideInBytes;
+	geometryDesc.Triangles.VertexBuffer.StrideInBytes = mesh->GetVBView().StrideInBytes;
 	geometryDesc.Triangles.VertexCount = static_cast<UINT>(mesh->GetVertexCount());
 	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	geometryDesc.Triangles.IndexBuffer = mesh->GetIBResource()->GetGPUVirtualAddress();
-	geometryDesc.Triangles.IndexFormat = mesh->GetIB().Format;
+	geometryDesc.Triangles.IndexFormat = mesh->GetIBView().Format;
 	geometryDesc.Triangles.IndexCount = static_cast<UINT>(mesh->GetIndexCount());
 	geometryDesc.Triangles.Transform3x4 = 0;
 	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE; // Performance boost when dealing with opaque geometry

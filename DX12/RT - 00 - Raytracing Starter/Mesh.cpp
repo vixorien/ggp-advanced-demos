@@ -46,7 +46,7 @@ Mesh::Mesh(const wchar_t* objFile)
 		if (chars[0] == 'v' && chars[1] == 'n')
 		{
 			// Read the 3 numbers directly into an XMFLOAT3
-			XMFLOAT3 norm;
+			XMFLOAT3 norm = {};
 			sscanf_s(
 				chars,
 				"vn %f %f %f",
@@ -58,7 +58,7 @@ Mesh::Mesh(const wchar_t* objFile)
 		else if (chars[0] == 'v' && chars[1] == 't')
 		{
 			// Read the 2 numbers directly into an XMFLOAT2
-			XMFLOAT2 uv;
+			XMFLOAT2 uv = {};
 			sscanf_s(
 				chars,
 				"vt %f %f",
@@ -70,7 +70,7 @@ Mesh::Mesh(const wchar_t* objFile)
 		else if (chars[0] == 'v')
 		{
 			// Read the 3 numbers directly into an XMFLOAT3
-			XMFLOAT3 pos;
+			XMFLOAT3 pos = {};
 			sscanf_s(
 				chars,
 				"v %f %f %f",
@@ -82,7 +82,7 @@ Mesh::Mesh(const wchar_t* objFile)
 		else if (chars[0] == 'f')
 		{
 			// Read the face indices into an array
-			unsigned int i[12];
+			unsigned int i[12] = {};
 			int facesRead = sscanf_s(
 				chars,
 				"f %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d",
@@ -95,17 +95,17 @@ Mesh::Mesh(const wchar_t* objFile)
 			//    corresponding data from vectors
 			// - OBJ File indices are 1-based, so
 			//    they need to be adusted
-			Vertex v1;
+			Vertex v1 = {};
 			v1.Position = positions[i[0] - 1];
 			v1.UV = uvs[i[1] - 1];
 			v1.Normal = normals[i[2] - 1];
 
-			Vertex v2;
+			Vertex v2 = {};
 			v2.Position = positions[i[3] - 1];
 			v2.UV = uvs[i[4] - 1];
 			v2.Normal = normals[i[5] - 1];
 
-			Vertex v3;
+			Vertex v3 = {};
 			v3.Position = positions[i[6] - 1];
 			v3.UV = uvs[i[7] - 1];
 			v3.Normal = normals[i[8] - 1];
@@ -150,7 +150,7 @@ Mesh::Mesh(const wchar_t* objFile)
 			if (facesRead == 12)
 			{
 				// Make the last vertex
-				Vertex v4;
+				Vertex v4 = {};
 				v4.Position = positions[i[9] - 1];
 				v4.UV = uvs[i[10] - 1];
 				v4.Normal = normals[i[11] - 1];
