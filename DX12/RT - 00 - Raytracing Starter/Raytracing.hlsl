@@ -5,12 +5,14 @@
 // Layout of data in the vertex buffer
 struct Vertex
 {
-    float3 localPosition	: POSITION;
-    float2 uv				: TEXCOORD;
-    float3 normal			: NORMAL;
-    float3 tangent			: TANGENT;
+    float3 localPosition;
+    float2 uv;
+    float3 normal;
+    float3 tangent;
 };
-static const uint VertexSizeInBytes = 11 * 4; // 11 floats total per vertex * 4 bytes each
+
+// 11 floats total per vertex * 4 bytes each
+static const uint VertexSizeInBytes = 11 * 4; 
 
 
 // Payload for rays (data that is "sent along" with each ray during raytrace)
@@ -31,13 +33,6 @@ cbuffer SceneData : register(b0)
 {
 	matrix inverseViewProjection;
 	float3 cameraPosition;
-	float pad0;
-};
-
-cbuffer ObjectData : register(b1)
-{
-	float3 colorTint;
-	float pad1;
 };
 
 
@@ -65,6 +60,7 @@ uint3 LoadIndices(uint triangleIndex)
 	// Adjust by the byte size before loading
 	return IndexBuffer.Load3(indicesStart * 4); // 4 bytes per index
 }
+
 
 // Barycentric interpolation of data from the triangle's vertices
 Vertex InterpolateVertices(uint triangleIndex, float3 barycentricData)
@@ -106,7 +102,8 @@ Vertex InterpolateVertices(uint triangleIndex, float3 barycentricData)
 }
 
 
-void CalcRayFromCamera(uint2 rayIndices, out float3 origin, out float3 direction)
+// Calculates an origin and direction from the camera fpr specific pixel indices
+void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 direction)
 {
 	// Offset to the middle of the pixel
 	float2 pixel = rayIndices + 0.5f;

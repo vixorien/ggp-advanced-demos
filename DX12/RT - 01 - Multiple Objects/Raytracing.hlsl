@@ -110,7 +110,7 @@ Vertex InterpolateVertices(uint triangleIndex, float3 barycentricData)
 	return vert;
 }
 
-
+// Calculates an origin and direction from the camera fpr specific pixel indices
 void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 direction)
 {
 	// Offset to the middle of the pixel

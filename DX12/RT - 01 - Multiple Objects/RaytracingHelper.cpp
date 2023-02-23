@@ -99,13 +99,6 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 		outputUAVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		outputUAVRange.RegisterSpace = 0;
 
-		D3D12_DESCRIPTOR_RANGE geometrySRVRange = {};
-		geometrySRVRange.BaseShaderRegister = 1;
-		geometrySRVRange.NumDescriptors = 2;
-		geometrySRVRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		geometrySRVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		geometrySRVRange.RegisterSpace = 0;
-
 		D3D12_DESCRIPTOR_RANGE cbufferRange = {};
 		cbufferRange.BaseShaderRegister = 0;
 		cbufferRange.NumDescriptors = 1;
@@ -718,10 +711,9 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
-	// TODO: Probably make a small ring buffer (exactly 3) of these buffers
-	//       to coincide with our frame sync stuff!
-	// 
 	// Copy the descriptions into the buffer
+	// NOTE: This may be a spot where a small ringbuffer would be useful
+	//       if we're working multiple frames ahead of the GPU
 	unsigned char* mapped = 0;
 	tlasInstanceDescBuffer->Map(0, 0, (void**)&mapped);
 	memcpy(mapped, &instanceDescs[0], sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size());
@@ -780,8 +772,6 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	dxrCommandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, 0);
 
 	// Set up a barrier to wait until the TLAS is actually built to proceed
-	// Note: Probably unnecessary because we're about to execute and wait below,
-	//       but keeping this here in the event we adjust when we execute.
 	D3D12_RESOURCE_BARRIER tlasBarrier = {};
 	tlasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 	tlasBarrier.UAV.pResource = topLevelAccelerationStructure.Get();
@@ -789,6 +779,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	dxrCommandList->ResourceBarrier(1, &tlasBarrier);
 
 	// Finalize the entity data cbuffer stuff and copy descriptors to shader table
+	// NOTE: Another place where ringbuffer style management based on frame sync would be a good idea!
 	unsigned char* tablePointer = 0;
 	shaderTable->Map(0, 0, (void**)&tablePointer);
 	tablePointer += shaderTableRecordSize * 2; // Get past raygen and miss shaders
