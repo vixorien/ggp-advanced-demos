@@ -27,6 +27,9 @@ public:
 	void Update(float deltaTime, float totalTime);
 	void Draw(float deltaTime, float totalTime);
 
+	void UINewFrame(float deltaTime);
+	void BuildUI();
+
 private:
 
 	// Initialization helper methods - feel free to customize, combine, etc.

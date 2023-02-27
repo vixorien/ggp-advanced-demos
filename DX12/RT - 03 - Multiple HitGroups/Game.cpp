@@ -7,6 +7,10 @@
 #include "Helpers.h"
 #include "RaytracingHelper.h"
 
+#include "../../Common/ImGui/imgui.h"
+#include "../../Common/ImGui/imgui_impl_dx12.h"
+#include "../../Common/ImGui/imgui_impl_win32.h"
+
 #include <stdlib.h>     // For seeding random and rand()
 #include <time.h>       // For grabbing time (to seed random)
 
@@ -65,6 +69,11 @@ Game::~Game()
 
 	// Clean up non-smart pointer objects
 	delete& RaytracingHelper::GetInstance();
+
+	// ImGui clean up
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }
 
 // --------------------------------------------------------
@@ -101,6 +110,18 @@ void Game::Init()
 
 	// Ensure the command list is closed going into Draw for the first time
 	commandList->Close();
+
+	// Reserve a slot for IMGUI's font texture
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+	DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(&cpuHandle, &gpuHandle);
+
+	// Initialize ImGui itself & platform/renderer backends
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui_ImplWin32_Init(hWnd);
+	ImGui_ImplDX12_Init(device.Get(), this->numBackBuffers, DXGI_FORMAT_R8G8B8A8_UNORM, DX12Helper::GetInstance().GetCBVSRVDescriptorHeap().Get(), cpuHandle, gpuHandle);
+	ImGui::StyleColorsDark();
 }
 
 
@@ -482,6 +503,8 @@ void Game::OnResize()
 // --------------------------------------------------------
 void Game::Update(float deltaTime, float totalTime)
 {
+	UINewFrame(deltaTime);
+
 	// Example input checking: Quit if the escape key is pressed
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
@@ -519,6 +542,8 @@ void Game::Update(float deltaTime, float totalTime)
 
 	// Update other objects
 	camera->Update(deltaTime);
+
+	BuildUI();
 }
 
 // --------------------------------------------------------
@@ -546,6 +571,42 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
 	}
 
+	// ImGui
+	{
+		// Reset the command list after waiting for the GPU - SLOW!
+		DX12Helper::GetInstance().WaitForGPU();
+		commandAllocators[currentSwapBuffer]->Reset();
+		commandList->Reset(commandAllocators[currentSwapBuffer].Get(), 0);
+
+		// Transition the back buffer from present to render target (assuming raytracing helper puts it in present mode)
+		D3D12_RESOURCE_BARRIER rb = {};
+		rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		rb.Transition.pResource = currentBackBuffer.Get();
+		rb.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		rb.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList->ResourceBarrier(1, &rb);
+
+		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetCBVSRVDescriptorHeap();
+		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
+
+		ImGui::Render();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
+
+		// Transition back to present
+		rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		rb.Transition.pResource = currentBackBuffer.Get();
+		rb.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList->ResourceBarrier(1, &rb);
+
+		DX12Helper::GetInstance().ExecuteCommandList();
+	}
+
 	// Finish the frame
 	{
 		// Present the current back buffer
@@ -558,4 +619,39 @@ void Game::Draw(float deltaTime, float totalTime)
 		currentSwapBuffer = dx12Helper.SyncSwapChain(currentSwapBuffer);
 	}
 
+}
+
+// --------------------------------------------------------
+// Prepares a new frame for the UI, feeding it fresh
+// input and time information for this new frame.
+// --------------------------------------------------------
+void Game::UINewFrame(float deltaTime)
+{
+	// Get a reference to our custom input manager
+	Input& input = Input::GetInstance();
+
+	// Reset input manager's gui state so we don’t
+	// taint our own input
+	input.SetKeyboardCapture(false);
+	input.SetMouseCapture(false);
+
+	// Feed fresh input data to ImGui
+	ImGuiIO& io = ImGui::GetIO();
+	io.DeltaTime = deltaTime;
+	io.DisplaySize.x = (float)this->windowWidth;
+	io.DisplaySize.y = (float)this->windowHeight;
+
+	// Reset the frame
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	// Determine new input capture
+	input.SetKeyboardCapture(io.WantCaptureKeyboard);
+	input.SetMouseCapture(io.WantCaptureMouse);
+}
+
+void Game::BuildUI()
+{
+	ImGui::ShowDemoWindow();
 }
