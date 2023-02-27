@@ -99,6 +99,13 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 		outputUAVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		outputUAVRange.RegisterSpace = 0;
 
+		D3D12_DESCRIPTOR_RANGE geometrySRVRange = {};
+		geometrySRVRange.BaseShaderRegister = 1;
+		geometrySRVRange.NumDescriptors = 2;
+		geometrySRVRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		geometrySRVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		geometrySRVRange.RegisterSpace = 0;
+
 		D3D12_DESCRIPTOR_RANGE cbufferRange = {};
 		cbufferRange.BaseShaderRegister = 0;
 		cbufferRange.NumDescriptors = 1;
@@ -209,18 +216,18 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 	libBytecode.BytecodeLength = blob->GetBufferSize();
 	libBytecode.pShaderBytecode = blob->GetBufferPointer();
 
-	// There are ten subobjects that make up our raytracing pipeline object:
+	// There are ELEVEN subobjects that make up our raytracing pipeline object:
 	// - Ray generation shader
 	// - Miss shader
 	// - Closest hit shader
-	// - Hit group (group of all "hit"-type shaders, which is just "closest hit" for us)
+	// - TWO Hit groups (group of all "hit"-type shaders, which is just "closest hit" for us)
 	// - Payload configuration
 	// - Association of payload to shaders
 	// - Local root signature
 	// - Association of local root sig to shader
 	// - Global root signature
 	// - Overall pipeline config
-	D3D12_STATE_SUBOBJECT subobjects[10] = {};
+	D3D12_STATE_SUBOBJECT subobjects[11] = {};
 
 	// === Ray generation shader ===
 	{
@@ -260,17 +267,23 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		subobjects[1] = missSubObj;
 	}
 
-	// === Closest hit shader ===
+	// === Closest hit shaders ===
 	{
-		D3D12_EXPORT_DESC closestHitExportDesc = {};
-		closestHitExportDesc.Name = L"ClosestHit";
-		closestHitExportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
+		D3D12_EXPORT_DESC closestHitExportDesc[2] = {};
+		
+		// Basic "closest hit" shader
+		closestHitExportDesc[0].Name = L"ClosestHit";
+		closestHitExportDesc[0].Flags = D3D12_EXPORT_FLAG_NONE;
+
+		// Transparent "closest hit" shader
+		closestHitExportDesc[1].Name = L"ClosestHitTransparent";
+		closestHitExportDesc[1].Flags = D3D12_EXPORT_FLAG_NONE;
 
 		D3D12_DXIL_LIBRARY_DESC	closestHitLibDesc = {};
 		closestHitLibDesc.DXILLibrary.BytecodeLength = blob->GetBufferSize();
 		closestHitLibDesc.DXILLibrary.pShaderBytecode = blob->GetBufferPointer();
-		closestHitLibDesc.NumExports = 1;
-		closestHitLibDesc.pExports = &closestHitExportDesc;
+		closestHitLibDesc.NumExports = ARRAYSIZE(closestHitExportDesc);
+		closestHitLibDesc.pExports = closestHitExportDesc;
 
 		D3D12_STATE_SUBOBJECT closestHitSubObj = {};
 		closestHitSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
@@ -279,8 +292,9 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		subobjects[2] = closestHitSubObj;
 	}
 
-	// === Hit group ===
+	// === Hit groups ===
 	{
+		// Standard
 		D3D12_HIT_GROUP_DESC hitGroupDesc = {};
 		hitGroupDesc.ClosestHitShaderImport = L"ClosestHit";
 		hitGroupDesc.HitGroupExport = L"HitGroup";
@@ -290,36 +304,47 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		hitGroup.pDesc = &hitGroupDesc;
 
 		subobjects[3] = hitGroup;
+
+		// Transparent
+		D3D12_HIT_GROUP_DESC hitGroupTranparentDesc = {};
+		hitGroupTranparentDesc.ClosestHitShaderImport = L"ClosestHitTransparent";
+		hitGroupTranparentDesc.HitGroupExport = L"HitGroupTransparent";
+
+		D3D12_STATE_SUBOBJECT hitGroupTransparent = {};
+		hitGroupTransparent.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+		hitGroupTransparent.pDesc = &hitGroupTranparentDesc;
+
+		subobjects[4] = hitGroupTransparent;
 	}
 
 	// === Shader config (payload) ===
 	{
 		D3D12_RAYTRACING_SHADER_CONFIG shaderConfigDesc = {};
-		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT3);// Float3 color
+		shaderConfigDesc.MaxPayloadSizeInBytes = sizeof(DirectX::XMFLOAT3) + sizeof(unsigned int) * 2;	// Float3 color, int for recursion depth, int for ray index
 		shaderConfigDesc.MaxAttributeSizeInBytes = sizeof(DirectX::XMFLOAT2); // Float2 for barycentric coords
 
 		D3D12_STATE_SUBOBJECT shaderConfigSubObj = {};
 		shaderConfigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
 		shaderConfigSubObj.pDesc = &shaderConfigDesc;
 
-		subobjects[4] = shaderConfigSubObj;
+		subobjects[5] = shaderConfigSubObj;
 	}
 
 	// === Association - Payload and shaders ===
 	{
 		// Names of shaders that use the payload
-		const wchar_t* payloadShaderNames[] = { L"RayGen", L"Miss", L"HitGroup" };
+		const wchar_t* payloadShaderNames[] = { L"RayGen", L"Miss", L"HitGroup", L"HitGroupTransparent" };
 
 		D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION shaderPayloadAssociation = {};
 		shaderPayloadAssociation.NumExports = ARRAYSIZE(payloadShaderNames);
 		shaderPayloadAssociation.pExports = payloadShaderNames;
-		shaderPayloadAssociation.pSubobjectToAssociate = &subobjects[4]; // Payload config above!
+		shaderPayloadAssociation.pSubobjectToAssociate = &subobjects[5]; // Payload config above!
 
 		D3D12_STATE_SUBOBJECT shaderPayloadAssociationObject = {};
 		shaderPayloadAssociationObject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
 		shaderPayloadAssociationObject.pDesc = &shaderPayloadAssociation;
 
-		subobjects[5] = shaderPayloadAssociationObject;
+		subobjects[6] = shaderPayloadAssociationObject;
 	}
 
 	// === Local root signature ===
@@ -328,25 +353,25 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		localRootSigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 		localRootSigSubObj.pDesc = localRaytracingRootSig.GetAddressOf();
 
-		subobjects[6] = localRootSigSubObj;
+		subobjects[7] = localRootSigSubObj;
 	}
 
 	// === Association - Shaders and local root sig ===
 	{
 		// Names of shaders that use the root sig
-		const wchar_t* rootSigShaderNames[] = { L"RayGen", L"Miss", L"HitGroup" };
+		const wchar_t* rootSigShaderNames[] = { L"RayGen", L"Miss", L"HitGroup", L"HitGroupTransparent" };
 
-		// Add a state subobject for the association between the RayGen shader and the local root signature
+		// Add a state subobject for the association between the shaders and the local root signature
 		D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION rootSigAssociation = {};
 		rootSigAssociation.NumExports = ARRAYSIZE(rootSigShaderNames);
 		rootSigAssociation.pExports = rootSigShaderNames;
-		rootSigAssociation.pSubobjectToAssociate = &subobjects[6]; // Root sig above
+		rootSigAssociation.pSubobjectToAssociate = &subobjects[7]; // Root sig above
 
 		D3D12_STATE_SUBOBJECT rootSigAssociationSubObj = {};
 		rootSigAssociationSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
 		rootSigAssociationSubObj.pDesc = &rootSigAssociation;
 
-		subobjects[7] = rootSigAssociationSubObj;
+		subobjects[8] = rootSigAssociationSubObj;
 	}
 
 	// === Global root sig ===
@@ -355,7 +380,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		globalRootSigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
 		globalRootSigSubObj.pDesc = globalRaytracingRootSig.GetAddressOf();
 
-		subobjects[8] = globalRootSigSubObj;
+		subobjects[9] = globalRootSigSubObj;
 	}
 
 	// === Pipeline config ===
@@ -368,7 +393,7 @@ void RaytracingHelper::CreateRaytracingPipelineState(std::wstring raytracingShad
 		pipelineConfigSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
 		pipelineConfigSubObj.pDesc = &pipelineConfig;
 
-		subobjects[9] = pipelineConfigSubObj;
+		subobjects[10] = pipelineConfigSubObj;
 	}
 
 	// === Finalize state ===
@@ -433,9 +458,13 @@ void RaytracingHelper::CreateShaderTable()
 	shaderTableData += shaderTableRecordSize;
 
 	// Make sure each entry in the shader table has the proper identifier
-	for (unsigned int i = 0; i < MAX_HIT_GROUPS_IN_SHADER_TABLE; i++)
+	// ALTERNATING between regular and transparent hit groups
+	for (unsigned int i = 0; i < MAX_HIT_GROUPS_IN_SHADER_TABLE; i += 2)
 	{
 		memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"HitGroup"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		shaderTableData += shaderTableRecordSize;
+
+		memcpy(shaderTableData, raytracingPipelineProperties->GetShaderIdentifier(L"HitGroupTransparent"), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 		shaderTableData += shaderTableRecordSize;
 	}
 
@@ -636,9 +665,13 @@ MeshRaytracingData RaytracingHelper::CreateBottomLevelAccelerationStructureForMe
 	{
 		// Get to the correct address in the table
 		tablePointer += shaderTableRecordSize * 2; // Get past raygen and miss shaders
-		tablePointer += shaderTableRecordSize * raytracingData.HitGroupIndex; // Skip to this hit group
+		tablePointer += shaderTableRecordSize * raytracingData.HitGroupIndex * 2; // Skip to this hit group
 		tablePointer += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES; // Get past the identifier
 		tablePointer += 8; // Skip first descriptor, which is for a CBV
+		memcpy(tablePointer, &raytracingData.IndexbufferSRV, 8); // Copy descriptor to table
+
+		// Handle 2nd hit group
+		tablePointer += shaderTableRecordSize; // Jump to SRV in next record
 		memcpy(tablePointer, &raytracingData.IndexbufferSRV, 8); // Copy descriptor to table
 	}
 	shaderTable->Unmap(0, 0);
@@ -677,21 +710,25 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		std::shared_ptr<Mesh> mesh = scene[i]->GetMesh();
 		unsigned int meshBlasIndex = mesh->GetRaytracingData().HitGroupIndex;
 
+		bool transparent = scene[i]->GetMaterial()->GetTransparent();
+
 		// Create this description and add to our overall set of descriptions
 		D3D12_RAYTRACING_INSTANCE_DESC id = {};
-		id.InstanceContributionToHitGroupIndex = meshBlasIndex;
+		id.InstanceContributionToHitGroupIndex = meshBlasIndex * 2 + (transparent ? 1 : 0);
+		//if (i == 2 || i == 3)id.InstanceContributionToHitGroupIndex += 1; // TRANSPARENT
 		id.InstanceID = instanceIDs[meshBlasIndex];
 		id.InstanceMask = 0xFF;
 		memcpy(&id.Transform, &transform, sizeof(float) * 3 * 4); // Copy first [3][4] elements
 		id.AccelerationStructure = mesh->GetRaytracingData().BLAS->GetGPUVirtualAddress();
-		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE; // Originally had D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE, but this was wrong
 		instanceDescs.push_back(id);
 
 		// Set up the entity data for this entity, too
 		// - mesh index tells us which cbuffer
 		// - instance ID tells us which instance in that cbuffer
 		XMFLOAT3 c = scene[i]->GetMaterial()->GetColorTint();
-		entityData[meshBlasIndex].color[id.InstanceID] = XMFLOAT4(c.x, c.y, c.z, (float)((i+1) % 2)); // Using alpha channel as "roughness"
+		float r = scene[i]->GetMaterial()->GetRoughness();
+		entityData[meshBlasIndex].color[id.InstanceID] = XMFLOAT4(c.x, c.y, c.z, r); // Using alpha channel as "roughness"
 
 		// On to the next instance for this mesh
 		instanceIDs[meshBlasIndex]++;
@@ -711,9 +748,10 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
+	// TODO: Probably make a small ring buffer (exactly 3) of these buffers
+	//       to coincide with our frame sync stuff!
+	// 
 	// Copy the descriptions into the buffer
-	// NOTE: This may be a spot where a small ringbuffer would be useful
-	//       if we're working multiple frames ahead of the GPU
 	unsigned char* mapped = 0;
 	tlasInstanceDescBuffer->Map(0, 0, (void**)&mapped);
 	memcpy(mapped, &instanceDescs[0], sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size());
@@ -772,6 +810,8 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	dxrCommandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, 0);
 
 	// Set up a barrier to wait until the TLAS is actually built to proceed
+	// Note: Probably unnecessary because we're about to execute and wait below,
+	//       but keeping this here in the event we adjust when we execute.
 	D3D12_RESOURCE_BARRIER tlasBarrier = {};
 	tlasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 	tlasBarrier.UAV.pResource = topLevelAccelerationStructure.Get();
@@ -779,18 +819,20 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 	dxrCommandList->ResourceBarrier(1, &tlasBarrier);
 
 	// Finalize the entity data cbuffer stuff and copy descriptors to shader table
-	// NOTE: Another place where ringbuffer style management based on frame sync would be a good idea!
 	unsigned char* tablePointer = 0;
 	shaderTable->Map(0, 0, (void**)&tablePointer);
 	tablePointer += shaderTableRecordSize * 2; // Get past raygen and miss shaders
 	for(int i = 0; i < entityData.size(); i++)
 	{
 		// Need to get to the first descriptor in this hit group's record
-		unsigned char* hitGroupPointer = tablePointer + shaderTableRecordSize * i;
+		unsigned char* hitGroupPointer = tablePointer + shaderTableRecordSize * 2 * i;
 		hitGroupPointer += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES; // Get past identifier
 
 		// Copy the data to the CB ring buffer and grab associated CBV to place in shader table
 		D3D12_GPU_DESCRIPTOR_HANDLE cbv = DX12Helper::GetInstance().FillNextConstantBufferAndGetGPUDescriptorHandle(&entityData[i], sizeof(RaytracingEntityData));
+		memcpy(hitGroupPointer, &cbv, sizeof(D3D12_GPU_DESCRIPTOR_HANDLE));
+
+		hitGroupPointer += shaderTableRecordSize;
 		memcpy(hitGroupPointer, &cbv, sizeof(D3D12_GPU_DESCRIPTOR_HANDLE));
 	}
 	shaderTable->Unmap(0, 0);
@@ -800,7 +842,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 // --------------------------------------------------------
 // Performs the actual raytracing work
 // --------------------------------------------------------
-void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer)
+void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex)
 {
 	if (!dxrAvailable || !helperInitialized)
 		return;

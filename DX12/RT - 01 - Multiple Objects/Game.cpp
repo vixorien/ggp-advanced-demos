@@ -515,7 +515,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 
 		// Perform raytrace
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer]);
 	}
 
 	// Finish the frame

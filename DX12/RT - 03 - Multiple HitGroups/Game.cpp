@@ -93,7 +93,7 @@ void Game::Init()
 	GenerateLights();
 
 	camera = std::make_shared<Camera>(
-		XMFLOAT3(0.0f, 0.0f, -5.0f),	// Position
+		XMFLOAT3(0.0f, 0.0f, -8.0f),	// Position
 		5.0f,							// Move speed
 		0.002f,							// Look speed
 		XM_PIDIV4,						// Field of view
@@ -327,26 +327,8 @@ void Game::CreateBasicGeometry()
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
-	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
-	cobbleMat->AddTexture(cobblestoneNormals, 1);
-	cobbleMat->AddTexture(cobblestoneRoughness, 2);
-	cobbleMat->AddTexture(cobblestoneMetal, 3);
-	cobbleMat->FinalizeTextures();
-
-	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	bronzeMat->AddTexture(bronzeAlbedo, 0);
-	bronzeMat->AddTexture(bronzeNormals, 1);
-	bronzeMat->AddTexture(bronzeRoughness, 2);
-	bronzeMat->AddTexture(bronzeMetal, 3);
-	bronzeMat->FinalizeTextures();
-
-	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	scratchedMat->AddTexture(scratchedAlbedo, 0);
-	scratchedMat->AddTexture(scratchedNormals, 1);
-	scratchedMat->AddTexture(scratchedRoughness, 2);
-	scratchedMat->AddTexture(scratchedMetal, 3);
-	scratchedMat->FinalizeTextures();
+	std::shared_ptr<Material> greyDiffuse = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 0.5f), 1.0f);
+	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), 0.0f);
 
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
@@ -355,27 +337,76 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Mesh> torus		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/torus.obj").c_str());
 	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
-	// Create entities
-	std::shared_ptr<GameEntity> entityCube = std::make_shared<GameEntity>(cube, scratchedMat);
-	entityCube->GetTransform()->SetPosition(3, 0, 0);
+	// Floor
+	std::shared_ptr<GameEntity> floor = std::make_shared<GameEntity>(cube, greyDiffuse);
+	floor->GetTransform()->SetScale(100);
+	floor->GetTransform()->SetPosition(0, -52, 0);
+	entities.push_back(floor);
 
-	std::shared_ptr<GameEntity> entityHelix = std::make_shared<GameEntity>(helix, cobbleMat);
-	entityHelix->GetTransform()->SetPosition(0, 0, 0);
+	// Spinning torus
+	std::shared_ptr<GameEntity> t = std::make_shared<GameEntity>(torus, metal);
+	t->GetTransform()->SetScale(2);
+	t->GetTransform()->SetPosition(0, 2, 0);
+	entities.push_back(t);
 
-	std::shared_ptr<GameEntity> entitySphere = std::make_shared<GameEntity>(sphere, bronzeMat);
-	entitySphere->GetTransform()->SetPosition(-3, 0, 0);
+	// Four floating transparent spheres
+	std::shared_ptr<Material> glassWhite	= std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1), 0.0f, true);
+	std::shared_ptr<Material> glassRed		= std::make_shared<Material>(pipelineState, XMFLOAT3(1, 0, 0), 0.0f, true);
+	std::shared_ptr<Material> glassGreen	= std::make_shared<Material>(pipelineState, XMFLOAT3(0, 1, 0), 0.0f, true);
+	std::shared_ptr<Material> glassBlue		= std::make_shared<Material>(pipelineState, XMFLOAT3(0, 0, 1), 0.0f, true);
+
+	std::shared_ptr<GameEntity> glassSphereWhite	= std::make_shared<GameEntity>(sphere, glassWhite);
+	std::shared_ptr<GameEntity> glassSphereRed		= std::make_shared<GameEntity>(sphere, glassRed);
+	std::shared_ptr<GameEntity> glassSphereGreen	= std::make_shared<GameEntity>(sphere, glassGreen);
+	std::shared_ptr<GameEntity> glassSphereBlue		= std::make_shared<GameEntity>(sphere, glassBlue);
 	
-	// Add to list
-	entities.push_back(entityCube);
-	entities.push_back(entityHelix);
-	entities.push_back(entitySphere);
+	glassSphereWhite->GetTransform()->SetPosition(0, 1, -2);
+	glassSphereRed  ->GetTransform()->SetPosition(2, 1, 0);
+	glassSphereGreen->GetTransform()->SetPosition(0, 1, 2);
+	glassSphereBlue ->GetTransform()->SetPosition(-2, 1, 0);
 
-	// Last step in raytracing setup is to create the accel structures,
-	// which require mesh data.  Currently just a single mesh is handled!
-	RaytracingHelper::GetInstance().CreateBottomLevelAccelerationStructure(sphere);
+	entities.push_back(glassSphereWhite);
+	entities.push_back(glassSphereRed);
+	entities.push_back(glassSphereGreen);
+	entities.push_back(glassSphereBlue);
 
-	// Once we have all of the BLAS ready, we can make a TLAS
-	RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructure();
+	std::shared_ptr<GameEntity> parent = std::make_shared<GameEntity>(cube, greyDiffuse);
+	parent->GetTransform()->SetPosition(0, -50, 0); // Move so we can't see it
+	parent->GetTransform()->AddChild(glassSphereWhite->GetTransform());
+	parent->GetTransform()->AddChild(glassSphereRed->GetTransform());
+	parent->GetTransform()->AddChild(glassSphereGreen->GetTransform());
+	parent->GetTransform()->AddChild(glassSphereBlue->GetTransform());
+	entities.push_back(parent);
+
+	float range = 10;
+	for (int i = 0; i < 50; i++)
+	{
+		// Random roughness
+		float rough = RandomRange(0.0f, 1.0f) > 0.5f ? 0.0f : 1.0f;
+
+		std::shared_ptr<Material> mat = std::make_shared<Material>(
+			pipelineState, 
+			XMFLOAT3(
+				RandomRange(0.0f, 1.0f),
+				RandomRange(0.0f, 1.0f),
+				RandomRange(0.0f, 1.0f)
+			),
+			rough);
+
+		float scale = RandomRange(0.5f, 1.5f);
+
+		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
+		sphereEnt->GetTransform()->SetScale(scale);
+		sphereEnt->GetTransform()->SetPosition(
+			RandomRange(-range, range),
+			-2 + scale / 2.0f,
+			RandomRange(-range, range));
+
+		entities.push_back(sphereEnt);
+	}
+
+	// Since meshes create their own BLAS's, we just need to create the TLAS for the scene
+	RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 }
 
 
@@ -455,11 +486,36 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	// Rotate entities
-	for (auto& e : entities)
+	entities[1]->GetTransform()->Rotate(deltaTime * 0.5f, deltaTime * 0.5f, deltaTime * 0.5f);
+	entities[6]->GetTransform()->Rotate(0, deltaTime * 0.1f, 0);
+
+	// Skip the first few entities:
+	// 0: floor
+	// 1: torus
+	// 2,3,4,5: transparent balls
+	// 6: ball parent
+	int skip = 7;
+
+	// Rotate entities (skip first two)
+	float range = 20;
+	for(int i = skip; i < entities.size(); i++)
 	{
-		e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
+		//e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
+		
+		XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
+		switch (i % 2)
+		{
+		case 0:
+			pos.x = sin((totalTime + i) * (4/range)) * range;
+			break;
+
+		case 1:
+			pos.z = sin((totalTime + i) * (4/range)) * range;
+			break;
+		}
+		entities[i]->GetTransform()->SetPosition(pos);
 	}
+
 
 	// Update other objects
 	camera->Update(deltaTime);
@@ -483,7 +539,11 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Raytracing here!
 	{
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer]);
+		// Update raytracing accel structure
+		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
+
+		// Perform raytrace
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
 	}
 
 	// Finish the frame

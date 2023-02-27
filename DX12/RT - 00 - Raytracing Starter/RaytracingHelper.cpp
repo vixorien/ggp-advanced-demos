@@ -664,7 +664,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructure()
 	instanceDesc.Transform[1][1] = 1;
 	instanceDesc.Transform[2][2] = 1;
 	instanceDesc.AccelerationStructure = bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-	instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+	instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 
 	// The instance description actually needs to be in a buffer
 	// on the GPU, so we need to make that buffer and toss it in
@@ -746,7 +746,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructure()
 // --------------------------------------------------------
 // Performs the actual raytracing work
 // --------------------------------------------------------
-void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex)
+void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer)
 {
 	if (!dxrAvailable || !helperInitialized)
 		return;

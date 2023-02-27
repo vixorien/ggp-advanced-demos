@@ -691,7 +691,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		id.InstanceMask = 0xFF;
 		memcpy(&id.Transform, &transform, sizeof(float) * 3 * 4); // Copy first [3][4] elements
 		id.AccelerationStructure = mesh->GetRaytracingData().BLAS->GetGPUVirtualAddress();
-		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+		id.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 		instanceDescs.push_back(id);
 
 		// Set up the entity data for this entity, too
@@ -809,7 +809,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 // --------------------------------------------------------
 // Performs the actual raytracing work
 // --------------------------------------------------------
-void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, unsigned int currentBackBufferIndex)
+void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer)
 {
 	if (!dxrAvailable || !helperInitialized)
 		return;
