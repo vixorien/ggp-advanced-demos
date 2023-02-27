@@ -567,17 +567,12 @@ void Game::Draw(float deltaTime, float totalTime)
 		// Update raytracing accel structure
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 
-		// Perform raytrace
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], currentSwapBuffer);
+		// Perform raytrace - specifically NOT executing the command list yet, as we're doing ImGui after
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], false);
 	}
 
 	// ImGui
 	{
-		// Reset the command list after waiting for the GPU - SLOW!
-		DX12Helper::GetInstance().WaitForGPU();
-		commandAllocators[currentSwapBuffer]->Reset();
-		commandList->Reset(commandAllocators[currentSwapBuffer].Get(), 0);
-
 		// Transition the back buffer from present to render target (assuming raytracing helper puts it in present mode)
 		D3D12_RESOURCE_BARRIER rb = {};
 		rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -588,9 +583,10 @@ void Game::Draw(float deltaTime, float totalTime)
 		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		commandList->ResourceBarrier(1, &rb);
 
-		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
+		// Set pipeline requirements
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = dx12Helper.GetCBVSRVDescriptorHeap();
 		commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
+		commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
 
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
@@ -603,9 +599,10 @@ void Game::Draw(float deltaTime, float totalTime)
 		rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		commandList->ResourceBarrier(1, &rb);
-
-		DX12Helper::GetInstance().ExecuteCommandList();
 	}
+
+	// Final execute of raytracing and ImGui
+	DX12Helper::GetInstance().ExecuteCommandList();
 
 	// Finish the frame
 	{
