@@ -34,7 +34,6 @@ cbuffer SceneData : register(b0)
 {
 	matrix inverseViewProjection;
 	float3 cameraPosition;
-	float pad0;
 };
 
 
@@ -188,17 +187,20 @@ void Miss(inout RayPayload payload)
 [shader("closesthit")]
 void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
-	// Grab the index of the triangle we hit
-	uint triangleIndex = PrimitiveIndex();
+	// The commented out code here is unnecessary for this demo
+	{
+		//// Grab the index of the triangle we hit
+		//uint triangleIndex = PrimitiveIndex();
 
-	// Calculate the barycentric data for vertex interpolation
-	float3 barycentricData = float3(
-		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
-		hitAttributes.barycentrics.x,
-		hitAttributes.barycentrics.y);
+		//// Calculate the barycentric data for vertex interpolation
+		//float3 barycentricData = float3(
+		//	1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
+		//	hitAttributes.barycentrics.x,
+		//	hitAttributes.barycentrics.y);
 
-	// Get the interpolated vertex data
-	Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
+		//// Get the interpolated vertex data
+		//Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
+	}
 
 	// Get the data for this entity
 	uint instanceID = InstanceID();
