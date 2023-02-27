@@ -378,7 +378,7 @@ void Game::CreateBasicGeometry()
 	parent->GetTransform()->AddChild(glassSphereBlue->GetTransform());
 	entities.push_back(parent);
 
-	float range = 10;
+	float range = 20;
 	for (int i = 0; i < 50; i++)
 	{
 		// Random roughness
