@@ -38,7 +38,8 @@ cbuffer SceneData : register(b0)
 {
 	matrix inverseViewProjection;
 	float3 cameraPosition;
-	float pad0;
+	int raysPerPixel;
+	int maxRecursionDepth;
 };
 
 
@@ -197,7 +198,7 @@ void RayGen()
 	// Average of all rays per pixel
 	float3 totalColor = float3(0, 0, 0);
 
-	int raysPerPixel = 25;
+	// Loop based on number from C++
 	for (int r = 0; r < raysPerPixel; r++)
 	{
 		float2 adjustedIndices = (float2)rayIndices;
@@ -277,7 +278,7 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	payload.color *= entityColor[instanceID].rgb;
 
 	// Can we go again?
-	if (payload.recursionDepth < 10)
+	if (payload.recursionDepth < maxRecursionDepth)
 	{
 		payload.recursionDepth++;
 
@@ -324,14 +325,14 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 }
 
 
-// IN PROGRESS: Transparent materials with a separate closest hit shader
-
+// Fresnel approximation
 float FresnelSchlick(float NdotV, float indexOfRefraction)
 {
 	float r0 = pow((1.0f - indexOfRefraction) / (1.0f + indexOfRefraction), 2.0f);
 	return r0 + (1.0f - r0) * pow(1 - NdotV, 5.0f);
 }
 
+// Refraction function that returns a bool depending on result
 bool TryRefract(float3 incident, float3 normal, float ior, out float3 refr)
 {
 	float NdotI = dot(normal, incident);
@@ -369,7 +370,7 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 	payload.color *= entityColor[instanceID].rgb;
 
 	// Can we go again?
-	if (payload.recursionDepth < 10)
+	if (payload.recursionDepth < maxRecursionDepth)
 	{
 		payload.recursionDepth++;
 

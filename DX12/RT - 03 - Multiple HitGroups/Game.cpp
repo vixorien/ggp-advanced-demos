@@ -40,7 +40,11 @@ Game::Game(HINSTANCE hInstance)
 		720,			// Height of the window's client area
 		false,			// Sync the framerate to the monitor refresh? (lock framerate)
 		true),			// Show extra stats (fps) in title bar?
-	lightCount(32)
+	lightCount(32),
+	raysPerPixel(25),
+	maxRecursionDepth(10),
+	freezeObjects(false),
+	updateTime(0.0f)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -509,36 +513,38 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 
-	entities[1]->GetTransform()->Rotate(deltaTime * 0.5f, deltaTime * 0.5f, deltaTime * 0.5f);
-	entities[6]->GetTransform()->Rotate(0, deltaTime * 0.1f, 0);
-
-	// Skip the first few entities:
-	// 0: floor
-	// 1: torus
-	// 2,3,4,5: transparent balls
-	// 6: ball parent
-	int skip = 7;
-
-	// Rotate entities (skip first two)
-	float range = 20;
-	for(int i = skip; i < entities.size(); i++)
+	if (!freezeObjects)
 	{
-		//e->GetTransform()->Rotate(0, deltaTime * 0.5f, 0);
-		
-		XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
-		switch (i % 2)
+		updateTime += deltaTime;
+
+		entities[1]->GetTransform()->Rotate(deltaTime * 0.5f, deltaTime * 0.5f, deltaTime * 0.5f);
+		entities[6]->GetTransform()->Rotate(0, deltaTime * 0.25f, 0);
+
+		// Skip the first few entities:
+		// 0: floor
+		// 1: torus
+		// 2,3,4,5: transparent balls
+		// 6: ball parent
+		int skip = 7;
+
+		// Rotate entities (skip first two)
+		float range = 20;
+		for (int i = skip; i < entities.size(); i++)
 		{
-		case 0:
-			pos.x = sin((totalTime + i) * (4/range)) * range;
-			break;
+			XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
+			switch (i % 2)
+			{
+			case 0:
+				pos.x = sin((updateTime + i) * (4 / range)) * range;
+				break;
 
-		case 1:
-			pos.z = sin((totalTime + i) * (4/range)) * range;
-			break;
+			case 1:
+				pos.z = sin((updateTime + i) * (4 / range)) * range;
+				break;
+			}
+			entities[i]->GetTransform()->SetPosition(pos);
 		}
-		entities[i]->GetTransform()->SetPosition(pos);
 	}
-
 
 	// Update other objects
 	camera->Update(deltaTime);
@@ -568,7 +574,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 
 		// Perform raytrace - specifically NOT executing the command list yet, as we're doing ImGui after
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], false);
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, false);
 	}
 
 	// ImGui
@@ -648,7 +654,20 @@ void Game::UINewFrame(float deltaTime)
 	input.SetMouseCapture(io.WantCaptureMouse);
 }
 
+// --------------------------------------------------------
+// Builds the ImGui interface
+// --------------------------------------------------------
 void Game::BuildUI()
 {
-	ImGui::ShowDemoWindow();
+	ImGui::Begin("Raytracing Options");
+	{
+		// Sets label width
+		ImGui::PushItemWidth(-150);
+
+		// Controls
+		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 100);
+		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
+		ImGui::Checkbox("Freeze Objects", &freezeObjects);
+	}
+	ImGui::End();
 }

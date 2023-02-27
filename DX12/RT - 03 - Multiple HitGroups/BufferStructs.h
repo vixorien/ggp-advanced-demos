@@ -27,7 +27,8 @@ struct RaytracingSceneData
 {
 	DirectX::XMFLOAT4X4 inverseViewProjection;
 	DirectX::XMFLOAT3 cameraPosition;
-	float pad;
+	int raysPerPixel;
+	int maxRecursionDepth;
 };
 
 // Ensure this matches Raytracing shader define!

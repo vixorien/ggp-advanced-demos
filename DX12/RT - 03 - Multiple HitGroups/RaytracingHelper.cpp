@@ -842,7 +842,12 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 // --------------------------------------------------------
 // Performs the actual raytracing work
 // --------------------------------------------------------
-void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, bool executeCommandList)
+void RaytracingHelper::Raytrace(
+	std::shared_ptr<Camera> camera, 
+	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer,
+	int raysPerPixel,
+	int maxRecursionDepth,
+	bool executeCommandList)
 {
 	if (!dxrAvailable || !helperInitialized)
 		return;
@@ -868,6 +873,8 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 	// Grab and fill a constant buffer
 	RaytracingSceneData sceneData = {};
 	sceneData.cameraPosition = camera->GetTransform()->GetPosition();
+	sceneData.raysPerPixel = raysPerPixel;
+	sceneData.maxRecursionDepth = maxRecursionDepth;
 	
 	DirectX::XMFLOAT4X4 view = camera->GetView();
 	DirectX::XMFLOAT4X4 proj = camera->GetProjection();

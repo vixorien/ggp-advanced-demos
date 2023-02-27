@@ -46,6 +46,12 @@ private:
 	std::vector<Light> lights;
 	std::shared_ptr<Camera> camera;
 	std::vector<std::shared_ptr<GameEntity>> entities;
+	bool freezeObjects;
+	float updateTime;
+
+	// Raytracing
+	int maxRecursionDepth;
+	int raysPerPixel;
 
 };
 

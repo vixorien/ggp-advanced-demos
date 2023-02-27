@@ -800,7 +800,7 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 // --------------------------------------------------------
 // Performs the actual raytracing work
 // --------------------------------------------------------
-void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer)
+void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, bool executeCommandList)
 {
 	if (!dxrAvailable || !helperInitialized)
 		return;
@@ -895,6 +895,7 @@ void RaytracingHelper::Raytrace(std::shared_ptr<Camera> camera, Microsoft::WRL::
 	}
 
 	// Close and execute
+	if(executeCommandList)
 	{
 		dxrCommandList->Close();
 		ID3D12CommandList* lists[] = { dxrCommandList.Get() };
