@@ -6,6 +6,9 @@
 # Custom for Advanced GPP project
 !*.lib
 
+## Dear ImGui artifacts
+imgui.ini
+
 # User-specific files
 *.rsuser
 *.suo
@@ -351,3 +354,4 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+/DX12/RT - 03 - Multiple HitGroups/imgui.ini

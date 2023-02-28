@@ -353,6 +353,7 @@ void Game::CreateBasicGeometry()
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
 	std::shared_ptr<Material> greyDiffuse = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 0.5f), 1.0f);
+	std::shared_ptr<Material> darkGrey = std::make_shared<Material>(pipelineState, XMFLOAT3(0.25f, 0.25f, 0.25f), 1.0f);
 	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), 0.0f);
 
 	// Load meshes
@@ -395,8 +396,9 @@ void Game::CreateBasicGeometry()
 	entities.push_back(glassSphereGreen);
 	entities.push_back(glassSphereBlue);
 
-	std::shared_ptr<GameEntity> parent = std::make_shared<GameEntity>(cube, greyDiffuse);
-	parent->GetTransform()->SetPosition(0, -50, 0); // Move so we can't see it
+	std::shared_ptr<GameEntity> parent = std::make_shared<GameEntity>(cube, darkGrey);
+	parent->GetTransform()->SetPosition(0, 2, 0);
+	parent->GetTransform()->SetScale(0.4f);
 	parent->GetTransform()->AddChild(glassSphereWhite->GetTransform());
 	parent->GetTransform()->AddChild(glassSphereRed->GetTransform());
 	parent->GetTransform()->AddChild(glassSphereGreen->GetTransform());
@@ -411,7 +413,11 @@ void Game::CreateBasicGeometry()
 
 		// Random chance to be emissive
 		MaterialType type = MaterialType::Normal;
-		if (RandomRange(0.0f, 1.0f) > 0.9f) type = MaterialType::Emissive;
+		if (RandomRange(0.0f, 1.0f) > 0.9f)
+		{
+			type = MaterialType::Emissive;
+			rough = RandomRange(1.0f, 2.0f); // Intensity for emissive materials
+		}
 
 		std::shared_ptr<Material> mat = std::make_shared<Material>(
 			pipelineState, 
@@ -425,7 +431,7 @@ void Game::CreateBasicGeometry()
 		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
 		entities.push_back(sphereEnt);
 		
-		float scale = RandomRange(0.5f, 1.5f);
+		float scale = RandomRange(0.5f, 3.5f);
 		sphereEnt->GetTransform()->SetScale(scale);
 		
 		sphereEnt->GetTransform()->SetPosition(
@@ -687,19 +693,32 @@ void Game::BuildUI()
 					XMFLOAT3 color = mat->GetColorTint();
 					float rough = mat->GetRoughness();
 
-					if (ImGui::ColorEdit3("Color", &color.x)) mat->SetColorTint(color);
-					if (ImGui::SliderFloat("Roughness", &rough, 0.0f, 1.0f)) mat->SetRoughness(rough);
-
 					MaterialType type = mat->GetType();
 					bool norm = type == MaterialType::Normal;
 					bool tran = type == MaterialType::Transparent;
 					bool emis = type == MaterialType::Emissive;
 
-					if (ImGui::RadioButton("Normal", norm)) mat->SetType(MaterialType::Normal);
-					ImGui::SameLine();
-					if (ImGui::RadioButton("Transparent", tran)) mat->SetType(MaterialType::Transparent);
-					ImGui::SameLine();
-					if (ImGui::RadioButton("Emissive", emis)) mat->SetType(MaterialType::Emissive);
+					if (ImGui::ColorEdit3("Color", &color.x)) mat->SetColorTint(color);
+					
+					// Roughness is intensity for emissive materials
+					if (emis)
+					{
+						if (ImGui::SliderFloat("Intensity", &rough, 1.0f, 10.0f)) mat->SetRoughness(rough);
+					}
+					else
+					{
+						if (ImGui::SliderFloat("Roughness", &rough, 0.0f, 1.0f)) mat->SetRoughness(rough);
+					}
+					
+
+					// Radio buttons for type
+					{
+						if (ImGui::RadioButton("Normal", norm)) mat->SetType(MaterialType::Normal);
+						ImGui::SameLine();
+						if (ImGui::RadioButton("Transparent", tran)) mat->SetType(MaterialType::Transparent);
+						ImGui::SameLine();
+						if (ImGui::RadioButton("Emissive", emis)) mat->SetType(MaterialType::Emissive);
+					}
 
 					ImGui::TreePop();
 				}

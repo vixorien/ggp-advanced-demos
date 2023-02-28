@@ -148,7 +148,7 @@ void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 directio
 
 // Sampling functions based on Chapter 16 of Raytracing Gems
 
-// params should be uniform between [0,1]
+// Params should be uniform between [0,1]
 float3 RandomVector(float u0, float u1)
 {
 	float a = u0 * 2 - 1;
@@ -162,6 +162,7 @@ float3 RandomVector(float u0, float u1)
 	return float3(x, y, z);
 }
 
+// First two params should be uniform between [0,1]
 float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
 {
 	float a = u0 * 2 - 1;
@@ -192,10 +193,7 @@ float2 rand2(float2 uv)
 
 float3 rand3(float2 uv) 
 {
-	float x = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	float y = (frac(sin(dot(1-uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	float z = (frac(sin(dot(uv.yx, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	return float3(x, y, z);
+	return float3(rand2(uv), rand(uv.yx));
 }
 
 // === Shaders ===
@@ -239,10 +237,7 @@ void RayGen()
 		TraceRay(
 			SceneTLAS,
 			RAY_FLAG_NONE,
-			0xFF,
-			0,
-			0,
-			0,
+			0xFF, 0, 0, 0, // Mask and offsets
 			ray,
 			payload);
 
@@ -281,34 +276,21 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 		return;
 	}
 
-	// Get the geometry hit details
+	// We've hit, so adjust the payload color by this instance's color
+	payload.color *= entityColor[InstanceID()].rgb;
+
+	// Get the geometry hit details and convert normal to world space
 	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
-
-	// Get the data for this entity
-	uint instanceID = InstanceID();
-	payload.color *= entityColor[instanceID].rgb;
-
-	// Get 0-1 values for this ray (basically screen UV)
-	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-	uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
-
-	// Convert the normal to world space
 	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
-		
-	// Perfect reflection
+
+	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
+	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
+
+	// Interpolate between perfect reflection and random bounce based on roughness squared
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
-
-	// Random bounce
-	float3 randomBounce;
-	randomBounce.x = rand(uv);
-	randomBounce.y = rand(1 - uv);
-	randomBounce.z = rand(uv.yx);
-
-	randomBounce = normalize(randomBounce * 2 - 1);
-	if (dot(randomBounce, normal_WS) < 0) randomBounce *= -1;
-
-	// Choose based on "material"
-	float3 dir = normalize(lerp(refl, randomBounce, entityColor[instanceID].a));
+	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
+	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
 		
 	// Create the new recursive ray
 	RayDesc ray;
@@ -321,11 +303,8 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	payload.recursionDepth++;
 	TraceRay(
 		SceneTLAS,
-		RAY_FLAG_NONE,
-		0xFF,
-		0,
-		0,
-		0,
+		RAY_FLAG_NONE, 
+		0xFF, 0, 0, 0, // Mask and offsets
 		ray,
 		payload);
 }
@@ -366,36 +345,42 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 		return;
 	}
 
-	// Get the geometry hit details
+	// We've hit, so adjust the payload color by this instance's color
+	payload.color *= entityColor[InstanceID()].rgb;
+
+	// Get the geometry hit details and convert normal to world space
 	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
+	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
 
-	// Get the data for this entity
-	uint instanceID = InstanceID();
-	payload.color *= entityColor[instanceID].rgb;
-
-	// Get 0-1 values for this ray (basically screen UV)
+	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-	uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
-
-	// Convert the normal to world space
-	float3 normal_WS = -normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
+	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
 	// Get the index of refraction based on the side of the hit
 	float ior = 1.5f;
-	if (HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE)
+	if (HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE) 
 	{
-		ior = 1.0f / ior;
+		// Invert the index of refraction for front faces
+		ior = 1.0f / ior; 
+	}
+	else 
+	{
+		// Invert the normal for back faces
 		normal_WS *= -1;
 	}
 
 	// Random chance for reflection instead of refraction based on Fresnel
 	float NdotV = dot(-WorldRayDirection(), normal_WS);
-	bool reflectFresnel = FresnelSchlick(NdotV, ior) > rand(uv);
+	bool reflectFresnel = FresnelSchlick(NdotV, ior) > rand(rng);
 
 	// Test for refraction
 	float3 dir;
 	if(reflectFresnel || !TryRefract(WorldRayDirection(), normal_WS, ior, dir))
 		dir = reflect(WorldRayDirection(), normal_WS);
+
+	// Interpolate between refract/reflect and random bounce based on roughness squared
+	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
+	dir = normalize(lerp(dir, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
 
 	// Create the new recursive ray
 	RayDesc ray;
@@ -409,10 +394,7 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 	TraceRay(
 		SceneTLAS,
 		RAY_FLAG_NONE,
-		0xFF,
-		0,
-		0,
-		0,
+		0xFF, 0, 0, 0, // Mask and offsets
 		ray,
 		payload);
 }
@@ -423,6 +405,6 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 void ClosestHitEmissive(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
 	// Get the data for this entity
-	uint instanceID = InstanceID();
-	payload.color = entityColor[instanceID].rgb;
+	float4 color = entityColor[InstanceID()];
+	payload.color = color.rgb * color.a; // Apply intensity for emissive material
 }
