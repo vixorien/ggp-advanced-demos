@@ -416,3 +416,13 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 		ray,
 		payload);
 }
+
+
+// Closest hit shader - Runs when a ray hits the closest surface
+[shader("closesthit")]
+void ClosestHitEmissive(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
+{
+	// Get the data for this entity
+	uint instanceID = InstanceID();
+	payload.color = entityColor[instanceID].rgb;
+}

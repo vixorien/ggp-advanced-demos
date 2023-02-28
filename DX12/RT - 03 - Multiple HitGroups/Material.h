@@ -9,6 +9,13 @@
 #include "Camera.h"
 #include "Transform.h"
 
+enum MaterialType
+{
+	Normal,
+	Transparent,
+	Emissive
+};
+
 class Material
 {
 public:
@@ -16,7 +23,7 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState,
 		DirectX::XMFLOAT3 tint, 
 		float roughness = 1.0f,
-		bool transparent = false,
+		MaterialType type = MaterialType::Normal,
 		DirectX::XMFLOAT2 uvScale = DirectX::XMFLOAT2(1, 1),
 		DirectX::XMFLOAT2 uvOffset = DirectX::XMFLOAT2(0, 0));
 
@@ -25,7 +32,7 @@ public:
 	DirectX::XMFLOAT2 GetUVOffset();
 	DirectX::XMFLOAT3 GetColorTint();
 	float GetRoughness();
-	bool GetTransparent();
+	MaterialType GetType();
 	D3D12_GPU_DESCRIPTOR_HANDLE GetFinalGPUHandleForTextures();
 
 	void SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState);
@@ -33,7 +40,7 @@ public:
 	void SetUVOffset(DirectX::XMFLOAT2 offset);
 	void SetColorTint(DirectX::XMFLOAT3 tint);
 	void SetRoughness(float roughness);
-	void SetTransparent(bool transparent);
+	void SetType(MaterialType type);
 
 	void AddTexture(D3D12_CPU_DESCRIPTOR_HANDLE srvDescriptorHandle, int slot);
 	void FinalizeTextures();
@@ -49,7 +56,7 @@ private:
 	DirectX::XMFLOAT2 uvOffset;
 	DirectX::XMFLOAT2 uvScale;
 	float roughness;
-	bool transparent;
+	MaterialType type;
 
 	// Texture-related GPU tracking
 	bool materialTexturesFinalized;

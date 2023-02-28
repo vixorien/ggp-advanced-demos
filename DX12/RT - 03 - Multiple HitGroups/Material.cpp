@@ -5,14 +5,14 @@ Material::Material(
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState,
 	DirectX::XMFLOAT3 tint, 
 	float roughness,
-	bool transparent,
+	MaterialType type,
 	DirectX::XMFLOAT2 uvScale,
 	DirectX::XMFLOAT2 uvOffset) 
 	:
 	pipelineState(pipelineState),
 	colorTint(tint),
 	roughness(roughness),
-	transparent(transparent),
+	type(type),
 	uvScale(uvScale),
 	uvOffset(uvOffset),
 	materialTexturesFinalized(false),
@@ -29,7 +29,7 @@ DirectX::XMFLOAT2 Material::GetUVScale() { return uvScale; }
 DirectX::XMFLOAT2 Material::GetUVOffset() { return uvOffset; }
 DirectX::XMFLOAT3 Material::GetColorTint() { return colorTint; }
 float Material::GetRoughness() { return roughness; }
-bool Material::GetTransparent() { return transparent; }
+MaterialType Material::GetType() { return type; }
 D3D12_GPU_DESCRIPTOR_HANDLE Material::GetFinalGPUHandleForTextures() { return finalGPUHandleForSRVs; }
 
 
@@ -39,7 +39,7 @@ void Material::SetUVScale(DirectX::XMFLOAT2 scale) { uvScale = scale; }
 void Material::SetUVOffset(DirectX::XMFLOAT2 offset) { uvOffset = offset; }
 void Material::SetColorTint(DirectX::XMFLOAT3 tint) { this->colorTint = tint; }
 void Material::SetRoughness(float roughness) { this->roughness = roughness; }
-void Material::SetTransparent(bool transparent) { this->transparent = transparent; }
+void Material::SetType(MaterialType type) { this->type = type; }
 
 
 // --------------------------------------------------------

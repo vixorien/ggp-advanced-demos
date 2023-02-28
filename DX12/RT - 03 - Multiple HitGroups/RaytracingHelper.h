@@ -90,6 +90,10 @@ private:
 	// In a simple demo, this is effectively the maximum
 	// number of unique mesh BLAS's.
 	const unsigned int MAX_HIT_GROUPS_IN_SHADER_TABLE = 1000;
+	
+	// The number of hit groups we'll have
+	// This needs to be manually updated when we add new hit groups
+	const unsigned int NUM_HIT_GROUPS = 3;
 
 	// Command queue for processing raytracing commands
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;

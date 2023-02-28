@@ -375,10 +375,10 @@ void Game::CreateBasicGeometry()
 	entities.push_back(t);
 
 	// Four floating transparent spheres
-	std::shared_ptr<Material> glassWhite	= std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1), 0.0f, true);
-	std::shared_ptr<Material> glassRed		= std::make_shared<Material>(pipelineState, XMFLOAT3(1, 0, 0), 0.0f, true);
-	std::shared_ptr<Material> glassGreen	= std::make_shared<Material>(pipelineState, XMFLOAT3(0, 1, 0), 0.0f, true);
-	std::shared_ptr<Material> glassBlue		= std::make_shared<Material>(pipelineState, XMFLOAT3(0, 0, 1), 0.0f, true);
+	std::shared_ptr<Material> glassWhite	= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 1.0f, 1.0f), 0.0f, MaterialType::Transparent);
+	std::shared_ptr<Material> glassRed		= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 0.1f, 0.1f), 0.0f, MaterialType::Transparent);
+	std::shared_ptr<Material> glassGreen	= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 1.0f, 0.1f), 0.0f, MaterialType::Transparent);
+	std::shared_ptr<Material> glassBlue		= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 0.1f, 1.0f), 0.0f, MaterialType::Transparent);
 
 	std::shared_ptr<GameEntity> glassSphereWhite	= std::make_shared<GameEntity>(sphere, glassWhite);
 	std::shared_ptr<GameEntity> glassSphereRed		= std::make_shared<GameEntity>(sphere, glassRed);
@@ -406,28 +406,33 @@ void Game::CreateBasicGeometry()
 	float range = 20;
 	for (int i = 0; i < 50; i++)
 	{
-		// Random roughness
+		// Random roughness either 0 or 1
 		float rough = RandomRange(0.0f, 1.0f) > 0.5f ? 0.0f : 1.0f;
+
+		// Random chance to be emissive
+		MaterialType type = MaterialType::Normal;
+		if (RandomRange(0.0f, 1.0f) > 0.9f) type = MaterialType::Emissive;
 
 		std::shared_ptr<Material> mat = std::make_shared<Material>(
 			pipelineState, 
 			XMFLOAT3(
 				RandomRange(0.0f, 1.0f),
 				RandomRange(0.0f, 1.0f),
-				RandomRange(0.0f, 1.0f)
-			),
-			rough);
-
-		float scale = RandomRange(0.5f, 1.5f);
+				RandomRange(0.0f, 1.0f)),
+			rough,
+			type);
 
 		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
+		entities.push_back(sphereEnt);
+		
+		float scale = RandomRange(0.5f, 1.5f);
 		sphereEnt->GetTransform()->SetScale(scale);
+		
 		sphereEnt->GetTransform()->SetPosition(
 			RandomRange(-range, range),
 			-2 + scale / 2.0f,
 			RandomRange(-range, range));
 
-		entities.push_back(sphereEnt);
 	}
 
 	// Since meshes create their own BLAS's, we just need to create the TLAS for the scene
@@ -668,6 +673,39 @@ void Game::BuildUI()
 		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 100);
 		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
 		ImGui::Checkbox("Freeze Objects", &freezeObjects);
+		ImGui::Spacing();
+
+		// Entities
+		if (ImGui::CollapsingHeader("Entities"))
+		{
+			int index = 0;
+			for (auto& e : entities)
+			{
+				if (ImGui::TreeNode((void*)e.get(), "Entity %i", index))
+				{
+					std::shared_ptr<Material> mat = e->GetMaterial();
+					XMFLOAT3 color = mat->GetColorTint();
+					float rough = mat->GetRoughness();
+
+					if (ImGui::ColorEdit3("Color", &color.x)) mat->SetColorTint(color);
+					if (ImGui::SliderFloat("Roughness", &rough, 0.0f, 1.0f)) mat->SetRoughness(rough);
+
+					MaterialType type = mat->GetType();
+					bool norm = type == MaterialType::Normal;
+					bool tran = type == MaterialType::Transparent;
+					bool emis = type == MaterialType::Emissive;
+
+					if (ImGui::RadioButton("Normal", norm)) mat->SetType(MaterialType::Normal);
+					ImGui::SameLine();
+					if (ImGui::RadioButton("Transparent", tran)) mat->SetType(MaterialType::Transparent);
+					ImGui::SameLine();
+					if (ImGui::RadioButton("Emissive", emis)) mat->SetType(MaterialType::Emissive);
+
+					ImGui::TreePop();
+				}
+				index++;
+			}
+		}
 	}
 	ImGui::End();
 }
