@@ -128,7 +128,7 @@ Vertex GetHitDetails(uint triangleIndex, BuiltInTriangleIntersectionAttributes h
 	return InterpolateVertices(triangleIndex, barycentricData);
 }
 
-
+// Calculates a ray through a particular pixel
 void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 direction)
 {
 	// Offset to the middle of the pixel
@@ -194,6 +194,31 @@ float2 rand2(float2 uv)
 float3 rand3(float2 uv) 
 {
 	return float3(rand2(uv), rand(uv.yx));
+}
+
+
+
+// Fresnel approximation
+float FresnelSchlick(float NdotV, float indexOfRefraction)
+{
+	float r0 = pow((1.0f - indexOfRefraction) / (1.0f + indexOfRefraction), 2.0f);
+	return r0 + (1.0f - r0) * pow(1 - NdotV, 5.0f);
+}
+
+// Refraction function that returns a bool depending on result
+bool TryRefract(float3 incident, float3 normal, float ior, out float3 refr)
+{
+	float NdotI = dot(normal, incident);
+	float k = 1.0f - ior * ior * (1.0f - NdotI * NdotI);
+
+	if (k < 0.0f)
+	{
+		refr = float3(0, 0, 0);
+		return false;
+	}
+
+	refr = ior * incident - (ior * NdotI + sqrt(k)) * normal;
+	return true;
 }
 
 // === Shaders ===
@@ -307,30 +332,6 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 		0xFF, 0, 0, 0, // Mask and offsets
 		ray,
 		payload);
-}
-
-
-// Fresnel approximation
-float FresnelSchlick(float NdotV, float indexOfRefraction)
-{
-	float r0 = pow((1.0f - indexOfRefraction) / (1.0f + indexOfRefraction), 2.0f);
-	return r0 + (1.0f - r0) * pow(1 - NdotV, 5.0f);
-}
-
-// Refraction function that returns a bool depending on result
-bool TryRefract(float3 incident, float3 normal, float ior, out float3 refr)
-{
-	float NdotI = dot(normal, incident);
-	float k = 1.0f - ior * ior * (1.0f - NdotI * NdotI);
-
-	if (k < 0.0f)
-	{
-		refr = float3(0, 0, 0);
-		return false;
-	}
-
-	refr = ior * incident - (ior * NdotI + sqrt(k)) * normal;
-	return true;
 }
 
 

@@ -718,9 +718,6 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
-	// TODO: Probably make a small ring buffer (exactly 3) of these buffers
-	//       to coincide with our frame sync stuff!
-	// 
 	// Copy the descriptions into the buffer
 	unsigned char* mapped = 0;
 	tlasInstanceDescBuffer->Map(0, 0, (void**)&mapped);

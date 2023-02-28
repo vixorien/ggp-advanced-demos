@@ -114,7 +114,20 @@ Vertex InterpolateVertices(uint triangleIndex, float3 barycentricData)
 	return vert;
 }
 
+// Interpolates the triangle
+Vertex GetHitDetails(uint triangleIndex, BuiltInTriangleIntersectionAttributes hitAttributes)
+{
+	// Calculate the barycentric data for vertex interpolation
+	float3 barycentricData = float3(
+		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
+		hitAttributes.barycentrics.x,
+		hitAttributes.barycentrics.y);
 
+	// Get the interpolated vertex data
+	return InterpolateVertices(triangleIndex, barycentricData);
+}
+
+// Calculates a ray through a particular pixel
 void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 direction)
 {
 	// Offset to the middle of the pixel
@@ -134,7 +147,7 @@ void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 directio
 
 // Sampling functions based on Chapter 16 of Raytracing Gems
 
-// params should be uniform between [0,1]
+// Params should be uniform between [0,1]
 float3 RandomVector(float u0, float u1)
 {
 	float a = u0 * 2 - 1;
@@ -148,6 +161,7 @@ float3 RandomVector(float u0, float u1)
 	return float3(x, y, z);
 }
 
+// First two params should be uniform between [0,1]
 float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
 {
 	float a = u0 * 2 - 1;
@@ -157,7 +171,7 @@ float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
 	float x = unitNormal.x + b * cos(phi);
 	float y = unitNormal.y + b * sin(phi);
 	float z = unitNormal.z + a;
-	
+
 	// float pdf = a / PI;
 	return float3(x, y, z);
 }
@@ -169,21 +183,18 @@ float rand(float2 uv)
 	return (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
 }
 
-
-float2 rand2(float2 uv) 
+float2 rand2(float2 uv)
 {
 	float x = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
 	float y = sqrt(1 - x * x);
 	return float2(x, y);
 }
 
-float3 rand3(float2 uv) 
+float3 rand3(float2 uv)
 {
-	float x = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	float y = (frac(sin(dot(1-uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	float z = (frac(sin(dot(uv.yx, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-	return float3(x, y, z);
+	return float3(rand2(uv), rand(uv.yx));
 }
+
 
 // === Shaders ===
 
@@ -226,10 +237,7 @@ void RayGen()
 		TraceRay(
 			SceneTLAS,
 			RAY_FLAG_NONE,
-			0xFF,
-			0,
-			0,
-			0,
+			0xFF, 0, 0, 0, // Mask and offsets
 			ray,
 			payload);
 
@@ -261,65 +269,42 @@ void Miss(inout RayPayload payload)
 [shader("closesthit")]
 void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
-	// Grab the index of the triangle we hit
-	uint triangleIndex = PrimitiveIndex();
-
-	// Calculate the barycentric data for vertex interpolation
-	float3 barycentricData = float3(
-		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
-		hitAttributes.barycentrics.x,
-		hitAttributes.barycentrics.y);
-
-	// Get the interpolated vertex data
-	Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
-
-	// Get the data for this entity
-	uint instanceID = InstanceID();
-	payload.color *= entityColor[instanceID].rgb;
-
-	// Can we go again?
-	if (payload.recursionDepth < 10)
+	// If we've reached the max recursion, we haven't hit a light source
+	if (payload.recursionDepth == 10)
 	{
-		payload.recursionDepth++;
-
-		// Get 0-1 values for this ray (basically screen UV)
-		float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-		uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
-
-		// Convert the normal to world space
-		float3 normal_WS = normalize(mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3()));
-		
-		// Perfect reflection
-		float3 refl = reflect(WorldRayDirection(), normal_WS);
-
-		// Random bounce
-		float3 randomBounce;
-		randomBounce.x = rand(uv);
-		randomBounce.y = rand(1 - uv);
-		randomBounce.z = rand(uv.yx);
-
-		randomBounce = normalize(randomBounce * 2 - 1);
-		if (dot(randomBounce, normal_WS) < 0) randomBounce *= -1;
-
-		// Choose based on "material"
-		float3 dir = normalize(lerp(refl, randomBounce, entityColor[instanceID].a));
-		
-		// Create the new recursive ray
-		RayDesc ray;
-		ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-		ray.Direction = dir;
-		ray.TMin = 0.0001f;
-		ray.TMax = 1000.0f;
-
-		// Recursive ray trace
-		TraceRay(
-			SceneTLAS,
-			RAY_FLAG_NONE,
-			0xFF,
-			0,
-			0,
-			0,
-			ray,
-			payload);
+		payload.color = float3(0, 0, 0);
+		return;
 	}
+
+	// We've hit, so adjust the payload color by this instance's color
+	payload.color *= entityColor[InstanceID()].rgb;
+
+	// Get the geometry hit details and convert normal to world space
+	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
+	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
+
+	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
+	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
+
+	// Interpolate between perfect reflection and random bounce based on roughness squared
+	float3 refl = reflect(WorldRayDirection(), normal_WS);
+	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
+	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
+
+	// Create the new recursive ray
+	RayDesc ray;
+	ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	ray.Direction = dir;
+	ray.TMin = 0.0001f;
+	ray.TMax = 1000.0f;
+
+	// Recursive ray trace
+	payload.recursionDepth++;
+	TraceRay(
+		SceneTLAS,
+		RAY_FLAG_NONE,
+		0xFF, 0, 0, 0, // Mask and offsets
+		ray,
+		payload);
 }
