@@ -115,6 +115,19 @@ Vertex InterpolateVertices(uint triangleIndex, float3 barycentricData)
 	return vert;
 }
 
+// Interpolates the triangle
+Vertex GetHitDetails(uint triangleIndex, BuiltInTriangleIntersectionAttributes hitAttributes)
+{
+	// Calculate the barycentric data for vertex interpolation
+	float3 barycentricData = float3(
+		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
+		hitAttributes.barycentrics.x,
+		hitAttributes.barycentrics.y);
+
+	// Get the interpolated vertex data
+	return InterpolateVertices(triangleIndex, barycentricData);
+}
+
 
 void CalcRayFromCamera(float2 rayIndices, out float3 origin, out float3 direction)
 {
@@ -261,67 +274,60 @@ void Miss(inout RayPayload payload)
 [shader("closesthit")]
 void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
-	// Grab the index of the triangle we hit
-	uint triangleIndex = PrimitiveIndex();
+	// If we've reached the max recursion, we haven't hit a light source
+	if (payload.recursionDepth == maxRecursionDepth)
+	{
+		payload.color = float3(0, 0, 0);
+		return;
+	}
 
-	// Calculate the barycentric data for vertex interpolation
-	float3 barycentricData = float3(
-		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
-		hitAttributes.barycentrics.x,
-		hitAttributes.barycentrics.y);
-
-	// Get the interpolated vertex data
-	Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
+	// Get the geometry hit details
+	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
 
 	// Get the data for this entity
 	uint instanceID = InstanceID();
 	payload.color *= entityColor[instanceID].rgb;
 
-	// Can we go again?
-	if (payload.recursionDepth < maxRecursionDepth)
-	{
-		payload.recursionDepth++;
+	// Get 0-1 values for this ray (basically screen UV)
+	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+	uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
-		// Get 0-1 values for this ray (basically screen UV)
-		float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-		uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
-
-		// Convert the normal to world space
-		float3 normal_WS = normalize(mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3()));
+	// Convert the normal to world space
+	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
 		
-		// Perfect reflection
-		float3 refl = reflect(WorldRayDirection(), normal_WS);
+	// Perfect reflection
+	float3 refl = reflect(WorldRayDirection(), normal_WS);
 
-		// Random bounce
-		float3 randomBounce;
-		randomBounce.x = rand(uv);
-		randomBounce.y = rand(1 - uv);
-		randomBounce.z = rand(uv.yx);
+	// Random bounce
+	float3 randomBounce;
+	randomBounce.x = rand(uv);
+	randomBounce.y = rand(1 - uv);
+	randomBounce.z = rand(uv.yx);
 
-		randomBounce = normalize(randomBounce * 2 - 1);
-		if (dot(randomBounce, normal_WS) < 0) randomBounce *= -1;
+	randomBounce = normalize(randomBounce * 2 - 1);
+	if (dot(randomBounce, normal_WS) < 0) randomBounce *= -1;
 
-		// Choose based on "material"
-		float3 dir = normalize(lerp(refl, randomBounce, entityColor[instanceID].a));
+	// Choose based on "material"
+	float3 dir = normalize(lerp(refl, randomBounce, entityColor[instanceID].a));
 		
-		// Create the new recursive ray
-		RayDesc ray;
-		ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-		ray.Direction = dir;
-		ray.TMin = 0.0001f;
-		ray.TMax = 1000.0f;
+	// Create the new recursive ray
+	RayDesc ray;
+	ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	ray.Direction = dir;
+	ray.TMin = 0.0001f;
+	ray.TMax = 1000.0f;
 
-		// Recursive ray trace
-		TraceRay(
-			SceneTLAS,
-			RAY_FLAG_NONE,
-			0xFF,
-			0,
-			0,
-			0,
-			ray,
-			payload);
-	}
+	// Recursive ray trace
+	payload.recursionDepth++;
+	TraceRay(
+		SceneTLAS,
+		RAY_FLAG_NONE,
+		0xFF,
+		0,
+		0,
+		0,
+		ray,
+		payload);
 }
 
 
@@ -353,67 +359,60 @@ bool TryRefract(float3 incident, float3 normal, float ior, out float3 refr)
 [shader("closesthit")]
 void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
-	// Grab the index of the triangle we hit
-	uint triangleIndex = PrimitiveIndex();
+	// If we've reached the max recursion, we haven't hit a light source
+	if (payload.recursionDepth == maxRecursionDepth)
+	{
+		payload.color = float3(0, 0, 0);
+		return;
+	}
 
-	// Calculate the barycentric data for vertex interpolation
-	float3 barycentricData = float3(
-		1.0f - hitAttributes.barycentrics.x - hitAttributes.barycentrics.y,
-		hitAttributes.barycentrics.x,
-		hitAttributes.barycentrics.y);
-
-	// Get the interpolated vertex data
-	Vertex interpolatedVert = InterpolateVertices(triangleIndex, barycentricData);
+	// Get the geometry hit details
+	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
 
 	// Get the data for this entity
 	uint instanceID = InstanceID();
 	payload.color *= entityColor[instanceID].rgb;
 
-	// Can we go again?
-	if (payload.recursionDepth < maxRecursionDepth)
+	// Get 0-1 values for this ray (basically screen UV)
+	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+	uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
+
+	// Convert the normal to world space
+	float3 normal_WS = -normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
+
+	// Get the index of refraction based on the side of the hit
+	float ior = 1.5f;
+	if (HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE)
 	{
-		payload.recursionDepth++;
-
-		// Get 0-1 values for this ray (basically screen UV)
-		float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-		uv = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
-
-		// Convert the normal to world space
-		float3 normal_WS = -normalize(mul(interpolatedVert.normal, (float3x3)ObjectToWorld4x3()));
-
-		// Get the index of refraction based on the side of the hit
-		float ior = 1.5f;
-		if (HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE)
-		{
-			ior = 1.0f / ior;
-			normal_WS *= -1;
-		}
-
-		// Random chance for reflection instead of refraction based on Fresnel
-		float NdotV = dot(-WorldRayDirection(), normal_WS);
-		bool reflectFresnel = FresnelSchlick(NdotV, ior) > rand(uv);
-
-		// Test for refraction
-		float3 dir;
-		if(reflectFresnel || !TryRefract(WorldRayDirection(), normal_WS, ior, dir))
-			dir = reflect(WorldRayDirection(), normal_WS);
-
-		// Create the new recursive ray
-		RayDesc ray;
-		ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-		ray.Direction = dir;
-		ray.TMin = 0.0001f;
-		ray.TMax = 1000.0f;
-
-		// Recursive ray trace
-		TraceRay(
-			SceneTLAS,
-			RAY_FLAG_NONE,
-			0xFF,
-			0,
-			0,
-			0,
-			ray,
-			payload);
+		ior = 1.0f / ior;
+		normal_WS *= -1;
 	}
+
+	// Random chance for reflection instead of refraction based on Fresnel
+	float NdotV = dot(-WorldRayDirection(), normal_WS);
+	bool reflectFresnel = FresnelSchlick(NdotV, ior) > rand(uv);
+
+	// Test for refraction
+	float3 dir;
+	if(reflectFresnel || !TryRefract(WorldRayDirection(), normal_WS, ior, dir))
+		dir = reflect(WorldRayDirection(), normal_WS);
+
+	// Create the new recursive ray
+	RayDesc ray;
+	ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	ray.Direction = dir;
+	ray.TMin = 0.0001f;
+	ray.TMax = 1000.0f;
+
+	// Recursive ray trace
+	payload.recursionDepth++;
+	TraceRay(
+		SceneTLAS,
+		RAY_FLAG_NONE,
+		0xFF,
+		0,
+		0,
+		0,
+		ray,
+		payload);
 }
