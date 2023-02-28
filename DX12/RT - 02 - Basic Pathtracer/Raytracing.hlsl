@@ -38,7 +38,6 @@ cbuffer SceneData : register(b0)
 {
 	matrix inverseViewProjection;
 	float3 cameraPosition;
-	float pad0;
 };
 
 
@@ -180,19 +179,21 @@ float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
 // Based on https://thebookofshaders.com/10/
 float rand(float2 uv)
 {
-	return (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+	return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
 }
 
 float2 rand2(float2 uv)
 {
-	float x = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+	float x = rand(uv);
 	float y = sqrt(1 - x * x);
 	return float2(x, y);
 }
 
 float3 rand3(float2 uv)
 {
-	return float3(rand2(uv), rand(uv.yx));
+	return float3(
+		rand2(uv), 
+		rand(uv.yx));
 }
 
 
@@ -259,8 +260,7 @@ void Miss(inout RayPayload payload)
 	float interpolation = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
 	float3 color = lerp(downColor, upColor, interpolation);
 
-	// Nothing was hit, so return black for now.
-	// Ideally this is where we would do skybox stuff!
+	// Alter the payload color by the sky color
 	payload.color *= color;
 }
 
@@ -287,10 +287,10 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
 	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
-	// Interpolate between perfect reflection and random bounce based on roughness squared
+	// Interpolate between perfect reflection and random bounce based on roughness
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
-	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
+	float3 dir = normalize(lerp(refl, randomBounce, entityColor[InstanceID()].a));
 
 	// Create the new recursive ray
 	RayDesc ray;

@@ -181,19 +181,21 @@ float3 RandomCosineWeightedHemisphere(float u0, float u1, float3 unitNormal)
 // Based on https://thebookofshaders.com/10/
 float rand(float2 uv)
 {
-	return (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+	return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
 }
 
-float2 rand2(float2 uv) 
+float2 rand2(float2 uv)
 {
-	float x = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+	float x = rand(uv);
 	float y = sqrt(1 - x * x);
 	return float2(x, y);
 }
 
-float3 rand3(float2 uv) 
+float3 rand3(float2 uv)
 {
-	return float3(rand2(uv), rand(uv.yx));
+	return float3(
+		rand2(uv),
+		rand(uv.yx));
 }
 
 
@@ -220,6 +222,8 @@ bool TryRefract(float3 incident, float3 normal, float ior, out float3 refr)
 	refr = ior * incident - (ior * NdotI + sqrt(k)) * normal;
 	return true;
 }
+
+
 
 // === Shaders ===
 
@@ -284,8 +288,7 @@ void Miss(inout RayPayload payload)
 	float interpolation = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
 	float3 color = lerp(downColor, upColor, interpolation);
 
-	// Nothing was hit, so return black for now.
-	// Ideally this is where we would do skybox stuff!
+	// Alter the payload color by the sky color
 	payload.color *= color;
 }
 
