@@ -149,8 +149,7 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 		anisoWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		anisoWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		anisoWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		anisoWrap.Filter = D3D12_FILTER_ANISOTROPIC;
-		anisoWrap.MaxAnisotropy = 16;
+		anisoWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		anisoWrap.MaxLOD = D3D12_FLOAT32_MAX;
 		anisoWrap.ShaderRegister = 0;
 		anisoWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
