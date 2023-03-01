@@ -31,9 +31,19 @@ struct RaytracingSceneData
 	int maxRecursionDepth;
 };
 
+struct RaytracingMaterial
+{
+	DirectX::XMFLOAT4 color;
+	unsigned int textureIndex;
+
+	unsigned int pad0;
+	unsigned int pad1;
+	unsigned int pad2;
+};
+
 // Ensure this matches Raytracing shader define!
-#define MAX_INSTANCES_PER_BLAS 100
+#define MAX_INSTANCES_PER_BLAS 256
 struct RaytracingEntityData
 {
-	DirectX::XMFLOAT4 color[MAX_INSTANCES_PER_BLAS];
+	RaytracingMaterial materials[MAX_INSTANCES_PER_BLAS];
 };

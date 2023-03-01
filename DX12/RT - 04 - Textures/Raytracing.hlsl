@@ -43,11 +43,21 @@ cbuffer SceneData : register(b0)
 };
 
 
+struct RaytracingMaterial
+{
+	float4 color;
+	uint textureIndex;
+
+	uint pad0;
+	uint pad1;
+	uint pad2;
+};
+
 // Ensure this matches C++ buffer struct define!
-#define MAX_INSTANCES_PER_BLAS 100
+#define MAX_INSTANCES_PER_BLAS 256
 cbuffer ObjectData : register(b1)
 {
-	float4 entityColor[MAX_INSTANCES_PER_BLAS];
+	RaytracingMaterial materials[MAX_INSTANCES_PER_BLAS];
 };
 
 
@@ -64,7 +74,10 @@ ByteAddressBuffer IndexBuffer        		: register(t1);
 ByteAddressBuffer VertexBuffer				: register(t2);
 
 // Textures
-Texture2D Texture2DBindless[] : register(t0, space1);
+Texture2D AllTextures[] : register(t0, space1);
+
+// Samplers
+SamplerState BasicSampler : register(s0);
 
 // === Helpers ===
 
@@ -306,12 +319,23 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 		return;
 	}
 
-	// We've hit, so adjust the payload color by this instance's color
-	payload.color *= entityColor[InstanceID()].rgb;
-
 	// Get the geometry hit details and convert normal to world space
 	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
 	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
+
+	// Get this material data
+	RaytracingMaterial mat = materials[InstanceID()];
+
+	// Texture?
+	if (mat.textureIndex != -1)
+	{
+		payload.color *= AllTextures[mat.textureIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb;
+	}
+	else
+	{
+		// We've hit, so adjust the payload color by this instance's color
+		payload.color *= mat.color.rgb;
+	}
 
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
@@ -320,7 +344,7 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	// Interpolate between perfect reflection and random bounce based on roughness squared
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
-	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
+	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(mat.color.a, 2))));
 		
 	// Create the new recursive ray
 	RayDesc ray;
@@ -351,8 +375,11 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 		return;
 	}
 
+	// Get this material data
+	RaytracingMaterial mat = materials[InstanceID()];
+
 	// We've hit, so adjust the payload color by this instance's color
-	payload.color *= entityColor[InstanceID()].rgb;
+	payload.color *= mat.color.rgb;
 
 	// Get the geometry hit details and convert normal to world space
 	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
@@ -386,7 +413,7 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 
 	// Interpolate between refract/reflect and random bounce based on roughness squared
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
-	dir = normalize(lerp(dir, randomBounce, saturate(pow(entityColor[InstanceID()].a, 2))));
+	dir = normalize(lerp(dir, randomBounce, saturate(pow(mat.color.a, 2))));
 
 	// Create the new recursive ray
 	RayDesc ray;
@@ -410,7 +437,9 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 [shader("closesthit")]
 void ClosestHitEmissive(inout RayPayload payload, BuiltInTriangleIntersectionAttributes hitAttributes)
 {
-	// Get the data for this entity
-	float4 color = entityColor[InstanceID()];
-	payload.color = color.rgb * color.a; // Apply intensity for emissive material
+	// Get this material data
+	RaytracingMaterial mat = materials[InstanceID()];
+
+	// Apply intensity for emissive material
+	payload.color = mat.color.rgb * mat.color.a; 
 }

@@ -356,6 +356,10 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> darkGrey = std::make_shared<Material>(pipelineState, XMFLOAT3(0.25f, 0.25f, 0.25f), 1.0f);
 	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), 0.0f);
 
+	// Set up textures
+	greyDiffuse->AddTexture(cobblestoneAlbedo, 0);
+	greyDiffuse->FinalizeTextures();
+
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
 	std::shared_ptr<Mesh> sphere	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/sphere.obj").c_str());
