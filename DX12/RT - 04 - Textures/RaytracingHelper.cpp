@@ -776,15 +776,22 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		entityData[meshBlasIndex].materials[id.InstanceID].color = XMFLOAT4(c.x, c.y, c.z, r); // Using alpha channel as "roughness"
 
 		// Set up the texture index (TEMPORARY - EXPAND ON THIS)
-		unsigned int textureIndex = -1;
-		D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = mat->GetFinalGPUHandleForTextures();
-		D3D12_GPU_DESCRIPTOR_HANDLE heapStart = DX12Helper::GetInstance().GetCBVSRVDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
-		if (textureHandle.ptr != 0)
+		unsigned int aIndex = -1, nIndex = -1, rIndex = -1, mIndex = -1;
+		D3D12_GPU_DESCRIPTOR_HANDLE textureHandleStart = mat->GetFinalGPUHandleForTextures();
+		
+		// ASSUMING ALL 4 ARE PRESENT FOR NOW
+		if (textureHandleStart.ptr != 0) 
 		{
-			// TODO: Turn this all into a helper method
-			textureIndex = (UINT)(textureHandle.ptr - heapStart.ptr) / dxrDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			aIndex = DX12Helper::GetInstance().GetDescriptorIndex(textureHandleStart);
+			nIndex = aIndex + 1;
+			rIndex = aIndex + 2;
+			mIndex = aIndex + 3;
 		}
-		entityData[meshBlasIndex].materials[id.InstanceID].textureIndex = textureIndex;
+
+		entityData[meshBlasIndex].materials[id.InstanceID].albedoIndex = aIndex;
+		entityData[meshBlasIndex].materials[id.InstanceID].normalMapIndex = nIndex;
+		entityData[meshBlasIndex].materials[id.InstanceID].roughnessIndex = rIndex;
+		entityData[meshBlasIndex].materials[id.InstanceID].metalnessIndex = mIndex;
 
 		// On to the next instance for this mesh
 		instanceIDs[meshBlasIndex]++;

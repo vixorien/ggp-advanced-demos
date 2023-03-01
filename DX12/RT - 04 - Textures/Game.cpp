@@ -358,7 +358,22 @@ void Game::CreateBasicGeometry()
 
 	// Set up textures
 	greyDiffuse->AddTexture(cobblestoneAlbedo, 0);
+	greyDiffuse->AddTexture(cobblestoneNormals, 1);
+	greyDiffuse->AddTexture(cobblestoneRoughness, 2);
+	greyDiffuse->AddTexture(cobblestoneMetal, 3);
 	greyDiffuse->FinalizeTextures();
+
+	darkGrey->AddTexture(scratchedAlbedo, 0);
+	darkGrey->AddTexture(scratchedNormals, 1);
+	darkGrey->AddTexture(scratchedRoughness, 2);
+	darkGrey->AddTexture(scratchedMetal, 3);
+	darkGrey->FinalizeTextures();
+
+	metal->AddTexture(bronzeAlbedo, 0);
+	metal->AddTexture(bronzeNormals, 1);
+	metal->AddTexture(bronzeRoughness, 2);
+	metal->AddTexture(bronzeMetal, 3);
+	metal->FinalizeTextures();
 
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
@@ -417,11 +432,11 @@ void Game::CreateBasicGeometry()
 
 		// Random chance to be emissive
 		MaterialType type = MaterialType::Normal;
-		if (RandomRange(0.0f, 1.0f) > 0.9f)
-		{
-			type = MaterialType::Emissive;
-			rough = RandomRange(1.0f, 2.0f); // Intensity for emissive materials
-		}
+		//if (RandomRange(0.0f, 1.0f) > 0.9f)
+		//{
+		//	type = MaterialType::Emissive;
+		//	rough = RandomRange(1.0f, 2.0f); // Intensity for emissive materials
+		//}
 
 		std::shared_ptr<Material> mat = std::make_shared<Material>(
 			pipelineState, 
@@ -432,7 +447,7 @@ void Game::CreateBasicGeometry()
 			rough,
 			type);
 
-		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, mat);
+		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, RandomRange(0, 1) > 0.5f ? darkGrey : mat);
 		entities.push_back(sphereEnt);
 		
 		float scale = RandomRange(0.5f, 3.5f);

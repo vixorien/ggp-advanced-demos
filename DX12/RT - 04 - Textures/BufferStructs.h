@@ -34,11 +34,10 @@ struct RaytracingSceneData
 struct RaytracingMaterial
 {
 	DirectX::XMFLOAT4 color;
-	unsigned int textureIndex;
-
-	unsigned int pad0;
-	unsigned int pad1;
-	unsigned int pad2;
+	unsigned int albedoIndex;
+	unsigned int normalMapIndex;
+	unsigned int roughnessIndex;
+	unsigned int metalnessIndex;
 };
 
 // Ensure this matches Raytracing shader define!

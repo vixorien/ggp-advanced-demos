@@ -46,11 +46,10 @@ cbuffer SceneData : register(b0)
 struct RaytracingMaterial
 {
 	float4 color;
-	uint textureIndex;
-
-	uint pad0;
-	uint pad1;
-	uint pad2;
+	uint albedoIndex;
+	uint normalMapIndex;
+	uint roughnessIndex;
+	uint metalnessIndex;
 };
 
 // Ensure this matches C++ buffer struct define!
@@ -307,6 +306,30 @@ void Miss(inout RayPayload payload)
 	payload.color *= color;
 }
 
+// Handle converting tangent-space normal map to world space normal
+float3 NormalMapping(float3 normalFromMap, float3 normal, float3 tangent)
+{
+	// Gather the required vectors for converting the normal
+	float3 N = normal;
+	float3 T = normalize(tangent - N * dot(tangent, N));
+	float3 B = cross(T, N);
+
+	// Create the 3x3 matrix to convert from TANGENT-SPACE normals to WORLD-SPACE normals
+	float3x3 TBN = float3x3(T, B, N);
+
+	// Adjust the normal from the map and simply use the results
+	return normalize(mul(normalFromMap, TBN));
+}
+
+float3 FresnelForMetal(float3 v, float3 h, float3 f0)
+{
+	// Pre-calculations
+	float VdotH = saturate(dot(v, h));
+
+	// Final value
+	return f0 + (1 - f0) * pow(1 - VdotH, 5);
+}
+
 
 // Closest hit shader - Runs when a ray hits the closest surface
 [shader("closesthit")]
@@ -322,29 +345,39 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	// Get the geometry hit details and convert normal to world space
 	Vertex hit = GetHitDetails(PrimitiveIndex(), hitAttributes);
 	float3 normal_WS = normalize(mul(hit.normal, (float3x3)ObjectToWorld4x3()));
+	float3 tangent_WS = normalize(mul(hit.tangent, (float3x3)ObjectToWorld4x3()));
 
 	// Get this material data
 	RaytracingMaterial mat = materials[InstanceID()];
+	float roughness = saturate(pow(mat.color.a, 2)); // Squared remap
+	float3 surfaceColor = mat.color.rgb;
+	float metal = 0;
 
 	// Texture?
-	if (mat.textureIndex != -1)
+	if (mat.albedoIndex != -1)
 	{
-		payload.color *= AllTextures[mat.textureIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb;
-	}
-	else
-	{
-		// We've hit, so adjust the payload color by this instance's color
-		payload.color *= mat.color.rgb;
-	}
+		surfaceColor = pow(AllTextures[mat.albedoIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb, 2.2f);
+		roughness = AllTextures[mat.roughnessIndex].SampleLevel(BasicSampler, hit.uv, 0).r;
+		metal = AllTextures[mat.metalnessIndex].SampleLevel(BasicSampler, hit.uv, 0).r;
 
+		float3 normalFromMap = AllTextures[mat.normalMapIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb * 2 - 1;
+		normal_WS = NormalMapping(normalFromMap, normal_WS, tangent_WS);
+	}
+	
+
+	
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
 	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
+	// We've hit, so adjust the payload color by this instance's color
+	//payload.color = rand(rng) > metal ? payload.color * surfaceColor : payload.color;
+	payload.color *= surfaceColor;
+
 	// Interpolate between perfect reflection and random bounce based on roughness squared
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
-	float3 dir = normalize(lerp(refl, randomBounce, saturate(pow(mat.color.a, 2))));
+	float3 dir = normalize(lerp(refl, randomBounce, roughness));
 		
 	// Create the new recursive ray
 	RayDesc ray;

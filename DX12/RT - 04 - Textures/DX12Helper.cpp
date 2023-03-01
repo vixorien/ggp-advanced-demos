@@ -409,6 +409,12 @@ void DX12Helper::ReserveSrvUavDescriptorHeapSlot(D3D12_CPU_DESCRIPTOR_HANDLE* re
 }
 
 
+UINT DX12Helper::GetDescriptorIndex(D3D12_GPU_DESCRIPTOR_HANDLE handle)
+{
+	return (UINT)(handle.ptr - cbvSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart().ptr) / (UINT)cbvSrvDescriptorHeapIncrementSize;
+}
+
+
 
 // --------------------------------------------------------
 // Closes the current command list and tells the GPU to
