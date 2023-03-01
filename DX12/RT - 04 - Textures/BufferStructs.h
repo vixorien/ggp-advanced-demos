@@ -33,7 +33,13 @@ struct RaytracingSceneData
 
 struct RaytracingMaterial
 {
-	DirectX::XMFLOAT4 color;
+	DirectX::XMFLOAT3 color;
+	float roughness;
+
+	float metal;
+	float emissiveIntensity;
+	DirectX::XMFLOAT2 uvScale;
+
 	unsigned int albedoIndex;
 	unsigned int normalMapIndex;
 	unsigned int roughnessIndex;

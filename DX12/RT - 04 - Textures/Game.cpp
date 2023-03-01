@@ -349,31 +349,59 @@ void Game::CreateBasicGeometry()
 	D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness = LoadTexture(L"../../../../Assets/Textures/scratched_roughness.png");
 	D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal = LoadTexture(L"../../../../Assets/Textures/scratched_metal.png");
 
+	D3D12_CPU_DESCRIPTOR_HANDLE woodAlbedo = LoadTexture(L"../../../../Assets/Textures/wood_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE woodNormals = LoadTexture(L"../../../../Assets/Textures/wood_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE woodRoughness = LoadTexture(L"../../../../Assets/Textures/wood_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE woodMetal = LoadTexture(L"../../../../Assets/Textures/wood_metal.png");
+
+	D3D12_CPU_DESCRIPTOR_HANDLE floorAlbedo = LoadTexture(L"../../../../Assets/Textures/floor_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE floorNormals = LoadTexture(L"../../../../Assets/Textures/floor_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE floorRoughness = LoadTexture(L"../../../../Assets/Textures/floor_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE floorMetal = LoadTexture(L"../../../../Assets/Textures/floor_metal.png");
+
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
-	std::shared_ptr<Material> greyDiffuse = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 0.5f), 1.0f);
-	std::shared_ptr<Material> darkGrey = std::make_shared<Material>(pipelineState, XMFLOAT3(0.25f, 0.25f, 0.25f), 1.0f);
-	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), 0.0f);
+	std::shared_ptr<Material> greyDiffuse = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.5f, 0.5f), MaterialType::Normal, 1.0f, 0.0f);
+	std::shared_ptr<Material> darkGrey = std::make_shared<Material>(pipelineState, XMFLOAT3(0.25f, 0.25f, 0.25f), MaterialType::Normal, 0.0f, 1.0f);
+	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), MaterialType::Normal, 0.0f, 1.0f);
+
+	std::shared_ptr<Material> cobblestone = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> scratched = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> bronze = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> floor = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> wood = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 
 	// Set up textures
-	greyDiffuse->AddTexture(cobblestoneAlbedo, 0);
-	greyDiffuse->AddTexture(cobblestoneNormals, 1);
-	greyDiffuse->AddTexture(cobblestoneRoughness, 2);
-	greyDiffuse->AddTexture(cobblestoneMetal, 3);
-	greyDiffuse->FinalizeTextures();
+	cobblestone->AddTexture(cobblestoneAlbedo, 0);
+	cobblestone->AddTexture(cobblestoneNormals, 1);
+	cobblestone->AddTexture(cobblestoneRoughness, 2);
+	cobblestone->AddTexture(cobblestoneMetal, 3);
+	cobblestone->FinalizeTextures();
 
-	darkGrey->AddTexture(scratchedAlbedo, 0);
-	darkGrey->AddTexture(scratchedNormals, 1);
-	darkGrey->AddTexture(scratchedRoughness, 2);
-	darkGrey->AddTexture(scratchedMetal, 3);
-	darkGrey->FinalizeTextures();
+	scratched->AddTexture(scratchedAlbedo, 0);
+	scratched->AddTexture(scratchedNormals, 1);
+	scratched->AddTexture(scratchedRoughness, 2);
+	scratched->AddTexture(scratchedMetal, 3);
+	scratched->FinalizeTextures();
 
-	metal->AddTexture(bronzeAlbedo, 0);
-	metal->AddTexture(bronzeNormals, 1);
-	metal->AddTexture(bronzeRoughness, 2);
-	metal->AddTexture(bronzeMetal, 3);
-	metal->FinalizeTextures();
+	bronze->AddTexture(bronzeAlbedo, 0);
+	bronze->AddTexture(bronzeNormals, 1);
+	bronze->AddTexture(bronzeRoughness, 2);
+	bronze->AddTexture(bronzeMetal, 3);
+	bronze->FinalizeTextures();
+
+	floor->AddTexture(floorAlbedo, 0);
+	floor->AddTexture(floorNormals, 1);
+	floor->AddTexture(floorRoughness, 2);
+	floor->AddTexture(floorMetal, 3);
+	floor->FinalizeTextures();
+
+	wood->AddTexture(woodAlbedo, 0);
+	wood->AddTexture(woodNormals, 1);
+	wood->AddTexture(woodRoughness, 2);
+	wood->AddTexture(woodMetal, 3);
+	wood->FinalizeTextures();
 
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
@@ -383,10 +411,10 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Mesh> cylinder	= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
 	// Floor
-	std::shared_ptr<GameEntity> floor = std::make_shared<GameEntity>(cube, greyDiffuse);
-	floor->GetTransform()->SetScale(100);
-	floor->GetTransform()->SetPosition(0, -52, 0);
-	entities.push_back(floor);
+	std::shared_ptr<GameEntity> ground = std::make_shared<GameEntity>(cube, wood);
+	ground->GetTransform()->SetScale(100);
+	ground->GetTransform()->SetPosition(0, -52, 0);
+	entities.push_back(ground);
 
 	// Spinning torus
 	std::shared_ptr<GameEntity> t = std::make_shared<GameEntity>(torus, metal);
@@ -395,10 +423,10 @@ void Game::CreateBasicGeometry()
 	entities.push_back(t);
 
 	// Four floating transparent spheres
-	std::shared_ptr<Material> glassWhite	= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 1.0f, 1.0f), 0.0f, MaterialType::Transparent);
-	std::shared_ptr<Material> glassRed		= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 0.1f, 0.1f), 0.0f, MaterialType::Transparent);
-	std::shared_ptr<Material> glassGreen	= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 1.0f, 0.1f), 0.0f, MaterialType::Transparent);
-	std::shared_ptr<Material> glassBlue		= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 0.1f, 1.0f), 0.0f, MaterialType::Transparent);
+	std::shared_ptr<Material> glassWhite	= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 1.0f, 1.0f), MaterialType::Transparent, 0.0f);
+	std::shared_ptr<Material> glassRed		= std::make_shared<Material>(pipelineState, XMFLOAT3(1.0f, 0.1f, 0.1f), MaterialType::Transparent, 0.0f);
+	std::shared_ptr<Material> glassGreen	= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 1.0f, 0.1f), MaterialType::Transparent, 0.0f);
+	std::shared_ptr<Material> glassBlue		= std::make_shared<Material>(pipelineState, XMFLOAT3(0.1f, 0.1f, 1.0f), MaterialType::Transparent, 0.0f);
 
 	std::shared_ptr<GameEntity> glassSphereWhite	= std::make_shared<GameEntity>(sphere, glassWhite);
 	std::shared_ptr<GameEntity> glassSphereRed		= std::make_shared<GameEntity>(sphere, glassRed);
@@ -415,7 +443,7 @@ void Game::CreateBasicGeometry()
 	entities.push_back(glassSphereGreen);
 	entities.push_back(glassSphereBlue);
 
-	std::shared_ptr<GameEntity> parent = std::make_shared<GameEntity>(cube, darkGrey);
+	std::shared_ptr<GameEntity> parent = std::make_shared<GameEntity>(cube, greyDiffuse);
 	parent->GetTransform()->SetPosition(0, 2, 0);
 	parent->GetTransform()->SetScale(0.4f);
 	parent->GetTransform()->AddChild(glassSphereWhite->GetTransform());
@@ -429,14 +457,15 @@ void Game::CreateBasicGeometry()
 	{
 		// Random roughness either 0 or 1
 		float rough = RandomRange(0.0f, 1.0f) > 0.5f ? 0.0f : 1.0f;
-
+		float emissiveIntensity = RandomRange(1.0f, 2.0f);
+		float metalness = RandomRange(0.0f, 1.0f) > 0.5f ? 0.0f : 1.0f;
+		
 		// Random chance to be emissive
 		MaterialType type = MaterialType::Normal;
-		//if (RandomRange(0.0f, 1.0f) > 0.9f)
-		//{
-		//	type = MaterialType::Emissive;
-		//	rough = RandomRange(1.0f, 2.0f); // Intensity for emissive materials
-		//}
+		/*if (RandomRange(0.0f, 1.0f) > 0.9f)
+		{
+			type = MaterialType::Emissive;
+		}*/
 
 		std::shared_ptr<Material> mat = std::make_shared<Material>(
 			pipelineState, 
@@ -444,10 +473,20 @@ void Game::CreateBasicGeometry()
 				RandomRange(0.0f, 1.0f),
 				RandomRange(0.0f, 1.0f),
 				RandomRange(0.0f, 1.0f)),
+			type,
 			rough,
-			type);
+			metalness,
+			emissiveIntensity);
 
-		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere, RandomRange(0, 1) > 0.5f ? darkGrey : mat);
+		// Randomly choose some others
+		float randMat = RandomRange(0, 1);
+		if (randMat > 0.9f) mat = bronze;
+		else if (randMat > 0.8f) mat = cobblestone;
+		else if (randMat > 0.7f) mat = scratched;
+		else if (randMat > 0.6f) mat = wood;
+		else if (randMat > 0.5f) mat = floor;
+
+		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere,  mat);
 		entities.push_back(sphereEnt);
 		
 		float scale = RandomRange(0.5f, 3.5f);
@@ -562,17 +601,23 @@ void Game::Update(float deltaTime, float totalTime)
 		for (int i = skip; i < entities.size(); i++)
 		{
 			XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
+			XMFLOAT3 rot = entities[i]->GetTransform()->GetPitchYawRoll();
+			XMFLOAT3 sc = entities[i]->GetTransform()->GetScale();
 			switch (i % 2)
 			{
 			case 0:
 				pos.x = sin((updateTime + i) * (4 / range)) * range;
+				rot.z = -pos.x / sc.x;
 				break;
 
 			case 1:
 				pos.z = sin((updateTime + i) * (4 / range)) * range;
+				rot.x = pos.z / sc.x;
 				break;
 			}
 			entities[i]->GetTransform()->SetPosition(pos);
+			entities[i]->GetTransform()->SetRotation(rot);
+			
 		}
 	}
 
@@ -695,7 +740,7 @@ void Game::BuildUI()
 		ImGui::PushItemWidth(-150);
 
 		// Controls
-		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 100);
+		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 1000);
 		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
 		ImGui::Checkbox("Freeze Objects", &freezeObjects);
 		ImGui::Spacing();
@@ -711,6 +756,7 @@ void Game::BuildUI()
 					std::shared_ptr<Material> mat = e->GetMaterial();
 					XMFLOAT3 color = mat->GetColorTint();
 					float rough = mat->GetRoughness();
+					bool metal = mat->GetMetal() == 1.0f;
 
 					MaterialType type = mat->GetType();
 					bool norm = type == MaterialType::Normal;
@@ -722,11 +768,12 @@ void Game::BuildUI()
 					// Roughness is intensity for emissive materials
 					if (emis)
 					{
-						if (ImGui::SliderFloat("Intensity", &rough, 1.0f, 10.0f)) mat->SetRoughness(rough);
+						if (ImGui::SliderFloat("Intensity", &rough, 1.0f, 10.0f)) mat->SetEmissiveIntensity(rough);
 					}
 					else
 					{
 						if (ImGui::SliderFloat("Roughness", &rough, 0.0f, 1.0f)) mat->SetRoughness(rough);
+						if (ImGui::Checkbox("Metal", &metal)) mat->SetMetal((float)metal);
 					}
 					
 

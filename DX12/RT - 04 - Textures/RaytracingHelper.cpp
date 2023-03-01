@@ -771,9 +771,11 @@ void RaytracingHelper::CreateTopLevelAccelerationStructureForScene(std::vector<s
 		// Set up the entity data for this entity, too
 		// - mesh index tells us which cbuffer
 		// - instance ID tells us which instance in that cbuffer
-		XMFLOAT3 c = mat->GetColorTint();
-		float r = mat->GetRoughness();
-		entityData[meshBlasIndex].materials[id.InstanceID].color = XMFLOAT4(c.x, c.y, c.z, r); // Using alpha channel as "roughness"
+		entityData[meshBlasIndex].materials[id.InstanceID].color = mat->GetColorTint();
+		entityData[meshBlasIndex].materials[id.InstanceID].roughness = mat->GetRoughness();
+		entityData[meshBlasIndex].materials[id.InstanceID].metal = mat->GetMetal();
+		entityData[meshBlasIndex].materials[id.InstanceID].emissiveIntensity = mat->GetEmissiveIntensity();
+		entityData[meshBlasIndex].materials[id.InstanceID].uvScale = mat->GetUVScale();
 
 		// Set up the texture index (TEMPORARY - EXPAND ON THIS)
 		unsigned int aIndex = -1, nIndex = -1, rIndex = -1, mIndex = -1;

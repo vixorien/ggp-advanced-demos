@@ -45,7 +45,13 @@ cbuffer SceneData : register(b0)
 
 struct RaytracingMaterial
 {
-	float4 color;
+	float3 color;
+	float roughness;
+
+	float metal;
+	float emissiveIntensity;
+	float2 uvScale;
+
 	uint albedoIndex;
 	uint normalMapIndex;
 	uint roughnessIndex;
@@ -321,13 +327,13 @@ float3 NormalMapping(float3 normalFromMap, float3 normal, float3 tangent)
 	return normalize(mul(normalFromMap, TBN));
 }
 
-float3 FresnelForMetal(float3 v, float3 h, float3 f0)
+float FresnelView(float3 n, float3 v, float f0)
 {
 	// Pre-calculations
-	float VdotH = saturate(dot(v, h));
+	float NdotV = saturate(dot(n, v));
 
 	// Final value
-	return f0 + (1 - f0) * pow(1 - VdotH, 5);
+	return f0 + (1 - f0) * pow(1 - NdotV, 5);
 }
 
 
@@ -349,36 +355,46 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 
 	// Get this material data
 	RaytracingMaterial mat = materials[InstanceID()];
-	float roughness = saturate(pow(mat.color.a, 2)); // Squared remap
+	float roughness = saturate(pow(mat.roughness, 2)); // Squared remap
 	float3 surfaceColor = mat.color.rgb;
-	float metal = 0;
+	float metal = mat.metal;
 
 	// Texture?
 	if (mat.albedoIndex != -1)
 	{
+		hit.uv *= mat.uvScale;
 		surfaceColor = pow(AllTextures[mat.albedoIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb, 2.2f);
-		roughness = AllTextures[mat.roughnessIndex].SampleLevel(BasicSampler, hit.uv, 0).r;
+		roughness = pow(AllTextures[mat.roughnessIndex].SampleLevel(BasicSampler, hit.uv, 0).r, 2); // Squared remap
 		metal = AllTextures[mat.metalnessIndex].SampleLevel(BasicSampler, hit.uv, 0).r;
 
 		float3 normalFromMap = AllTextures[mat.normalMapIndex].SampleLevel(BasicSampler, hit.uv, 0).rgb * 2 - 1;
 		normal_WS = NormalMapping(normalFromMap, normal_WS, tangent_WS);
 	}
 	
-
-	
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
 	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
 
-	// We've hit, so adjust the payload color by this instance's color
-	//payload.color = rand(rng) > metal ? payload.color * surfaceColor : payload.color;
-	payload.color *= surfaceColor;
-
-	// Interpolate between perfect reflection and random bounce based on roughness squared
+	// Interpolate between perfect reflection and random bounce based on roughness
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
 	float3 dir = normalize(lerp(refl, randomBounce, roughness));
-		
+
+	// Interpolate between fully random bounce and roughness-based bounce based on fresnel/metal switch
+	// - If we're a "diffuse" ray, we need a random bounce
+	// - If we're a "specular" ray, we need the roughness-based bounce
+	// - Metals will have a fresnel result of 1.0, so this won't affect them
+	float fres = FresnelView(-WorldRayDirection(), normal_WS, lerp(0.04f, 1.0f, metal));
+	float randChance = rand(rng);
+	dir = lerp(randomBounce, dir, fres > randChance);
+
+	// Determine how we color the ray:
+	// - If this is a "diffuse" ray, use the surface color
+	// - If this is a "specular" ray, assume a bounce without tint
+	// - Metals always tint, so the final lerp below takes care of that
+	float3 diffuseColor = lerp(surfaceColor, float3(1,1,1), fres > randChance); // Diffuse "reflection" chance
+	payload.color *= lerp(diffuseColor, surfaceColor, metal); // Metal always tints
+
 	// Create the new recursive ray
 	RayDesc ray;
 	ray.Origin = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
@@ -446,7 +462,7 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 
 	// Interpolate between refract/reflect and random bounce based on roughness squared
 	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
-	dir = normalize(lerp(dir, randomBounce, saturate(pow(mat.color.a, 2))));
+	dir = normalize(lerp(dir, randomBounce, saturate(pow(mat.roughness, 2))));
 
 	// Create the new recursive ray
 	RayDesc ray;
@@ -474,5 +490,5 @@ void ClosestHitEmissive(inout RayPayload payload, BuiltInTriangleIntersectionAtt
 	RaytracingMaterial mat = materials[InstanceID()];
 
 	// Apply intensity for emissive material
-	payload.color = mat.color.rgb * mat.color.a; 
+	payload.color = mat.color.rgb * mat.emissiveIntensity; 
 }

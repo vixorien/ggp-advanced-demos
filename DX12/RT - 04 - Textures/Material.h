@@ -21,9 +21,11 @@ class Material
 public:
 	Material(
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState,
-		DirectX::XMFLOAT3 tint, 
-		float roughness = 1.0f,
+		DirectX::XMFLOAT3 tint,
 		MaterialType type = MaterialType::Normal,
+		float roughness = 1.0f,
+		float metal = 0.0f,
+		float emissiveIntensity = 1.0f,
 		DirectX::XMFLOAT2 uvScale = DirectX::XMFLOAT2(1, 1),
 		DirectX::XMFLOAT2 uvOffset = DirectX::XMFLOAT2(0, 0));
 
@@ -32,6 +34,8 @@ public:
 	DirectX::XMFLOAT2 GetUVOffset();
 	DirectX::XMFLOAT3 GetColorTint();
 	float GetRoughness();
+	float GetMetal();
+	float GetEmissiveIntensity();
 	MaterialType GetType();
 	D3D12_GPU_DESCRIPTOR_HANDLE GetFinalGPUHandleForTextures();
 
@@ -40,6 +44,8 @@ public:
 	void SetUVOffset(DirectX::XMFLOAT2 offset);
 	void SetColorTint(DirectX::XMFLOAT3 tint);
 	void SetRoughness(float roughness);
+	void SetMetal(float metal);
+	void SetEmissiveIntensity(float intensity);
 	void SetType(MaterialType type);
 
 	void AddTexture(D3D12_CPU_DESCRIPTOR_HANDLE srvDescriptorHandle, int slot);
@@ -56,6 +62,8 @@ private:
 	DirectX::XMFLOAT2 uvOffset;
 	DirectX::XMFLOAT2 uvScale;
 	float roughness;
+	float metal;
+	float emissiveIntensity;
 	MaterialType type;
 
 	// Texture-related GPU tracking
