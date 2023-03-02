@@ -914,6 +914,8 @@ void RaytracingHelper::Raytrace(
 	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer,
 	int raysPerPixel,
 	int maxRecursionDepth,
+	DirectX::XMFLOAT3 skyUpColor,
+	DirectX::XMFLOAT3 skyDownColor,
 	bool executeCommandList)
 {
 	if (!dxrAvailable || !helperInitialized)
@@ -942,6 +944,8 @@ void RaytracingHelper::Raytrace(
 	sceneData.cameraPosition = camera->GetTransform()->GetPosition();
 	sceneData.raysPerPixel = raysPerPixel;
 	sceneData.maxRecursionDepth = maxRecursionDepth;
+	sceneData.skyUpColor = skyUpColor;
+	sceneData.skyDownColor = skyDownColor;
 	
 	DirectX::XMFLOAT4X4 view = camera->GetView();
 	DirectX::XMFLOAT4X4 proj = camera->GetProjection();

@@ -40,6 +40,8 @@ cbuffer SceneData : register(b0)
 	float3 cameraPosition;
 	int raysPerPixel;
 	int maxRecursionDepth;
+	float3 skyUpColor;
+	float3 skyDownColor;
 };
 
 
@@ -303,10 +305,10 @@ void RayGen()
 void Miss(inout RayPayload payload)
 {
 	// Hemispheric gradient
-	float3 upColor = float3(0.3f, 0.5f, 0.95f);
-	float3 downColor = float3(1, 1, 1);
+	//float3 upColor = float3(0.3f, 0.5f, 0.95f);
+	//float3 downColor = float3(1, 1, 1);
 	float interpolation = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
-	float3 color = lerp(downColor, upColor, interpolation);
+	float3 color = lerp(skyDownColor, skyUpColor, interpolation);
 
 	// Alter the payload color by the sky color
 	payload.color *= color;
@@ -372,12 +374,15 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	}
 	
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
-	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
+	float2 uv = 
+		(float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions() *
+		(payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent();
+	float2 rng = rand2(uv);
+	float randChance = rand(uv);
 
 	// Interpolate between perfect reflection and random bounce based on roughness
 	float3 refl = reflect(WorldRayDirection(), normal_WS);
-	float3 randomBounce = RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS);
+	float3 randomBounce = normalize(RandomCosineWeightedHemisphere(rand(rng), rand(rng.yx), normal_WS));
 	float3 dir = normalize(lerp(refl, randomBounce, roughness));
 
 	// Interpolate between fully random bounce and roughness-based bounce based on fresnel/metal switch
@@ -385,15 +390,16 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	// - If we're a "specular" ray, we need the roughness-based bounce
 	// - Metals will have a fresnel result of 1.0, so this won't affect them
 	float fres = FresnelView(-WorldRayDirection(), normal_WS, lerp(0.04f, 1.0f, metal));
-	float randChance = rand(rng);
-	dir = lerp(randomBounce, dir, fres > randChance);
+	dir = normalize(lerp(randomBounce, dir, fres > randChance));
 
 	// Determine how we color the ray:
 	// - If this is a "diffuse" ray, use the surface color
 	// - If this is a "specular" ray, assume a bounce without tint
 	// - Metals always tint, so the final lerp below takes care of that
-	float3 diffuseColor = lerp(surfaceColor, float3(1,1,1), fres > randChance); // Diffuse "reflection" chance
+	float3 roughnessBounceColor = lerp(float3(1, 1, 1), surfaceColor, roughness); // Dir is roughness-based, so color is too
+	float3 diffuseColor = lerp(surfaceColor, roughnessBounceColor, fres > randChance); // Diffuse "reflection" chance
 	payload.color *= lerp(diffuseColor, surfaceColor, metal); // Metal always tints
+
 
 	// Create the new recursive ray
 	RayDesc ray;

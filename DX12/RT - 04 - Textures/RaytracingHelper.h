@@ -72,6 +72,8 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer, 
 		int raysPerPixel,
 		int maxRecursionDepth,
+		DirectX::XMFLOAT3 skyUpColor,
+		DirectX::XMFLOAT3 skyDownColor,
 		bool executeCommandList = true);
 
 

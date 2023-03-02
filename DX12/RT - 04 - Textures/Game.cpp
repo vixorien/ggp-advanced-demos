@@ -44,7 +44,9 @@ Game::Game(HINSTANCE hInstance)
 	raysPerPixel(25),
 	maxRecursionDepth(10),
 	freezeObjects(false),
-	updateTime(0.0f)
+	updateTime(0.0f),
+	skyUpColor(0.3f, 0.5f, 0.95f),
+	skyDownColor(1,1,1)
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -452,6 +454,22 @@ void Game::CreateBasicGeometry()
 	parent->GetTransform()->AddChild(glassSphereBlue->GetTransform());
 	entities.push_back(parent);
 
+	// Test spheres
+	for (int i = 0; i <= 10; i++)
+	{
+		std::shared_ptr<Material> matMetal = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1), MaterialType::Normal, i * 0.1f, 1.0f);
+		std::shared_ptr<Material> matPlast = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 0, 0), MaterialType::Normal, i * 0.1f, 0.0f);
+
+		std::shared_ptr<GameEntity> entMetal = std::make_shared<GameEntity>(sphere, matMetal);
+		std::shared_ptr<GameEntity> entPlast = std::make_shared<GameEntity>(sphere, matPlast);
+
+		entMetal->GetTransform()->SetPosition((i - 5) * 1.1f, 11.1f, 0);
+		entPlast->GetTransform()->SetPosition((i - 5) * 1.1f, 10, 0);
+
+		entities.push_back(entMetal);
+		entities.push_back(entPlast);
+	}
+
 	float range = 20;
 	for (int i = 0; i < 50; i++)
 	{
@@ -594,7 +612,8 @@ void Game::Update(float deltaTime, float totalTime)
 		// 1: torus
 		// 2,3,4,5: transparent balls
 		// 6: ball parent
-		int skip = 7;
+		// 7-28: test balls
+		int skip = 29;
 
 		// Rotate entities (skip first two)
 		float range = 20;
@@ -607,12 +626,12 @@ void Game::Update(float deltaTime, float totalTime)
 			{
 			case 0:
 				pos.x = sin((updateTime + i) * (4 / range)) * range;
-				rot.z = -pos.x / sc.x;
+				rot.z = -pos.x / (sc.x * 0.5f);
 				break;
 
 			case 1:
 				pos.z = sin((updateTime + i) * (4 / range)) * range;
-				rot.x = pos.z / sc.x;
+				rot.x = pos.z / (sc.x * 0.5f);
 				break;
 			}
 			entities[i]->GetTransform()->SetPosition(pos);
@@ -649,7 +668,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 
 		// Perform raytrace - specifically NOT executing the command list yet, as we're doing ImGui after
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, false);
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, skyUpColor, skyDownColor, false);
 	}
 
 	// ImGui
@@ -743,6 +762,8 @@ void Game::BuildUI()
 		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 1000);
 		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
 		ImGui::Checkbox("Freeze Objects", &freezeObjects);
+		ImGui::ColorEdit3("Sky Up Color", &skyUpColor.x);
+		ImGui::ColorEdit3("Sky Down Color", &skyDownColor.x);
 		ImGui::Spacing();
 
 		// Entities

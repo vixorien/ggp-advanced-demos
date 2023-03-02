@@ -52,6 +52,8 @@ private:
 	// Raytracing
 	int maxRecursionDepth;
 	int raysPerPixel;
+	DirectX::XMFLOAT3 skyUpColor;
+	DirectX::XMFLOAT3 skyDownColor;
 
 };
 

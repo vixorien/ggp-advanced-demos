@@ -29,6 +29,8 @@ struct RaytracingSceneData
 	DirectX::XMFLOAT3 cameraPosition;
 	int raysPerPixel;
 	int maxRecursionDepth;
+	DirectX::XMFLOAT3 skyUpColor;
+	DirectX::XMFLOAT3 skyDownColor;
 };
 
 struct RaytracingMaterial
