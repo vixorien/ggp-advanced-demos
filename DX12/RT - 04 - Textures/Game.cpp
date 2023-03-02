@@ -361,6 +361,16 @@ void Game::CreateBasicGeometry()
 	D3D12_CPU_DESCRIPTOR_HANDLE floorRoughness = LoadTexture(L"../../../../Assets/Textures/floor_roughness.png");
 	D3D12_CPU_DESCRIPTOR_HANDLE floorMetal = LoadTexture(L"../../../../Assets/Textures/floor_metal.png");
 
+	D3D12_CPU_DESCRIPTOR_HANDLE paintAlbedo = LoadTexture(L"../../../../Assets/Textures/paint_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE paintNormals = LoadTexture(L"../../../../Assets/Textures/paint_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE paintRoughness = LoadTexture(L"../../../../Assets/Textures/paint_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE paintMetal = LoadTexture(L"../../../../Assets/Textures/paint_metal.png");
+
+	D3D12_CPU_DESCRIPTOR_HANDLE ironAlbedo = LoadTexture(L"../../../../Assets/Textures/rough_albedo.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE ironNormals = LoadTexture(L"../../../../Assets/Textures/rough_normals.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE ironRoughness = LoadTexture(L"../../../../Assets/Textures/rough_roughness.png");
+	D3D12_CPU_DESCRIPTOR_HANDLE ironMetal = LoadTexture(L"../../../../Assets/Textures/rough_metal.png");
+
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
@@ -372,6 +382,8 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> scratched = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	std::shared_ptr<Material> bronze = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	std::shared_ptr<Material> floor = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> paint = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	std::shared_ptr<Material> iron = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	std::shared_ptr<Material> wood = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 
 	// Set up textures
@@ -399,11 +411,23 @@ void Game::CreateBasicGeometry()
 	floor->AddTexture(floorMetal, 3);
 	floor->FinalizeTextures();
 
+	paint->AddTexture(paintAlbedo, 0);
+	paint->AddTexture(paintNormals, 1);
+	paint->AddTexture(paintRoughness, 2);
+	paint->AddTexture(paintMetal, 3);
+	paint->FinalizeTextures();
+
 	wood->AddTexture(woodAlbedo, 0);
 	wood->AddTexture(woodNormals, 1);
 	wood->AddTexture(woodRoughness, 2);
 	wood->AddTexture(woodMetal, 3);
 	wood->FinalizeTextures();
+
+	iron->AddTexture(ironAlbedo, 0);
+	iron->AddTexture(ironNormals, 1);
+	iron->AddTexture(ironRoughness, 2);
+	iron->AddTexture(ironMetal, 3);
+	iron->FinalizeTextures();
 
 	// Load meshes
 	std::shared_ptr<Mesh> cube		= std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
@@ -498,11 +522,13 @@ void Game::CreateBasicGeometry()
 
 		// Randomly choose some others
 		float randMat = RandomRange(0, 1);
-		if (randMat > 0.9f) mat = bronze;
-		else if (randMat > 0.8f) mat = cobblestone;
-		else if (randMat > 0.7f) mat = scratched;
-		else if (randMat > 0.6f) mat = wood;
-		else if (randMat > 0.5f) mat = floor;
+		if (randMat > 0.95f) mat = bronze;
+		else if (randMat > 0.9f) mat = cobblestone;
+		else if (randMat > 0.85f) mat = scratched;
+		else if (randMat > 0.8f) mat = wood;
+		else if (randMat > 0.75f) mat = iron;
+		else if (randMat > 0.7f) mat = paint;
+		else if (randMat > 0.65f) mat = floor;
 
 		std::shared_ptr<GameEntity> sphereEnt = std::make_shared<GameEntity>(sphere,  mat);
 		entities.push_back(sphereEnt);
