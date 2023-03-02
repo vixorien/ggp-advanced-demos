@@ -82,6 +82,7 @@ ByteAddressBuffer VertexBuffer				: register(t2);
 
 // Textures
 Texture2D AllTextures[] : register(t0, space1);
+TextureCube Skybox		: register(t0, space2);
 
 // Samplers
 SamplerState BasicSampler : register(s0);
@@ -307,8 +308,10 @@ void Miss(inout RayPayload payload)
 	// Hemispheric gradient
 	//float3 upColor = float3(0.3f, 0.5f, 0.95f);
 	//float3 downColor = float3(1, 1, 1);
-	float interpolation = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
-	float3 color = lerp(skyDownColor, skyUpColor, interpolation);
+	//float interpolation = dot(normalize(WorldRayDirection()), float3(0, 1, 0)) * 0.5f + 0.5f;
+	//float3 color = lerp(skyDownColor, skyUpColor, interpolation);
+
+	float3 color = Skybox.SampleLevel(BasicSampler, WorldRayDirection(), 0).rgb;
 
 	// Alter the payload color by the sky color
 	payload.color *= color;

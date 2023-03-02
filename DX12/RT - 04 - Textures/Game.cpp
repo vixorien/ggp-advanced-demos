@@ -332,6 +332,15 @@ void Game::CreateRootSigAndPipelineState()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
+	// Load the skybox
+	skyboxHandle = DX12Helper::GetInstance().LoadCubeTexture(
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/right.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/left.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/up.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/down.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/front.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Clouds Blue/back.png").c_str());
+
 	// Quick macro to simplify texture loading lines below
 #define LoadTexture(x) DX12Helper::GetInstance().LoadTexture(FixPath(x).c_str())
 
@@ -694,7 +703,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(entities);
 
 		// Perform raytrace - specifically NOT executing the command list yet, as we're doing ImGui after
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, skyUpColor, skyDownColor, false);
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, skyUpColor, skyDownColor, skyboxHandle, false);
 	}
 
 	// ImGui

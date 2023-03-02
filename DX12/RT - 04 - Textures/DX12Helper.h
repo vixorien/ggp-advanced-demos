@@ -63,6 +63,13 @@ public:
 
 	// Resource creation
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(const wchar_t* file, bool generateMips = true);
+	D3D12_GPU_DESCRIPTOR_HANDLE LoadCubeTexture(
+		const wchar_t* right,
+		const wchar_t* left,
+		const wchar_t* up,
+		const wchar_t* down,
+		const wchar_t* front,
+		const wchar_t* back);
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBuffer(
 		UINT64 size,
 		D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT,

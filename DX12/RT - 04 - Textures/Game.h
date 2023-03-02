@@ -55,5 +55,6 @@ private:
 	DirectX::XMFLOAT3 skyUpColor;
 	DirectX::XMFLOAT3 skyDownColor;
 
+	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle;
 };
 

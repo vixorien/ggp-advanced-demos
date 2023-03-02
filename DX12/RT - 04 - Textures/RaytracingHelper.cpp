@@ -114,9 +114,16 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 		allTexturesRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		allTexturesRange.RegisterSpace = 1; // Must match shader setup!
 
-		// Set up the root parameters for the global signature (of which there are four)
+		D3D12_DESCRIPTOR_RANGE skyboxRange = {};
+		skyboxRange.BaseShaderRegister = 0;
+		skyboxRange.NumDescriptors = 1;
+		skyboxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		skyboxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		skyboxRange.RegisterSpace = 2; // Must match shader setup!
+
+		// Set up the root parameters for the global signature
 		// These need to match the shader(s) we'll be using
-		D3D12_ROOT_PARAMETER rootParams[4] = {};
+		D3D12_ROOT_PARAMETER rootParams[5] = {};
 		{
 			// First param is the UAV range for the output texture
 			rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -141,6 +148,12 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 			rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 			rootParams[3].DescriptorTable.NumDescriptorRanges = 1;
 			rootParams[3].DescriptorTable.pDescriptorRanges = &allTexturesRange;
+
+			// Fifth is skybox table
+			rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+			rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
+			rootParams[4].DescriptorTable.pDescriptorRanges = &skyboxRange;
 		}
 
 		// Create a single static sampler (available to all shaders at the same slot)
@@ -916,6 +929,7 @@ void RaytracingHelper::Raytrace(
 	int maxRecursionDepth,
 	DirectX::XMFLOAT3 skyUpColor,
 	DirectX::XMFLOAT3 skyDownColor,
+	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle,
 	bool executeCommandList)
 {
 	if (!dxrAvailable || !helperInitialized)
@@ -972,6 +986,7 @@ void RaytracingHelper::Raytrace(
 		dxrCommandList->SetComputeRootShaderResourceView(1, topLevelAccelerationStructure->GetGPUVirtualAddress());		// Second is SRV for accel structure (as root SRV, no table needed)
 		dxrCommandList->SetComputeRootDescriptorTable(2, cbuffer);					// Third is CBV
 		dxrCommandList->SetComputeRootDescriptorTable(3, heap[0]->GetGPUDescriptorHandleForHeapStart()); // Fourth is entire heap for bindless
+		dxrCommandList->SetComputeRootDescriptorTable(4, skyboxHandle);
 
 		// Dispatch rays
 		D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
