@@ -46,7 +46,8 @@ Game::Game(HINSTANCE hInstance)
 	freezeObjects(false),
 	updateTime(0.0f),
 	skyUpColor(0.3f, 0.5f, 0.95f),
-	skyDownColor(1,1,1)
+	skyDownColor(1,1,1),
+	skyboxHandle{}
 {
 
 #if defined(DEBUG) || defined(_DEBUG)
