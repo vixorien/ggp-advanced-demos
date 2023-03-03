@@ -6,6 +6,7 @@
 #include "Transform.h"
 #include "Camera.h"
 #include "Lights.h"
+#include "Scene.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
@@ -45,7 +46,8 @@ private:
 	int lightCount;
 	std::vector<Light> lights;
 	std::shared_ptr<Camera> camera;
-	std::vector<std::shared_ptr<GameEntity>> entities;
+	std::vector<std::shared_ptr<Scene>> scenes;
+	unsigned int currentScene;
 	bool freezeObjects;
 	float updateTime;
 
