@@ -73,6 +73,7 @@ cbuffer ObjectData : register(b1)
 
 // Output UAV 
 RWTexture2D<float4> OutputColor				: register(u0);
+RWTexture2D<float4> Accumulation			: register(u1);
 
 // The actual scene we want to trace through (a TLAS)
 RaytracingAccelerationStructure SceneTLAS	: register(t0);
@@ -297,20 +298,27 @@ void RayGen()
 		totalColor += payload.color;
 	}
 
-	totalColor = pow(totalColor / raysPerPixel, 1.0f / 2.2f);
+	// Average the total color this frame
+	totalColor /= raysPerPixel;
 
-	// Set the final color of the buffer (gamma corrected)
-	//OutputColor[rayIndices] = float4(pow(totalColor / raysPerPixel, 1.0f / 2.2f), 1);
-
-	float4 currentOutput = OutputColor[rayIndices];
+	// Are we starting fresh?
 	if (accumulationFrameCount == 0)
-		OutputColor[rayIndices] = float4(totalColor, 1);
+	{
+		// Overwrite both since this is a fresh frame
+		Accumulation[rayIndices] = float4(totalColor, 1); // NO gamma correction
+		OutputColor[rayIndices] = float4(pow(totalColor, 1.0f / 2.2f), 1);
+	}
 	else
 	{
-		currentOutput.rgb *= accumulationFrameCount; // Expand the average
-		currentOutput.rgb += totalColor; // Add to total
-		currentOutput.rgb /= (accumulationFrameCount + 1); // Re-average
-		OutputColor[rayIndices] = currentOutput;
+		// Grab the overall accumulation thus far, apply the new data and replace
+		float4 acc = Accumulation[rayIndices];
+		acc.rgb *= accumulationFrameCount; // Expand the average
+		acc.rgb += totalColor; // Add to total
+		acc.rgb /= (accumulationFrameCount + 1); // Re-average
+		Accumulation[rayIndices] = acc;
+
+		// Save the gamma corrected version for output
+		OutputColor[rayIndices] = float4(pow(acc.rgb, 1.0f / 2.2f), 1);
 	}
 }
 

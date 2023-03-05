@@ -90,12 +90,13 @@ void RaytracingHelper::CreateRaytracingRootSignatures()
 	// Create a global root signature shared across all raytracing shaders
 	{
 		// Three descriptor ranges
-		// 1: The output texture, which is an unordered access view (UAV)
+		// 1: The output texture and accumulation texture
 		// 2: The CBV to hold scene data
 		// 3: The "bindless" table of the entire heap
+		// 4: Skybox
 		D3D12_DESCRIPTOR_RANGE outputUAVRange = {};
 		outputUAVRange.BaseShaderRegister = 0;
-		outputUAVRange.NumDescriptors = 1;
+		outputUAVRange.NumDescriptors = 2;
 		outputUAVRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 		outputUAVRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		outputUAVRange.RegisterSpace = 0;
@@ -579,6 +580,34 @@ void RaytracingHelper::CreateRaytracingOutputUAV(unsigned int width, unsigned in
 		0,
 		&uavDesc,
 		raytracingOutputUAV_CPU);
+
+
+	// === Also create the accumulation texture ===
+	// - same heap details, slightly different desc
+	desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	dxrDevice->CreateCommittedResource(
+		&heapDesc,
+		D3D12_HEAP_FLAG_NONE,
+		&desc,
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		0,
+		IID_PPV_ARGS(accumulationTexture.GetAddressOf()));
+
+	// Do we have a UAV alrady?
+	if (!accumulationUAV_GPU.ptr)
+	{
+		// Nope, so reserve a spot
+		DX12Helper::GetInstance().ReserveSrvUavDescriptorHeapSlot(
+			&accumulationUAV_CPU,
+			&accumulationUAV_GPU);
+	}
+
+	// Set up the UAV for the accumulation texture
+	dxrDevice->CreateUnorderedAccessView(
+		accumulationTexture.Get(),
+		0,
+		&uavDesc,
+		accumulationUAV_CPU);
 }
 
 
@@ -598,6 +627,7 @@ void RaytracingHelper::ResizeOutputUAV(unsigned int screenWidth, unsigned int sc
 
 	// Reset and re-created the buffer
 	raytracingOutput.Reset();
+	accumulationTexture.Reset();
 	CreateRaytracingOutputUAV(screenWidth, screenHeight);
 }
 

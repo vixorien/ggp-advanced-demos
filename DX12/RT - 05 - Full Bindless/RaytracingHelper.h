@@ -133,6 +133,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasInstanceDescBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> topLevelAccelerationStructure;
 
+	// Accumulation texture
+	Microsoft::WRL::ComPtr<ID3D12Resource> accumulationTexture;
+	D3D12_CPU_DESCRIPTOR_HANDLE accumulationUAV_CPU;
+	D3D12_GPU_DESCRIPTOR_HANDLE accumulationUAV_GPU;
+
 	// Actual output resource
 	Microsoft::WRL::ComPtr<ID3D12Resource> raytracingOutput;
 	D3D12_CPU_DESCRIPTOR_HANDLE raytracingOutputUAV_CPU;
