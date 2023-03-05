@@ -432,15 +432,15 @@ void Game::Update(float deltaTime, float totalTime)
 		Scene::UpdateScene(scenes[currentScene], deltaTime, updateTime);
 	}
 
-	// Update other objects
-	if (camera->Update(deltaTime))
-		accumulationFrameCount = 0;
-
 	// Should we accumulate?
 	if (accumulateFrames && accumulationFrameCount < (unsigned int)(-1) - 1)
 	{
 		accumulationFrameCount++;
 	}
+
+	// Update other objects
+	if (camera->Update(deltaTime))
+		accumulationFrameCount = 0;
 
 	BuildUI();
 }
@@ -559,9 +559,21 @@ void Game::BuildUI()
 		// Controls
 		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 1000);
 		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
-		ImGui::Checkbox("Freeze Objects", &freezeObjects);
-		if (ImGui::Checkbox("Accumulate Frames", &accumulateFrames) && !accumulateFrames)
+		
+		if (ImGui::Checkbox("Freeze Objects", &freezeObjects) && !freezeObjects)
+		{
+			// If we turn freeze objects OFF, also turn off accumulation
+			accumulateFrames = false;
 			accumulationFrameCount = 0;
+		}
+		
+		if (ImGui::Checkbox("Accumulate Frames", &accumulateFrames))
+		{
+			// If accumulate is on, freeze is on too!
+			// Also reset accumulation count when accumulation is turned off
+			if (accumulateFrames) freezeObjects = true;
+			else accumulationFrameCount = 0;
+		}
 		//ImGui::ColorEdit3("Sky Up Color", &skyUpColor.x);
 		//ImGui::ColorEdit3("Sky Down Color", &skyDownColor.x);
 		ImGui::Spacing();
