@@ -189,6 +189,50 @@ void Camera::SetProjectionType(CameraProjectionType type)
 {
 	projectionType = type;
 	UpdateProjectionMatrix(aspectRatio);
-} 
+}
+
+
+std::shared_ptr<Camera> Camera::Parse(nlohmann::json jsonCamera)
+{
+   // Defaults
+	CameraProjectionType projType = CameraProjectionType::Perspective;
+	float moveSpeed = 5.0f;
+	float lookSpeed = 0.002f;
+	float fov = XM_PIDIV4;
+	float nearClip = 0.01f;
+	float farClip = 1000.0f;
+	XMFLOAT3 pos = { 0, 0, -5 };
+	XMFLOAT3 rot = { 0, 0, 0 };
+
+	// Check for each type of data
+	if (jsonCamera.contains("type") && jsonCamera["type"].get<std::string>() == "orthographic")
+		projType = CameraProjectionType::Orthographic;
+
+	if (jsonCamera.contains("moveSpeed")) moveSpeed = jsonCamera["moveSpeed"].get<float>();
+	if (jsonCamera.contains("lookSpeed")) lookSpeed = jsonCamera["lookSpeed"].get<float>();
+	if (jsonCamera.contains("fov")) fov = jsonCamera["fov"].get<float>();
+	if (jsonCamera.contains("near")) nearClip = jsonCamera["near"].get<float>();
+	if (jsonCamera.contains("far")) farClip = jsonCamera["far"].get<float>();
+	if (jsonCamera.contains("position") && jsonCamera["position"].size() == 3)
+	{
+		pos.x = jsonCamera["position"][0].get<float>();
+		pos.y = jsonCamera["position"][1].get<float>();
+		pos.z = jsonCamera["position"][2].get<float>();
+	}
+	if (jsonCamera.contains("rotation") && jsonCamera["rotation"].size() == 3)
+	{
+		rot.x = jsonCamera["rotation"][0].get<float>();
+		rot.y = jsonCamera["rotation"][1].get<float>();
+		rot.z = jsonCamera["rotation"][2].get<float>();
+	}
+
+	// Create the camera
+	std::shared_ptr<Camera> cam = std::make_shared<Camera>(
+		pos, moveSpeed, lookSpeed, fov, 1.0f, nearClip, farClip, projType);
+	cam->GetTransform()->SetRotation(rot);
+
+	return cam;
+}
+
 
 

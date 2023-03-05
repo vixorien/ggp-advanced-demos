@@ -1,6 +1,8 @@
 #include "Sky.h"
 #include "WICTextureLoader.h"
 #include "DDSTextureLoader.h"
+#include "Assets.h"
+#include "Helpers.h"
 
 using namespace DirectX;
 
@@ -131,6 +133,34 @@ void Sky::Draw(std::shared_ptr<Camera> camera)
 	context->OMSetDepthStencilState(0, 0);
 }
 
+std::shared_ptr<Sky> Sky::Parse(
+	nlohmann::json jsonSky, 
+	Microsoft::WRL::ComPtr<ID3D11Device> device,
+	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
+{
+	Assets& assets = Assets::GetInstance();
+
+	nlohmann::json t = jsonSky["texture"];
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> xPos = assets.GetTexture(NarrowToWide(t["xPos"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> xNeg = assets.GetTexture(NarrowToWide(t["xNeg"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> yPos = assets.GetTexture(NarrowToWide(t["yPos"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> yNeg = assets.GetTexture(NarrowToWide(t["yNeg"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> zPos = assets.GetTexture(NarrowToWide(t["zPos"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> zNeg = assets.GetTexture(NarrowToWide(t["zNeg"].get<std::string>()));
+	std::shared_ptr<Mesh> mesh = assets.GetMesh(NarrowToWide(jsonSky["mesh"].get<std::string>()));
+	std::shared_ptr<SimpleVertexShader> vs = assets.GetVertexShader(NarrowToWide(jsonSky["shaders"]["vertex"].get<std::string>()));
+	std::shared_ptr<SimplePixelShader> ps = assets.GetPixelShader(NarrowToWide(jsonSky["shaders"]["pixel"].get<std::string>()));
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler = assets.GetSampler(NarrowToWide(jsonSky["sampler"].get<std::string>()));
+
+	return std::make_shared<Sky>(
+		xPos, xNeg, yPos, yNeg, zPos, zNeg,
+		mesh,
+		vs, ps,
+		sampler,
+		device,
+		context);
+}
+
 void Sky::InitRenderStates()
 {
 	// Rasterizer to reverse the cull mode
@@ -183,18 +213,18 @@ Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
 	// Load the 6 textures into an array.
 	// - We need references to the TEXTURES, not the SHADER RESOURCE VIEWS!
 	// - Order matters here!  +X, -X, +Y, -Y, +Z, -Z
-	ID3D11Resource* textures[6] = {};
-	right.Get()->GetResource(&textures[0]);
-	left.Get()->GetResource(&textures[1]);
-	up.Get()->GetResource(&textures[2]);
-	down.Get()->GetResource(&textures[3]);
-	front.Get()->GetResource(&textures[4]);
-	back.Get()->GetResource(&textures[5]);
+	Microsoft::WRL::ComPtr<ID3D11Resource> textures[6] = {};
+	right.Get()->GetResource(textures[0].GetAddressOf());
+	left.Get()->GetResource(textures[1].GetAddressOf());
+	up.Get()->GetResource(textures[2].GetAddressOf());
+	down.Get()->GetResource(textures[3].GetAddressOf());
+	front.Get()->GetResource(textures[4].GetAddressOf());
+	back.Get()->GetResource(textures[5].GetAddressOf());
 
 	// We'll assume all of the textures are the same color format and resolution,
 	// so get the description of the first shader resource view
 	D3D11_TEXTURE2D_DESC faceDesc = {};
-	((ID3D11Texture2D*)textures[0])->GetDesc(&faceDesc);
+	((ID3D11Texture2D*)textures[0].Get())->GetDesc(&faceDesc);
 
 	// Describe the resource for the cube map, which is simply 
 	// a "texture 2d array".  This is a special GPU resource format, 
@@ -231,7 +261,7 @@ Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
 			cubeMapTexture.Get(), // Destination resource
 			subresource,		// Dest subresource index (one of the array elements)
 			0, 0, 0,			// XYZ location of copy
-			textures[i],		// Source resource
+			textures[i].Get(),		// Source resource
 			0,					// Source subresource index (we're assuming there's only one)
 			0);					// Source subresource "box" of data to copy (zero means the whole thing)
 	}
@@ -247,10 +277,6 @@ Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Sky::CreateCubemap(
 	// Make the SRV
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cubeSRV;
 	device->CreateShaderResourceView(cubeMapTexture.Get(), &srvDesc, cubeSRV.GetAddressOf());
-
-	// Clean up our extra texture refs
-	for (int i = 0; i < 6; i++)
-		textures[i]->Release();
 
 	// Send back the SRV, which is what we need for our shaders
 	return cubeSRV;

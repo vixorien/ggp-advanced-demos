@@ -2,6 +2,7 @@
 #include <DirectXMath.h>
 
 #include "Transform.h"
+#include "..\Common\json\json.hpp"
 
 enum class CameraProjectionType
 {
@@ -65,6 +66,8 @@ public:
 
 	CameraProjectionType GetProjectionType();
 	void SetProjectionType(CameraProjectionType type);
+
+	static std::shared_ptr<Camera> Parse(nlohmann::json jsonCamera);
 
 private:
 	// Camera matrices

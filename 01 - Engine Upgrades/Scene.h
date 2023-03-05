@@ -41,21 +41,17 @@ public:
 
 private:
 
+	// Drawing and setup requirements
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 
-	// Vectors of various scene objects
+	// Vectors of various scene elements
 	std::vector<std::shared_ptr<GameEntity>> entities;
 	std::vector<std::shared_ptr<Camera>> cameras;
 	std::vector<Light> lights;
 
+	// Singular elements
 	std::shared_ptr<Camera> currentCamera;
 	std::shared_ptr<Sky> sky;
-
-	// Helpers for json parsing
-	std::shared_ptr<Sky> ParseSky(nlohmann::json j);
-	std::shared_ptr<Camera> ParseCamera(nlohmann::json j);
-	std::shared_ptr<GameEntity> ParseEntity(nlohmann::json j);
-	Light ParseLight(nlohmann::json j);
 };
 

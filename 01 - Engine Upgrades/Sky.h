@@ -5,6 +5,7 @@
 #include "Mesh.h"
 #include "SimpleShader.h"
 #include "Camera.h"
+#include "..\Common\json\json.hpp"
 
 #include <wrl/client.h> // Used for ComPtr
 
@@ -66,6 +67,11 @@ public:
 	~Sky();
 
 	void Draw(std::shared_ptr<Camera> camera);
+
+	static std::shared_ptr<Sky> Parse(
+		nlohmann::json jsonSky,
+		Microsoft::WRL::ComPtr<ID3D11Device> device,
+		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
 
 private:
 

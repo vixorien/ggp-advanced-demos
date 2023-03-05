@@ -7,6 +7,7 @@
 #include "Transform.h"
 #include "Camera.h"
 #include "Material.h"
+#include "..\Common\json\json.hpp"
 
 class GameEntity
 {
@@ -21,6 +22,8 @@ public:
 	void SetMaterial(std::shared_ptr<Material> material);
 
 	void Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera);
+
+	static std::shared_ptr<GameEntity> Parse(nlohmann::json jsonEntity);
 
 private:
 

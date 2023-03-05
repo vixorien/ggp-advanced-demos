@@ -136,34 +136,7 @@ void Game::LoadAssetsAndCreateEntities()
 // --------------------------------------------------------
 void Game::GenerateLights()
 {
-	//// Reset
-	//lights.clear();
-
-	//// Setup directional lights
-	//Light dir1 = {};
-	//dir1.Type = LIGHT_TYPE_DIRECTIONAL;
-	//dir1.Direction = XMFLOAT3(1, -1, 1);
-	//dir1.Color = XMFLOAT3(0.8f, 0.8f, 0.8f);
-	//dir1.Intensity = 1.0f;
-
-	//Light dir2 = {};
-	//dir2.Type = LIGHT_TYPE_DIRECTIONAL;
-	//dir2.Direction = XMFLOAT3(-1, -0.25f, 0);
-	//dir2.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
-	//dir2.Intensity = 1.0f;
-
-	//Light dir3 = {};
-	//dir3.Type = LIGHT_TYPE_DIRECTIONAL;
-	//dir3.Direction = XMFLOAT3(0, -1, 1);
-	//dir3.Color = XMFLOAT3(0.2f, 0.2f, 0.2f);
-	//dir3.Intensity = 1.0f;
-
-	//// Add light to the list
-	//lights.push_back(dir1);
-	//lights.push_back(dir2);
-	//lights.push_back(dir3);
-
-	// Create the rest of the lights
+	// Create extra lights
 	while (scene->GetLights().size() < MAX_LIGHTS)
 	{
 		Light point = {};
