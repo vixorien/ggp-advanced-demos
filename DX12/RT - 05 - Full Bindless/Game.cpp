@@ -344,7 +344,7 @@ void Game::CreateBasicGeometry()
 
 	// Create all scenes
 	scenes = Scene::CreateExampleScenes(pipelineState);
-	currentScene = 1;
+	currentScene = 0;
 }
 
 
@@ -555,8 +555,22 @@ void Game::BuildUI()
 		ImGui::Checkbox("Freeze Objects", &freezeObjects);
 		ImGui::ColorEdit3("Sky Up Color", &skyUpColor.x);
 		ImGui::ColorEdit3("Sky Down Color", &skyDownColor.x);
+		ImGui::Spacing();
 
-		
+		if (ImGui::BeginCombo("Scene", scenes[currentScene]->GetName().c_str()))
+		{
+			for(int s = 0; s < scenes.size(); s++)
+			{
+				bool selected = s == currentScene;
+				if (ImGui::Selectable(scenes[s]->GetName().c_str(), selected))
+					currentScene = s;
+
+				if (selected)
+					ImGui::SetItemDefaultFocus();
+			}
+
+			ImGui::EndCombo();
+		}
 
 		ImGui::Spacing();
 

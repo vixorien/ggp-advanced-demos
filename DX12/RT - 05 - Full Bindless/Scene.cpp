@@ -174,6 +174,8 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 	std::shared_ptr<Material> darkGrey = std::make_shared<Material>(pipelineState, XMFLOAT3(0.25f, 0.25f, 0.25f), MaterialType::Normal, 0.0f, 1.0f);
 	std::shared_ptr<Material> metal = std::make_shared<Material>(pipelineState, XMFLOAT3(0.5f, 0.6f, 0.7f), MaterialType::Normal, 0.0f, 1.0f);
 
+	std::shared_ptr<Material> emitWhite = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1), MaterialType::Emissive, 1.0f, 0.0f, 5.0f);
+
 	std::shared_ptr<Material> cobblestone = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	std::shared_ptr<Material> scratched = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	std::shared_ptr<Material> bronze = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
@@ -342,12 +344,17 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 	exampleScenes.push_back(sphereScene);
 
 	// Sponza scene
+	XMFLOAT3 sponzaScale = { 0.1f, 0.1f, 0.1f };
+	XMFLOAT3 sponzaOffset = { 0, 0, 0 };
 	std::shared_ptr<Scene> sponzaScene = std::make_shared<Scene>("Sponza");
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE blackTexture = LoadTexture(L"../../../../Assets/Textures/Sponza/Dielectric_metallic.png");
 		D3D12_CPU_DESCRIPTOR_HANDLE curtainNormal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_normal.png");
 		D3D12_CPU_DESCRIPTOR_HANDLE curtainRough = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_roughness.png");
 		D3D12_CPU_DESCRIPTOR_HANDLE curtainMetal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_metallic.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE fabricNormal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_normal.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE fabricRough = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_roughness.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE fabricMetal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_metallic.png");
 
 		std::shared_ptr<Material> sponzaArchMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 		sponzaArchMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Arch_diffuse.png"), 0);
@@ -355,6 +362,13 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 		sponzaArchMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Arch_roughness.png"), 2);
 		sponzaArchMat->AddTexture(blackTexture, 3);
 		sponzaArchMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaCeilingMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaCeilingMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Ceiling_diffuse.png"), 0);
+		sponzaCeilingMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Ceiling_normal.png"), 1);
+		sponzaCeilingMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Ceiling_roughness.png"), 2);
+		sponzaCeilingMat->AddTexture(blackTexture, 3);
+		sponzaCeilingMat->FinalizeTextures();
 
 		std::shared_ptr<Material> sponzaCurtainRedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 		sponzaCurtainRedMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_Red_diffuse.png"), 0);
@@ -377,6 +391,27 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 		sponzaCurtainBlueMat->AddTexture(curtainMetal, 3);
 		sponzaCurtainBlueMat->FinalizeTextures();
 
+		std::shared_ptr<Material> sponzaFabricRedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaFabricRedMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_Red_diffuse.png"), 0);
+		sponzaFabricRedMat->AddTexture(fabricNormal, 1);
+		sponzaFabricRedMat->AddTexture(fabricRough, 2);
+		sponzaFabricRedMat->AddTexture(fabricMetal, 3);
+		sponzaFabricRedMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaFabricGreenMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaFabricGreenMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_Green_diffuse.png"), 0);
+		sponzaFabricGreenMat->AddTexture(fabricNormal, 1);
+		sponzaFabricGreenMat->AddTexture(fabricRough, 2);
+		sponzaFabricGreenMat->AddTexture(fabricMetal, 3);
+		sponzaFabricGreenMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaFabricBlueMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaFabricBlueMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Fabric_Blue_diffuse.png"), 0);
+		sponzaFabricBlueMat->AddTexture(fabricNormal, 1);
+		sponzaFabricBlueMat->AddTexture(fabricRough, 2);
+		sponzaFabricBlueMat->AddTexture(fabricMetal, 3);
+		sponzaFabricBlueMat->FinalizeTextures();
+
 		std::shared_ptr<Material> sponzaFloorMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 		sponzaFloorMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Floor_diffuse.png"), 0);
 		sponzaFloorMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Floor_normal.png"), 1);
@@ -384,18 +419,25 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 		sponzaFloorMat->AddTexture(blackTexture, 3);
 		sponzaFloorMat->FinalizeTextures();
 
+		std::shared_ptr<Material> sponzaDetailsMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaDetailsMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Details_diffuse.png"), 0);
+		sponzaDetailsMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Details_normal.png"), 1);
+		sponzaDetailsMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Details_roughness.png"), 2);
+		sponzaDetailsMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Details_metallic.png"), 3);
+		sponzaDetailsMat->FinalizeTextures();
+
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaArch, sponzaArchMat));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCeiling, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCeiling, sponzaCeilingMat));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsLower, greyDiffuse));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsRound, greyDiffuse));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsSquare, greyDiffuse));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsBlue, sponzaCurtainBlueMat));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsGreen, sponzaCurtainGreenMat));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsRed, sponzaCurtainRedMat));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaDetails, greyDiffuse));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricBlue, greyDiffuse));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricGreen, greyDiffuse));
-		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricRed, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsGreen, sponzaCurtainGreenMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsBlue, sponzaCurtainBlueMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaDetails, sponzaDetailsMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricRed, sponzaFabricRedMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricGreen, sponzaFabricGreenMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricBlue, sponzaFabricBlueMat));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFloor, sponzaFloorMat));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaLionBackground, greyDiffuse));
 		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaLionHead, greyDiffuse));
@@ -406,10 +448,31 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 
 		for (auto& e : sponzaScene->GetEntities())
 		{
-			e->GetTransform()->SetScale(0.1f);
+			e->GetTransform()->SetScale(sponzaScale);
+			e->GetTransform()->SetPosition(sponzaOffset);
 		}
 	}
 	exampleScenes.push_back(sponzaScene);
+
+	// Sponza with many emissive objects
+	std::shared_ptr<Scene> sponzaLightsScene = std::make_shared<Scene>("Sponza with Lights");
+	{
+		// Copy all sponza entities
+		for (auto& e : sponzaScene->GetEntities())
+		{
+			std::shared_ptr<GameEntity> copy = std::make_shared<GameEntity>(e->GetMesh(), e->GetMaterial());
+			copy->GetTransform()->SetScale(sponzaScale);
+			copy->GetTransform()->SetPosition(sponzaOffset);
+			sponzaLightsScene->AddEntity(copy);
+		}
+		
+		// Also create light entities
+		std::shared_ptr<GameEntity> white1 = std::make_shared<GameEntity>(sphere, emitWhite);
+		white1->GetTransform()->SetScale(5);
+		white1->GetTransform()->SetPosition(0, 20, 50);
+		sponzaLightsScene->AddEntity(white1);
+	}
+	exampleScenes.push_back(sponzaLightsScene);
 
 	// Finalize
 	exampleScenesCreated = true;

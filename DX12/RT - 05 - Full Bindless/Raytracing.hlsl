@@ -500,5 +500,5 @@ void ClosestHitEmissive(inout RayPayload payload, BuiltInTriangleIntersectionAtt
 	RaytracingMaterial mat = materials[InstanceID()];
 
 	// Apply intensity for emissive material
-	payload.color = mat.color.rgb * mat.emissiveIntensity; 
+	payload.color = mat.color.rgb * mat.emissiveIntensity * payload.color; 
 }
