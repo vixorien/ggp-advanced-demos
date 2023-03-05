@@ -101,29 +101,29 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 
 	std::shared_ptr<Mesh> cube = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cube.obj").c_str());
 	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/sphere.obj").c_str());
-	std::shared_ptr<Mesh> helix = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/helix.obj").c_str());
 	std::shared_ptr<Mesh> torus = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/torus.obj").c_str());
+	std::shared_ptr<Mesh> helix = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/helix.obj").c_str());
 	std::shared_ptr<Mesh> cylinder = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/cylinder.obj").c_str());
 
-	//std::shared_ptr<Mesh> sponzaArch = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Arch.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaCeiling = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Ceiling.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaColumnsLower = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsLower.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaColumnsRound = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsRound.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaColumnsSquare = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsSquare.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaCurtainsBlue = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsBlue.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaCurtainsGreen = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsGreen.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaCurtainsRed = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsRed.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaDetails = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Details.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaFabricBlue = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricBlue.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaFabricGreen = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricGreen.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaFabricRed = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricRed.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaFloor = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Floor.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaLionBackground = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/LionBackground.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaLionHead = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/LionHead.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaPoles = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Poles.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaRoof = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Roof.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaVasesLarge = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/VasesLarge.obj").c_str());
-	//std::shared_ptr<Mesh> sponzaWalls = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Walls.obj").c_str());
+	std::shared_ptr<Mesh> sponzaArch = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Arch.obj").c_str());
+	std::shared_ptr<Mesh> sponzaCeiling = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Ceiling.obj").c_str());
+	std::shared_ptr<Mesh> sponzaColumnsLower = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsLower.obj").c_str());
+	std::shared_ptr<Mesh> sponzaColumnsRound = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsRound.obj").c_str());
+	std::shared_ptr<Mesh> sponzaColumnsSquare = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/ColumnsSquare.obj").c_str());
+	std::shared_ptr<Mesh> sponzaCurtainsBlue = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsBlue.obj").c_str());
+	std::shared_ptr<Mesh> sponzaCurtainsGreen = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsGreen.obj").c_str());
+	std::shared_ptr<Mesh> sponzaCurtainsRed = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/CurtainsRed.obj").c_str());
+	std::shared_ptr<Mesh> sponzaDetails = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Details.obj").c_str());
+	std::shared_ptr<Mesh> sponzaFabricBlue = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricBlue.obj").c_str());
+	std::shared_ptr<Mesh> sponzaFabricGreen = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricGreen.obj").c_str());
+	std::shared_ptr<Mesh> sponzaFabricRed = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/FabricRed.obj").c_str());
+	std::shared_ptr<Mesh> sponzaFloor = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Floor.obj").c_str());
+	std::shared_ptr<Mesh> sponzaLionBackground = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/LionBackground.obj").c_str());
+	std::shared_ptr<Mesh> sponzaLionHead = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/LionHead.obj").c_str());
+	std::shared_ptr<Mesh> sponzaPoles = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Poles.obj").c_str());
+	std::shared_ptr<Mesh> sponzaRoof = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Roof.obj").c_str());
+	std::shared_ptr<Mesh> sponzaVasesLarge = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/VasesLarge.obj").c_str());
+	std::shared_ptr<Mesh> sponzaWalls = std::make_shared<Mesh>(FixPath(L"../../../../Assets/Models/Sponza/Walls.obj").c_str());
 
 	// === TEXTURES ==============================
 
@@ -341,7 +341,75 @@ std::vector<std::shared_ptr<Scene>> Scene::CreateExampleScenes(Microsoft::WRL::C
 	}
 	exampleScenes.push_back(sphereScene);
 
+	// Sponza scene
+	std::shared_ptr<Scene> sponzaScene = std::make_shared<Scene>("Sponza");
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE blackTexture = LoadTexture(L"../../../../Assets/Textures/Sponza/Dielectric_metallic.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE curtainNormal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_normal.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE curtainRough = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_roughness.png");
+		D3D12_CPU_DESCRIPTOR_HANDLE curtainMetal = LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_metallic.png");
 
+		std::shared_ptr<Material> sponzaArchMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaArchMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Arch_diffuse.png"), 0);
+		sponzaArchMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Arch_normal.png"), 1);
+		sponzaArchMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Arch_roughness.png"), 2);
+		sponzaArchMat->AddTexture(blackTexture, 3);
+		sponzaArchMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaCurtainRedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaCurtainRedMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_Red_diffuse.png"), 0);
+		sponzaCurtainRedMat->AddTexture(curtainNormal, 1);
+		sponzaCurtainRedMat->AddTexture(curtainRough, 2);
+		sponzaCurtainRedMat->AddTexture(curtainMetal, 3);
+		sponzaCurtainRedMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaCurtainGreenMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaCurtainGreenMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_Green_diffuse.png"), 0);
+		sponzaCurtainGreenMat->AddTexture(curtainNormal, 1);
+		sponzaCurtainGreenMat->AddTexture(curtainRough, 2);
+		sponzaCurtainGreenMat->AddTexture(curtainMetal, 3);
+		sponzaCurtainGreenMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaCurtainBlueMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaCurtainBlueMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Curtain_Blue_diffuse.png"), 0);
+		sponzaCurtainBlueMat->AddTexture(curtainNormal, 1);
+		sponzaCurtainBlueMat->AddTexture(curtainRough, 2);
+		sponzaCurtainBlueMat->AddTexture(curtainMetal, 3);
+		sponzaCurtainBlueMat->FinalizeTextures();
+
+		std::shared_ptr<Material> sponzaFloorMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+		sponzaFloorMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Floor_diffuse.png"), 0);
+		sponzaFloorMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Floor_normal.png"), 1);
+		sponzaFloorMat->AddTexture(LoadTexture(L"../../../../Assets/Textures/Sponza/Sponza_Floor_roughness.png"), 2);
+		sponzaFloorMat->AddTexture(blackTexture, 3);
+		sponzaFloorMat->FinalizeTextures();
+
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaArch, sponzaArchMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCeiling, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsLower, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsRound, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaColumnsSquare, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsBlue, sponzaCurtainBlueMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsGreen, sponzaCurtainGreenMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaCurtainsRed, sponzaCurtainRedMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaDetails, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricBlue, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricGreen, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFabricRed, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaFloor, sponzaFloorMat));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaLionBackground, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaLionHead, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaPoles, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaRoof, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaVasesLarge, greyDiffuse));
+		sponzaScene->AddEntity(std::make_shared<GameEntity>(sponzaWalls, greyDiffuse));
+
+		for (auto& e : sponzaScene->GetEntities())
+		{
+			e->GetTransform()->SetScale(0.1f);
+		}
+	}
+	exampleScenes.push_back(sponzaScene);
 
 	// Finalize
 	exampleScenesCreated = true;

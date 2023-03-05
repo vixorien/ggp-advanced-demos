@@ -6,13 +6,14 @@
 #include "Transform.h"
 #include "Camera.h"
 #include "Lights.h"
+#include "Scene.h"
 
 #include <DirectXMath.h>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
 #include <vector>
 #include <memory>
 
-class Game
+class Game 
 	: public DXCore
 {
 
@@ -36,7 +37,7 @@ private:
 	void CreateRootSigAndPipelineState();
 	void CreateBasicGeometry();
 	void GenerateLights();
-
+	
 	// Overall pipeline and rendering requirements
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
@@ -45,7 +46,8 @@ private:
 	int lightCount;
 	std::vector<Light> lights;
 	std::shared_ptr<Camera> camera;
-	std::vector<std::shared_ptr<GameEntity>> entities;
+	std::vector<std::shared_ptr<Scene>> scenes;
+	unsigned int currentScene;
 	bool freezeObjects;
 	float updateTime;
 
@@ -57,3 +59,4 @@ private:
 
 	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle;
 };
+
