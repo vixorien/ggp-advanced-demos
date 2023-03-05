@@ -433,7 +433,14 @@ void Game::Update(float deltaTime, float totalTime)
 	}
 
 	// Update other objects
-	camera->Update(deltaTime);
+	if (camera->Update(deltaTime))
+		accumulationFrameCount = 0;
+
+	// Should we accumulate?
+	if (accumulateFrames && accumulationFrameCount < (unsigned int)(-1) - 1)
+	{
+		accumulationFrameCount++;
+	}
 
 	BuildUI();
 }
@@ -460,7 +467,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		RaytracingHelper::GetInstance().CreateTopLevelAccelerationStructureForScene(scenes[currentScene]->GetEntities());
 
 		// Perform raytrace - specifically NOT executing the command list yet, as we're doing ImGui after
-		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, skyUpColor, skyDownColor, skyboxHandle, false);
+		RaytracingHelper::GetInstance().Raytrace(camera, backBuffers[currentSwapBuffer], raysPerPixel, maxRecursionDepth, skyUpColor, skyDownColor, skyboxHandle, accumulationFrameCount, false);
 	}
 
 	// ImGui
@@ -553,8 +560,10 @@ void Game::BuildUI()
 		ImGui::SliderInt("Rays Per Pixel", &raysPerPixel, 1, 1000);
 		ImGui::SliderInt("Max Recursion Depth", &maxRecursionDepth, 0, D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH - 1);
 		ImGui::Checkbox("Freeze Objects", &freezeObjects);
-		ImGui::ColorEdit3("Sky Up Color", &skyUpColor.x);
-		ImGui::ColorEdit3("Sky Down Color", &skyDownColor.x);
+		if (ImGui::Checkbox("Accumulate Frames", &accumulateFrames) && !accumulateFrames)
+			accumulationFrameCount = 0;
+		//ImGui::ColorEdit3("Sky Up Color", &skyUpColor.x);
+		//ImGui::ColorEdit3("Sky Down Color", &skyDownColor.x);
 		ImGui::Spacing();
 
 		if (ImGui::BeginCombo("Scene", scenes[currentScene]->GetName().c_str()))

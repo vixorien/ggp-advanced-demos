@@ -57,6 +57,9 @@ private:
 	DirectX::XMFLOAT3 skyUpColor;
 	DirectX::XMFLOAT3 skyDownColor;
 
+	bool accumulateFrames = false;
+	unsigned int accumulationFrameCount = 0;
+
 	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle;
 };
 

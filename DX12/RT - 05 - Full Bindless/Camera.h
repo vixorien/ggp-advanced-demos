@@ -35,7 +35,7 @@ public:
 	~Camera();
 
 	// Updating methods
-	void Update(float dt);
+	bool Update(float dt);
 	void UpdateViewMatrix();
 	void UpdateProjectionMatrix(float aspectRatio);
 

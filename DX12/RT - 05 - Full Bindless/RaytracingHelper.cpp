@@ -933,6 +933,7 @@ void RaytracingHelper::Raytrace(
 	DirectX::XMFLOAT3 skyUpColor,
 	DirectX::XMFLOAT3 skyDownColor,
 	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle,
+	unsigned int accumulationFrameCount,
 	bool executeCommandList)
 {
 	if (!dxrAvailable || !helperInitialized)
@@ -963,6 +964,7 @@ void RaytracingHelper::Raytrace(
 	sceneData.maxRecursionDepth = maxRecursionDepth;
 	sceneData.skyUpColor = skyUpColor;
 	sceneData.skyDownColor = skyDownColor;
+	sceneData.accumulationFrameCount = accumulationFrameCount;
 	
 	DirectX::XMFLOAT4X4 view = camera->GetView();
 	DirectX::XMFLOAT4X4 proj = camera->GetProjection();

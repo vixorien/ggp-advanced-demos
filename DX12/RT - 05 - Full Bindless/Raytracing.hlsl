@@ -42,7 +42,7 @@ cbuffer SceneData : register(b0)
 	int maxRecursionDepth;
 	float3 skyUpColor;
 	float3 skyDownColor;
-	float pad;
+	uint accumulationFrameCount;
 };
 
 
@@ -297,8 +297,21 @@ void RayGen()
 		totalColor += payload.color;
 	}
 
+	totalColor = pow(totalColor / raysPerPixel, 1.0f / 2.2f);
+
 	// Set the final color of the buffer (gamma corrected)
-	OutputColor[rayIndices] = float4(pow(totalColor / raysPerPixel, 1.0f / 2.2f), 1);
+	//OutputColor[rayIndices] = float4(pow(totalColor / raysPerPixel, 1.0f / 2.2f), 1);
+
+	float4 currentOutput = OutputColor[rayIndices];
+	if (accumulationFrameCount == 0)
+		OutputColor[rayIndices] = float4(totalColor, 1);
+	else
+	{
+		currentOutput.rgb *= accumulationFrameCount; // Expand the average
+		currentOutput.rgb += totalColor; // Add to total
+		currentOutput.rgb /= (accumulationFrameCount + 1); // Re-average
+		OutputColor[rayIndices] = currentOutput;
+	}
 }
 
 
@@ -380,7 +393,7 @@ void ClosestHit(inout RayPayload payload, BuiltInTriangleIntersectionAttributes 
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = 
 		(float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions() *
-		(payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent();
+		(payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent() + accumulationFrameCount;
 	float2 rng = rand2(uv);
 	float randChance = rand(uv);
 
@@ -446,7 +459,7 @@ void ClosestHitTransparent(inout RayPayload payload, BuiltInTriangleIntersection
 
 	// Calc a unique RNG value for this ray, based on the "uv" of this pixel and other per-ray data
 	float2 uv = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
-	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent());
+	float2 rng = rand2(uv * (payload.recursionDepth + 1) + payload.rayPerPixelIndex + RayTCurrent() + accumulationFrameCount);
 
 	// Get the index of refraction based on the side of the hit
 	float ior = 1.5f;

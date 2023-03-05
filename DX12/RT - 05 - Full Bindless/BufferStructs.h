@@ -31,7 +31,7 @@ struct RaytracingSceneData
 	int maxRecursionDepth;
 	DirectX::XMFLOAT3 skyUpColor;
 	DirectX::XMFLOAT3 skyDownColor;
-	float pad;
+	unsigned int accumulationFrameCount;
 };
 
 struct RaytracingMaterial

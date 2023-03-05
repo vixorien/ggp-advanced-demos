@@ -58,7 +58,7 @@ Camera::~Camera()
 
 
 // Camera's update, which looks for key presses
-void Camera::Update(float dt)
+bool Camera::Update(float dt)
 {
 	// Current speed
 	float speed = dt * movementSpeed;
@@ -70,13 +70,15 @@ void Camera::Update(float dt)
 	if (input.KeyDown(VK_SHIFT)) { speed *= 5; }
 	if (input.KeyDown(VK_CONTROL)) { speed *= 0.1f; }
 
+	bool anyMovement = false;
+
 	// Movement
-	if (input.KeyDown('W')) { transform.MoveRelative(0, 0, speed); }
-	if (input.KeyDown('S')) { transform.MoveRelative(0, 0, -speed); }
-	if (input.KeyDown('A')) { transform.MoveRelative(-speed, 0, 0); }
-	if (input.KeyDown('D')) { transform.MoveRelative(speed, 0, 0); }
-	if (input.KeyDown('X')) { transform.MoveAbsolute(0, -speed, 0); }
-	if (input.KeyDown(' ')) { transform.MoveAbsolute(0, speed, 0); }
+	if (input.KeyDown('W')) { transform.MoveRelative(0, 0, speed); anyMovement = true; }
+	if (input.KeyDown('S')) { transform.MoveRelative(0, 0, -speed); anyMovement = true;}
+	if (input.KeyDown('A')) { transform.MoveRelative(-speed, 0, 0); anyMovement = true; }
+	if (input.KeyDown('D')) { transform.MoveRelative(speed, 0, 0); anyMovement = true;}
+	if (input.KeyDown('X')) { transform.MoveAbsolute(0, -speed, 0); anyMovement = true;}
+	if (input.KeyDown(' ')) { transform.MoveAbsolute(0, speed, 0); anyMovement = true;}
 
 	// Handle mouse movement only when button is down
 	if (input.MouseLeftDown())
@@ -91,11 +93,17 @@ void Camera::Update(float dt)
 		if (rot.x > XM_PIDIV2) rot.x = XM_PIDIV2;
 		if (rot.x < -XM_PIDIV2) rot.x = -XM_PIDIV2;
 		transform.SetRotation(rot);
+
+		// Was there movement?
+		if (input.GetMouseXDelta() != 0 || input.GetMouseYDelta() != 0)
+			anyMovement = true;
 	}
 
 	// Update the view every frame - could be optimized
 	UpdateViewMatrix();
 
+	// Any type of movement?
+	return anyMovement;
 }
 
 // Creates a new view matrix based on current position and orientation
