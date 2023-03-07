@@ -18,28 +18,41 @@ class Scene
 public:
 
 	Scene(
+		std::string name,
 		Microsoft::WRL::ComPtr<ID3D11Device> device,
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
 	~Scene();
 
 	void Clear();
-	void Load(std::wstring sceneFile);
+	//void Load(std::wstring sceneFile);
 
 	void AddEntity(std::shared_ptr<GameEntity> entity);
 	void AddCamera(std::shared_ptr<Camera> camera);
 	void AddLight(Light light);
+
+	void SetName(std::string name);
 	void SetSky(std::shared_ptr<Sky> sky);
 	void SetCurrentCamera(std::shared_ptr<Camera> camera);
 	void SetCurrentCamera(unsigned int cameraIndex);
+
 
 	std::vector<Light>& GetLights();
 	std::vector<std::shared_ptr<Camera>>& GetCameras();
 	std::vector<std::shared_ptr<GameEntity>>& GetEntities();
 
+	std::string GetName();
 	std::shared_ptr<Sky> GetSky();
 	std::shared_ptr<Camera> GetCurrentCamera();
 
+	static std::shared_ptr<Scene> Load(
+		std::wstring sceneFile, 
+		Microsoft::WRL::ComPtr<ID3D11Device> device,
+		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
+
 private:
+
+	// General scene data
+	std::string name;
 
 	// Drawing and setup requirements
 	Microsoft::WRL::ComPtr<ID3D11Device> device;

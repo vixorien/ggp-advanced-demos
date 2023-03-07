@@ -124,8 +124,7 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.Initialize(L"../../../Assets/", L"./", device, context, true, true);
 
 	// Load a scene json file
-	scene = std::make_shared<Scene>(device, context);
-	scene->Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"));
+	scene = Scene::Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"), device, context);
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 }
 
