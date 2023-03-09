@@ -2,7 +2,7 @@
 	"name": "Two Rows of Spheres",
 	"sky":
 	{
-		"texture":
+		"textures":
 		{
 			"xPos":"Skies/Clouds Blue/right",
 			"xNeg":"Skies/Clouds Blue/left",
