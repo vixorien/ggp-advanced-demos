@@ -63,32 +63,32 @@
     <ClCompile Include="Helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_impl_win32.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_tables.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_widgets.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_demo.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_draw.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Common\ImGui\imgui_impl_dx11.cpp">
-      <Filter>Common\ImGui</Filter>
-    </ClCompile>
     <ClCompile Include="Assets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_demo.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_draw.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_impl_dx11.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_impl_win32.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_tables.cpp">
+      <Filter>Common\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Common\ImGui\imgui_widgets.cpp">
+      <Filter>Common\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -131,37 +131,37 @@
     <ClInclude Include="Helpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imgui_impl_dx11.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imgui_impl_win32.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imgui_internal.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imstb_rectpack.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imstb_textedit.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imstb_truetype.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imconfig.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Common\ImGui\imgui.h">
-      <Filter>Common\ImGui</Filter>
-    </ClInclude>
     <ClInclude Include="Assets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Common\json\json.hpp">
+    <ClInclude Include="..\..\Common\ImGui\imconfig.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imgui.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imgui_impl_dx11.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imgui_impl_win32.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imgui_internal.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imstb_rectpack.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imstb_textedit.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\ImGui\imstb_truetype.h">
+      <Filter>Common\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Common\json\json.hpp">
       <Filter>Common\json</Filter>
     </ClInclude>
   </ItemGroup>

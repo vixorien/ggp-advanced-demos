@@ -9,9 +9,9 @@
 #include "Helpers.h"
 
 #include "WICTextureLoader.h"
-#include "../Common/ImGui/imgui.h"
-#include "../Common/ImGui/imgui_impl_dx11.h"
-#include "../Common/ImGui/imgui_impl_win32.h"
+#include "../../Common/ImGui/imgui.h"
+#include "../../Common/ImGui/imgui_impl_dx11.h"
+#include "../../Common/ImGui/imgui_impl_win32.h"
 
 
 // Needed for a helper function to read compiled shader files from the hard drive
@@ -121,10 +121,10 @@ void Game::LoadAssetsAndCreateEntities()
 	// Note: You could call LoadAllAssets() to load literally everything
 	//       found in the asstes folder, but "load on demand" is more efficient
 	Assets& assets = Assets::GetInstance();
-	assets.Initialize(L"../../../Assets/", L"./", device, context, true, true);
+	assets.Initialize(L"../../../../Assets/", L"./", device, context, true, true);
 
 	// Load a scene json file
-	scene = Scene::Load(FixPath(L"../../../Assets/Scenes/twoRows.scene"), device, context);
+	scene = Scene::Load(FixPath(L"../../../../Assets/Scenes/twoRows.scene"), device, context);
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 }
 

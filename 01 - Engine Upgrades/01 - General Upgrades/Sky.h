@@ -5,7 +5,7 @@
 #include "Mesh.h"
 #include "SimpleShader.h"
 #include "Camera.h"
-#include "..\Common\json\json.hpp"
+#include "..\..\Common\json\json.hpp"
 
 #include <wrl/client.h> // Used for ComPtr
 

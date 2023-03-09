@@ -1,7 +1,7 @@
 #include "DXCore.h"
 #include "Input.h"
-#include "../Common/ImGui/imgui.h"
-#include "../Common/ImGui/imgui_impl_win32.h"
+#include "../../Common/ImGui/imgui.h"
+#include "../../Common/ImGui/imgui_impl_win32.h"
 
 #include <dxgi1_5.h>
 #include <WindowsX.h>

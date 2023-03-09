@@ -2,7 +2,7 @@
 
 #include <DirectXMath.h>
 #include <string>
-#include "../Common/json/json.hpp"
+#include "../../Common/json/json.hpp"
 
 // This define should match your
 // MAX_LIGHTS definition in your shader(s)

@@ -7,7 +7,7 @@
 #include "Transform.h"
 #include "Camera.h"
 #include "Material.h"
-#include "..\Common\json\json.hpp"
+#include "..\..\Common\json\json.hpp"
 
 class GameEntity
 {

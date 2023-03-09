@@ -6,7 +6,7 @@
 #include "Lights.h"
 #include "Sky.h"
 
-#include "..\Common\json\json.hpp"
+#include "..\..\Common\json\json.hpp"
 
 #include <d3d11.h>
 #include <vector>

@@ -3,7 +3,7 @@
 #include "Helpers.h"
 
 #include <fstream>
-#include "../Common/json/json.hpp"
+#include "../../Common/json/json.hpp"
 using json = nlohmann::json;
 
 using namespace DirectX;

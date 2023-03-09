@@ -2,7 +2,7 @@
 #include <DirectXMath.h>
 
 #include "Transform.h"
-#include "..\Common\json\json.hpp"
+#include "../../Common/json/json.hpp"
 
 enum class CameraProjectionType
 {
