@@ -47,7 +47,7 @@ Game::Game(HINSTANCE hInstance)
 		true),				// Show extra stats (fps) in title bar?
 	lightCount(0),
 	showUIDemoWindow(false),
-	showPointLights(false)
+	useOptimizedRendering(false)
 {
 	// Seed random
 	srand((unsigned int)time(0));
@@ -157,6 +157,36 @@ void Game::GenerateLights()
 
 }
 
+void Game::AddRandomEntity()
+{
+	// Get the materail from a random entity in the scene
+	int entityIndex = rand() % scene->GetEntities().size();
+	std::shared_ptr<Material> mat = scene->GetEntities()[entityIndex]->GetMaterial();
+
+	// Choose a random mesh
+	std::shared_ptr<Mesh> mesh;
+	Assets& assets = Assets::GetInstance();
+
+	int meshIndex = rand() % 5;
+	switch (meshIndex)
+	{
+	case 0: mesh = assets.GetMesh(L"Models/cube"); break;
+	case 1: mesh = assets.GetMesh(L"Models/sphere"); break;
+	case 2: mesh = assets.GetMesh(L"Models/helix"); break;
+	case 3: mesh = assets.GetMesh(L"Models/torus"); break;
+	case 4: mesh = assets.GetMesh(L"Models/cylinder"); break;
+	}
+
+	// Create the entity
+	std::shared_ptr<GameEntity> ge = std::make_shared<GameEntity>(mesh, mat);
+	float range = 20;
+	ge->GetTransform()->SetPosition(RandomRange(-range, range), RandomRange(-range, range), RandomRange(-range, range));
+	ge->GetTransform()->SetScale(RandomRange(0.5f, 3.0f));
+
+	// Add to scene
+	scene->AddEntity(ge);
+}
+
 
 
 // --------------------------------------------------------
@@ -204,75 +234,14 @@ void Game::Draw(float deltaTime, float totalTime)
 	renderer->FrameStart();
 
 	// Draw the scene
-	renderer->RenderSimple(scene, lightCount);
+	if (useOptimizedRendering)
+		renderer->RenderOptimized(scene, lightCount);
+	else
+		renderer->RenderSimple(scene, lightCount);
 
 	// Finalize the frame
 	renderer->FrameEnd(vsync || !deviceSupportsTearing || isFullscreen);
 }
-
-
-// --------------------------------------------------------
-// Draws the point lights as solid color spheres
-// --------------------------------------------------------
-void Game::DrawPointLights()
-{
-	// Get necessary assets
-	Assets& assets = Assets::GetInstance();
-	std::shared_ptr<Mesh> lightMesh = assets.GetMesh(L"Models/sphere");
-	std::shared_ptr<SimpleVertexShader> lightVS = assets.GetVertexShader(L"VertexShader");
-	std::shared_ptr<SimplePixelShader> lightPS = assets.GetPixelShader(L"SolidColorPS");
-
-	// Turn on these shaders
-	lightVS->SetShader();
-	lightPS->SetShader();
-
-	// Set up vertex shader
-	lightVS->SetMatrix4x4("view", scene->GetCurrentCamera()->GetView());
-	lightVS->SetMatrix4x4("projection", scene->GetCurrentCamera()->GetProjection());
-
-	for (int i = 0; i < lightCount && i < scene->GetLights().size(); i++)
-	{
-		Light light = scene->GetLights()[i];
-
-		// Only drawing points, so skip others
-		if (light.Type != LIGHT_TYPE_POINT)
-			continue;
-
-		// Calc quick scale based on range
-		float scale = light.Range / 20.0f;
-
-		// Make the transform for this light
-		XMMATRIX rotMat = XMMatrixIdentity();
-		XMMATRIX scaleMat = XMMatrixScaling(scale, scale, scale);
-		XMMATRIX transMat = XMMatrixTranslation(light.Position.x, light.Position.y, light.Position.z);
-		XMMATRIX worldMat = scaleMat * rotMat * transMat;
-
-		XMFLOAT4X4 world;
-		XMFLOAT4X4 worldInvTrans;
-		XMStoreFloat4x4(&world, worldMat);
-		XMStoreFloat4x4(&worldInvTrans, XMMatrixInverse(0, XMMatrixTranspose(worldMat)));
-
-		// Set up the world matrix for this light
-		lightVS->SetMatrix4x4("world", world);
-		lightVS->SetMatrix4x4("worldInverseTranspose", worldInvTrans);
-
-		// Set up the pixel shader data
-		XMFLOAT3 finalColor = light.Color;
-		finalColor.x *= light.Intensity;
-		finalColor.y *= light.Intensity;
-		finalColor.z *= light.Intensity;
-		lightPS->SetFloat3("Color", finalColor);
-
-		// Copy data
-		lightVS->CopyAllBufferData();
-		lightPS->CopyAllBufferData();
-
-		// Draw
-		lightMesh->SetBuffersAndDraw(context);
-	}
-
-}
-
 
 
 // --------------------------------------------------------
@@ -374,6 +343,9 @@ void Game::BuildUI()
 		// === Entities ===
 		if (ImGui::TreeNode("Scene Entities"))
 		{
+			if (ImGui::Button("Add Random Entity"))
+				AddRandomEntity();
+
 			// Loop and show the details for each entity
 			for (int i = 0; i < scene->GetEntities().size(); i++)
 			{
@@ -401,7 +373,6 @@ void Game::BuildUI()
 			// Light details
 			ImGui::Spacing();
 			ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS);
-			ImGui::Checkbox("Show Point Lights", &showPointLights);
 			ImGui::Spacing();
 
 			// Loop and show the details for each entity
@@ -429,6 +400,15 @@ void Game::BuildUI()
 				}
 				ImGui::PopID();
 			}
+
+			// Finalize the tree node
+			ImGui::TreePop();
+		}
+
+		// --- Renderer ---
+		if (ImGui::TreeNode("Renderer"))
+		{
+			ImGui::Checkbox("Optimize Rendering", &useOptimizedRendering);
 
 			// Finalize the tree node
 			ImGui::TreePop();

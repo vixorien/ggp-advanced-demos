@@ -1,11 +1,22 @@
 
-// Constant Buffer for external (C++) data
-cbuffer externalData : register(b0)
+// Data that changes at most once per frame
+cbuffer perFrame : register(b0)
+{
+	matrix view;
+	matrix projection;
+};
+
+// Data that can change per material
+cbuffer perMaterial : register(b1)
+{
+	// Note: No per-material vertex data currently
+};
+
+// Data that can change per object
+cbuffer perObject : register(b2)
 {
 	matrix world;
 	matrix worldInverseTranspose;
-	matrix view;
-	matrix projection;
 };
 
 // Struct representing a single vertex worth of data

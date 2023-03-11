@@ -45,8 +45,9 @@ public:
 		Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthBufferDSV);
 
 	void FrameStart();
-	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
 	void FrameEnd(bool vsync);
+	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
+	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
 
 private:
 

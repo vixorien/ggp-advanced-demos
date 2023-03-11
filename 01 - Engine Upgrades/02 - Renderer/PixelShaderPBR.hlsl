@@ -4,19 +4,8 @@
 // How many lights could we handle?
 #define MAX_LIGHTS 128
 
-// Data that can change per material
-cbuffer perMaterial : register(b0)
-{
-	// Surface color
-	float3 colorTint;
-
-	// UV adjustments
-	float2 uvScale;
-	float2 uvOffset;
-};
-
 // Data that only changes once per frame
-cbuffer perFrame : register(b1)
+cbuffer perFrame : register(b0)
 {
 	// An array of light data
 	Light lights[MAX_LIGHTS];
@@ -26,6 +15,17 @@ cbuffer perFrame : register(b1)
 
 	// Needed for specular (reflection) calculation
 	float3 cameraPosition;
+};
+
+// Data that can change per material
+cbuffer perMaterial : register(b1)
+{
+	// Surface color
+	float3 colorTint;
+
+	// UV adjustments
+	float2 uvScale;
+	float2 uvOffset;
 };
 
 

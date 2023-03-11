@@ -41,6 +41,7 @@ public:
 	void RemoveSampler(std::string name);
 
 	void PrepareMaterial(Transform* transform, std::shared_ptr<Camera> camera);
+	void SetPerMaterialDataAndResources(bool copyToGPUNow);
 
 private:
 

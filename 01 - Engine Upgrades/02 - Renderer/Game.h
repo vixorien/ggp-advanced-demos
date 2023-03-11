@@ -37,14 +37,10 @@ private:
 	// Rendering
 	std::shared_ptr<Renderer> renderer;
 
-	// Lights
-	int lightCount;
-	bool showPointLights;
-
 	// General helpers for setup and drawing
 	void LoadAssetsAndCreateEntities();
 	void GenerateLights();
-	void DrawPointLights();
+	void AddRandomEntity();
 
 	// UI functions
 	void UINewFrame(float deltaTime);
@@ -53,7 +49,9 @@ private:
 	void EntityUI(std::shared_ptr<GameEntity> entity);	
 	void LightUI(Light& light);
 	
-	// Should the ImGui demo window be shown?
+	// General options, controlled through UI
+	bool useOptimizedRendering;
 	bool showUIDemoWindow;
+	int lightCount;
 };
 

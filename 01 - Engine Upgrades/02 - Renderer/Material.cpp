@@ -102,3 +102,22 @@ void Material::PrepareMaterial(Transform* transform, std::shared_ptr<Camera> cam
 	for (auto& t : textureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second.Get()); }
 	for (auto& s : samplers) { ps->SetSamplerState(s.first.c_str(), s.second.Get()); }
 }
+
+void Material::SetPerMaterialDataAndResources(bool copyToGPUNow)
+{
+	// Set vertex shader per-material vars
+	// Note: Currently no per-material vertex data!
+
+	// Set pixel shader per-material vars
+	ps->SetFloat2("uvScale", uvScale);
+	ps->SetFloat2("uvOffset", uvOffset);
+	ps->SetFloat3("colorTint", colorTint);
+	if (copyToGPUNow)
+	{
+		ps->CopyBufferData("perMaterial");
+	}
+
+	// Loop and set any other resources
+	for (auto& t : textureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second.Get()); }
+	for (auto& s : samplers) { ps->SetSamplerState(s.first.c_str(), s.second.Get()); }
+}
