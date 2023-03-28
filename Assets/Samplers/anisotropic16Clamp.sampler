@@ -1,0 +1,5 @@
+{
+	"filter" : "anisotropic",
+	"addressMode" : "clamp",
+	"maxAnisotropy" : 16
+}
