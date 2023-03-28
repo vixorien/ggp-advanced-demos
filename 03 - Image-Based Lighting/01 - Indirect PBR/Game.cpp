@@ -409,6 +409,7 @@ void Game::BuildUI()
 		if (ImGui::TreeNode("Renderer"))
 		{
 			ImGui::Checkbox("Optimize Rendering", &useOptimizedRendering);
+			ImGui::Checkbox("Indirect Lighting", &renderer->indirectLighting);
 
 			// Finalize the tree node
 			ImGui::TreePop();

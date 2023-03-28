@@ -21,7 +21,8 @@ Renderer::Renderer(
 	backBufferRTV(backBufferRTV),
 	depthBufferDSV(depthBufferDSV),
 	vsPerFrameData{},
-	psPerFrameData{}
+	psPerFrameData{},
+	indirectLighting(true)
 {
 	// Create per-frame constant buffers for the renderer
 	D3D11_BUFFER_DESC perFrame = {};
@@ -36,8 +37,6 @@ Renderer::Renderer(
 	// PS
 	perFrame.ByteWidth = (sizeof(PSPerFrameData) + 15) / 16 * 16; // Align to 16 bytes
 	device->CreateBuffer(&perFrame, 0, psPerFrameConstantBuffer.GetAddressOf());
-
-
 }
 
 void Renderer::PreResize()
@@ -99,6 +98,7 @@ void Renderer::RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLig
 		ps->SetInt("lightCount", activeLightCount);
 		ps->SetFloat3("cameraPosition", scene->GetCurrentCamera()->GetTransform()->GetPosition());
 		ps->SetInt("specularIBLTotalMipLevels", scene->GetSky()->GetTotalSpecularIBLMipLevels());
+		ps->SetInt("indirectLightingEnabled", indirectLighting);
 		ps->CopyBufferData("perFrame");
 
 		// Set IBL textures now, too
@@ -136,6 +136,7 @@ void Renderer::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 		psPerFrameData.LightCount = activeLightCount;
 		psPerFrameData.CameraPosition = camera->GetTransform()->GetPosition();
 		psPerFrameData.TotalSpecIBLMipLevels = scene->GetSky()->GetTotalSpecularIBLMipLevels();
+		psPerFrameData.IndirectLightingEnabled = indirectLighting;
 
 		context->Map(psPerFrameConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &map);
 		memcpy(map.pData, &psPerFrameData, sizeof(PSPerFrameData));

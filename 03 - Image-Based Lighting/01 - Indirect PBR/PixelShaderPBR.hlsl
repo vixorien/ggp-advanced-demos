@@ -18,6 +18,9 @@ cbuffer perFrame : register(b0)
 
 	// The number of mip levels in the specular IBL map
 	int specularIBLTotalMipLevels;
+
+	// Is indirect lighting on?
+	int indirectLightingEnabled;
 };
 
 // Data that can change per material
@@ -125,7 +128,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 fullIndirect = indirectSpecular + balancedDiff * surfaceColor.rgb;
 
 	// Add the indirect to the direct
-	totalColor += fullIndirect;
+	totalColor += indirectLightingEnabled ? fullIndirect : float3(0,0,0);
 
 	// Gamma correction
 	return float4(pow(totalColor, 1.0f / 2.2f), 1);

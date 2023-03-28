@@ -22,6 +22,7 @@ struct PSPerFrameData
 	int LightCount;
 	DirectX::XMFLOAT3 CameraPosition;
 	int TotalSpecIBLMipLevels;
+	int IndirectLightingEnabled;
 };
 
 class Renderer
@@ -49,6 +50,9 @@ public:
 	void FrameEnd(bool vsync);
 	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
 	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
+
+	// Public-facing options (for UI interaction)
+	bool indirectLighting;
 
 private:
 
