@@ -194,27 +194,33 @@ void Game::LoadAssetsAndCreateEntities()
 
 	std::shared_ptr<Mesh> sphereMesh = assets.GetMesh(L"Models/sphere");
 	std::shared_ptr<GameEntity> shinyMetal = std::make_shared<GameEntity>(sphereMesh, solidShinyMetal);
-	shinyMetal->GetTransform()->SetPosition(-5, 0, 0);
+	shinyMetal->GetTransform()->SetPosition(-6, -1, 0);
+	shinyMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(shinyMetal);
 
 	std::shared_ptr<GameEntity> quarterRoughMetal = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughMetal);
-	quarterRoughMetal->GetTransform()->SetPosition(-3.5f, 0, 0);
+	quarterRoughMetal->GetTransform()->SetPosition(-4, -1, 0);
+	quarterRoughMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(quarterRoughMetal);
 
 	std::shared_ptr<GameEntity> roughMetal = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughMetal);
-	roughMetal->GetTransform()->SetPosition(-2, 0, 0);
+	roughMetal->GetTransform()->SetPosition(-2, -1, 0);
+	roughMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(roughMetal);
 
 	std::shared_ptr<GameEntity> shinyPlastic = std::make_shared<GameEntity>(sphereMesh, solidShinyPlastic);
-	shinyPlastic->GetTransform()->SetPosition(2, 0, 0);
+	shinyPlastic->GetTransform()->SetPosition(2, -1, 0);
+	shinyPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(shinyPlastic);
 
 	std::shared_ptr<GameEntity> quarterRoughPlastic = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughPlastic);
-	quarterRoughPlastic->GetTransform()->SetPosition(3.5f, 0, 0);
+	quarterRoughPlastic->GetTransform()->SetPosition(4, -1, 0);
+	quarterRoughPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(quarterRoughPlastic);
 
 	std::shared_ptr<GameEntity> roughPlastic = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughPlastic);
-	roughPlastic->GetTransform()->SetPosition(5, 0, 0);
+	roughPlastic->GetTransform()->SetPosition(6, -1, 0);
+	roughPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(roughPlastic);
 }
 
