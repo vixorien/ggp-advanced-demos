@@ -1,0 +1,119 @@
+{
+	"name": "Two Rows of Spheres",
+	"sky":
+	{
+		"textures":
+		{
+			"xPos":"Skies/Clouds Blue/right",
+			"xNeg":"Skies/Clouds Blue/left",
+			"yPos":"Skies/Clouds Blue/up",
+			"yNeg":"Skies/Clouds Blue/down",
+			"zPos":"Skies/Clouds Blue/front",
+			"zNeg":"Skies/Clouds Blue/back"
+		},
+		"mesh":"Models/cube",
+		"shaders":
+		{
+			"pixel":"SkyPS",
+			"vertex":"SkyVS"
+		},
+		"sampler":"Samplers/anisotropic16Wrap"
+	},
+	"cameras": [
+		{
+			"type": "perspective",
+			"moveSpeed": 5.0,
+			"lookSpeed": 0.002,
+			"fov": 0.7853975,
+			"near": 0.01,
+			"far": 1000.0,
+			"position": [0, 0, -15],
+			"rotation": [0, 0, 0]
+		}
+	],
+	"lights": [
+		{
+			"type": "directional",
+			"direction": [ 1.0, -1.0, 1.0 ],
+			"color": [ 0.8, 0.8, 0.8 ],
+			"intensity": 1.0
+		},
+		{
+			"type": "directional",
+			"direction": [ -1, -0.25, 0 ],
+			"color": [ 0.2, 0.2, 0.2 ],
+			"intensity": 1.0
+		},
+		{
+			"type": "directional",
+			"direction": [ 0.0, -1.0, 1.0 ],
+			"color": [ 0.2, 0.2, 0.2 ],
+			"intensity": 1.0
+		}
+	],
+	"entities": [
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/cobblestone2x",
+			"transform": {
+				"position": [ -6, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/floor",
+			"transform": {
+				"position": [ -4, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/paint",
+			"transform": {
+				"position": [ -2, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/scratched",
+			"transform": {
+				"position": [ 0, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/bronze",
+			"transform": {
+				"position": [ 2, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/rough",
+			"transform": {
+				"position": [ 4, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		},
+		{
+			"mesh": "Models/sphere",
+			"material": "Materials/PBR/wood",
+			"transform": {
+				"position": [ 6, 2, 0 ],
+				"rotation": [ 0, 0, 0 ],
+				"scale": [ 2, 2, 2 ]
+			}
+		}
+	]
+}

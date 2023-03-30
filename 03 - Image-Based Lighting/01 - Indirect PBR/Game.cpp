@@ -130,8 +130,92 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.Initialize(L"../../../../Assets/", L"./", device, context, true, true);
 
 	// Load a scene json file
-	scene = Scene::Load(FixPath(L"../../../../Assets/Scenes/twoRows.scene"), device, context);
+	scene = Scene::Load(FixPath(L"../../../../Assets/Scenes/pbrSpheres.scene"), device, context);
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
+
+	// Create textures, simple PBR materials & entities (mostly for IBL testing)
+	assets.CreateSolidColorTexture(L"white", 2, 2, XMFLOAT4(1, 1, 1, 1));
+	assets.CreateSolidColorTexture(L"black", 2, 2, XMFLOAT4(0, 0, 0, 0));
+	assets.CreateSolidColorTexture(L"grey", 2, 2, XMFLOAT4(0.5f, 0.5f, 0.5f, 1));
+	assets.CreateSolidColorTexture(L"darkGrey", 2, 2, XMFLOAT4(0.25f, 0.25f, 0.25f, 1));
+	assets.CreateSolidColorTexture(L"flatNormalMap", 2, 2, XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f));
+
+	std::shared_ptr<SimpleVertexShader> vs = assets.GetVertexShader(L"VertexShader");
+	std::shared_ptr<SimplePixelShader> psPBR = assets.GetPixelShader(L"PixelShaderPBR");
+
+	std::shared_ptr<Material> solidShinyMetal = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidShinyMetal->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidShinyMetal->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidShinyMetal->AddTextureSRV("RoughnessMap", assets.GetTexture(L"black"));
+	solidShinyMetal->AddTextureSRV("MetalMap", assets.GetTexture(L"white"));
+	solidShinyMetal->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidShinyMetal->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+	std::shared_ptr<Material> solidQuarterRoughMetal = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidQuarterRoughMetal->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidQuarterRoughMetal->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidQuarterRoughMetal->AddTextureSRV("RoughnessMap", assets.GetTexture(L"darkGrey"));
+	solidQuarterRoughMetal->AddTextureSRV("MetalMap", assets.GetTexture(L"white"));
+	solidQuarterRoughMetal->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidQuarterRoughMetal->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+	std::shared_ptr<Material> solidHalfRoughMetal = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidHalfRoughMetal->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidHalfRoughMetal->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidHalfRoughMetal->AddTextureSRV("RoughnessMap", assets.GetTexture(L"grey"));
+	solidHalfRoughMetal->AddTextureSRV("MetalMap", assets.GetTexture(L"white"));
+	solidHalfRoughMetal->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidHalfRoughMetal->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+	std::shared_ptr<Material> solidShinyPlastic = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidShinyPlastic->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidShinyPlastic->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidShinyPlastic->AddTextureSRV("RoughnessMap", assets.GetTexture(L"black"));
+	solidShinyPlastic->AddTextureSRV("MetalMap", assets.GetTexture(L"black"));
+	solidShinyPlastic->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidShinyPlastic->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+	std::shared_ptr<Material> solidQuarterRoughPlastic = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidQuarterRoughPlastic->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidQuarterRoughPlastic->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidQuarterRoughPlastic->AddTextureSRV("RoughnessMap", assets.GetTexture(L"darkGrey"));
+	solidQuarterRoughPlastic->AddTextureSRV("MetalMap", assets.GetTexture(L"black"));
+	solidQuarterRoughPlastic->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidQuarterRoughPlastic->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+	std::shared_ptr<Material> solidHalfRoughPlastic = std::make_shared<Material>(psPBR, vs, XMFLOAT3(1, 1, 1), XMFLOAT2(1, 1));
+	solidHalfRoughPlastic->AddTextureSRV("Albedo", assets.GetTexture(L"white"));
+	solidHalfRoughPlastic->AddTextureSRV("NormalMap", assets.GetTexture(L"flatNormalMap"));
+	solidHalfRoughPlastic->AddTextureSRV("RoughnessMap", assets.GetTexture(L"grey"));
+	solidHalfRoughPlastic->AddTextureSRV("MetalMap", assets.GetTexture(L"black"));
+	solidHalfRoughPlastic->AddSampler("BasicSampler", assets.GetSampler(L"Samplers/anisotropic16Wrap"));
+	solidHalfRoughPlastic->AddSampler("ClampSampler", assets.GetSampler(L"Samplers/anisotropic16Clamp"));
+
+
+	std::shared_ptr<Mesh> sphereMesh = assets.GetMesh(L"Models/sphere");
+	std::shared_ptr<GameEntity> shinyMetal = std::make_shared<GameEntity>(sphereMesh, solidShinyMetal);
+	shinyMetal->GetTransform()->SetPosition(-5, 0, 0);
+	scene->AddEntity(shinyMetal);
+
+	std::shared_ptr<GameEntity> quarterRoughMetal = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughMetal);
+	quarterRoughMetal->GetTransform()->SetPosition(-3.5f, 0, 0);
+	scene->AddEntity(quarterRoughMetal);
+
+	std::shared_ptr<GameEntity> roughMetal = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughMetal);
+	roughMetal->GetTransform()->SetPosition(-2, 0, 0);
+	scene->AddEntity(roughMetal);
+
+	std::shared_ptr<GameEntity> shinyPlastic = std::make_shared<GameEntity>(sphereMesh, solidShinyPlastic);
+	shinyPlastic->GetTransform()->SetPosition(2, 0, 0);
+	scene->AddEntity(shinyPlastic);
+
+	std::shared_ptr<GameEntity> quarterRoughPlastic = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughPlastic);
+	quarterRoughPlastic->GetTransform()->SetPosition(3.5f, 0, 0);
+	scene->AddEntity(quarterRoughPlastic);
+
+	std::shared_ptr<GameEntity> roughPlastic = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughPlastic);
+	roughPlastic->GetTransform()->SetPosition(5, 0, 0);
+	scene->AddEntity(roughPlastic);
 }
 
 
