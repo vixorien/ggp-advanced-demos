@@ -45,7 +45,7 @@ Game::Game(HINSTANCE hInstance)
 		720,				// Height of the window's client area
 		false,				// Sync the framerate to the monitor refresh? (lock framerate)
 		true),				// Show extra stats (fps) in title bar?
-	lightCount(0),
+	lightCount(1),
 	showUIDemoWindow(false),
 	useOptimizedRendering(false)
 {
@@ -98,7 +98,6 @@ void Game::Init()
 	LoadAssetsAndCreateEntities();
 
 	// Set up lights initially
-	lightCount = 64;
 	GenerateLights();
 
 	// Set initial graphics API state
@@ -130,7 +129,7 @@ void Game::LoadAssetsAndCreateEntities()
 	assets.Initialize(L"../../../../Assets/", L"./", device, context, true, true);
 
 	// Load a scene json file
-	scene = Scene::Load(FixPath(L"../../../../Assets/Scenes/pbrSpheres.scene"), device, context);
+	scene = Scene::Load(FixPath(L"../../../../Assets/Scenes/ssao.scene"), device, context);
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(this->windowWidth / (float)this->windowHeight);
 
 	// Create textures, simple PBR materials & entities (mostly for IBL testing)
@@ -194,32 +193,32 @@ void Game::LoadAssetsAndCreateEntities()
 
 	std::shared_ptr<Mesh> sphereMesh = assets.GetMesh(L"Models/sphere");
 	std::shared_ptr<GameEntity> shinyMetal = std::make_shared<GameEntity>(sphereMesh, solidShinyMetal);
-	shinyMetal->GetTransform()->SetPosition(-6, -1, 0);
+	shinyMetal->GetTransform()->SetPosition(-8, -2, 0);
 	shinyMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(shinyMetal);
 
 	std::shared_ptr<GameEntity> quarterRoughMetal = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughMetal);
-	quarterRoughMetal->GetTransform()->SetPosition(-4, -1, 0);
+	quarterRoughMetal->GetTransform()->SetPosition(-6, -2, 0);
 	quarterRoughMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(quarterRoughMetal);
 
 	std::shared_ptr<GameEntity> roughMetal = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughMetal);
-	roughMetal->GetTransform()->SetPosition(-2, -1, 0);
+	roughMetal->GetTransform()->SetPosition(-4, -2, 0);
 	roughMetal->GetTransform()->SetScale(2);
 	scene->AddEntity(roughMetal);
 
 	std::shared_ptr<GameEntity> shinyPlastic = std::make_shared<GameEntity>(sphereMesh, solidShinyPlastic);
-	shinyPlastic->GetTransform()->SetPosition(2, -1, 0);
+	shinyPlastic->GetTransform()->SetPosition(4, -2, 0);
 	shinyPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(shinyPlastic);
 
 	std::shared_ptr<GameEntity> quarterRoughPlastic = std::make_shared<GameEntity>(sphereMesh, solidQuarterRoughPlastic);
-	quarterRoughPlastic->GetTransform()->SetPosition(4, -1, 0);
+	quarterRoughPlastic->GetTransform()->SetPosition(6, -2, 0);
 	quarterRoughPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(quarterRoughPlastic);
 
 	std::shared_ptr<GameEntity> roughPlastic = std::make_shared<GameEntity>(sphereMesh, solidHalfRoughPlastic);
-	roughPlastic->GetTransform()->SetPosition(6, -1, 0);
+	roughPlastic->GetTransform()->SetPosition(8, -2, 0);
 	roughPlastic->GetTransform()->SetScale(2);
 	scene->AddEntity(roughPlastic);
 }
@@ -330,7 +329,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		renderer->RenderSimple(scene, lightCount);
 
 	// Finalize the frame
-	renderer->FrameEnd(vsync || !deviceSupportsTearing || isFullscreen);
+	renderer->FrameEnd(vsync || !deviceSupportsTearing || isFullscreen, scene->GetCurrentCamera());
 }
 
 
@@ -500,6 +499,34 @@ void Game::BuildUI()
 		{
 			ImGui::Checkbox("Optimize Rendering", &useOptimizedRendering);
 			ImGui::Checkbox("Indirect Lighting", &renderer->indirectLighting);
+			if (renderer->indirectLighting)
+				ImGui::SliderFloat("IBL Intensity", &renderer->iblIntensity, 0.0f, 2.0f);
+
+			ImGui::Spacing();
+			if (ImGui::CollapsingHeader("SSAO"))
+			{
+				ImVec2 size = ImGui::GetItemRectSize();
+				float rtHeight = size.x * ((float)windowHeight / windowWidth);
+
+				ImGui::Checkbox("Enabled", &renderer->ssaoEnabled);
+				ImGui::Checkbox("SSAO Output Only", &renderer->ssaoOutputOnly);
+				ImGui::SliderInt("Sample Count", &renderer->ssaoSamples, 1, 64);
+				ImGui::SliderFloat("Sample Radius", &renderer->ssaoRadius, 0.0f, 2.0f);
+			}
+
+			ImGui::Spacing();
+			if (ImGui::CollapsingHeader("All Render Targets"))
+			{
+				ImVec2 size = ImGui::GetItemRectSize();
+				float rtHeight = size.x * ((float)windowHeight / windowWidth);
+
+				for (int i = 0; i < RenderTargetType::RENDER_TARGET_TYPE_COUNT; i++)
+				{
+					ImageWithHover(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
+				}
+
+				ImageWithHover(Assets::GetInstance().GetTexture(L"random").Get(), ImVec2(256, 256));
+			}
 
 			// Finalize the tree node
 			ImGui::TreePop();
@@ -637,5 +664,44 @@ void Game::LightUI(Light& light)
 	ImGui::ColorEdit3("Color", &light.Color.x);
 	ImGui::SliderFloat("Intensity", &light.Intensity, 0.0f, 10.0f);
 }
+
+
+void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
+{
+	// Draw the image
+	ImGui::Image(user_texture_id, size);
+
+	// Check for hover
+	if (ImGui::IsItemHovered())
+	{
+		// Zoom amount and aspect of the image
+		float zoom = 0.03f;
+		float aspect = (float)size.x / size.y;
+
+		// Get the coords of the image
+		ImVec2 topLeft = ImGui::GetItemRectMin();
+		ImVec2 bottomRight = ImGui::GetItemRectMax();
+
+		// Get the mouse pos as a percent across the image, clamping near the edge
+		ImVec2 mousePosGlobal = ImGui::GetMousePos();
+		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
+		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
+
+		uvPercent.x = max(uvPercent.x, zoom / 2);
+		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
+		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
+		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
+
+		// Figure out the uv coords for the zoomed image
+		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
+		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
+
+		// Draw a floating box with a zoomed view of the image
+		ImGui::BeginTooltip();
+		ImGui::Image(user_texture_id, ImVec2(256, 256), uvTL, uvBR);
+		ImGui::EndTooltip();
+	}
+}
+
 
 

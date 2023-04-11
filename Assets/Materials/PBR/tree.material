@@ -1,0 +1,33 @@
+{
+	"shaders": {
+		"pixel": "PixelShaderPBR",
+		"vertex": "VertexShader"
+	},
+	"tint": [1.0, 1.0, 1.0],
+	"uvScale": [1.0, 1.0],
+	"uvOffset": [0.0, 0.0],
+	"samplers": [
+		{
+			"name": "Samplers/anisotropic16Wrap",
+			"shaderName": "BasicSampler"
+		}
+	],
+	"textures": [
+		{
+			"name": "Textures/lowpoly tree",
+			"shaderName": "Albedo"
+		},
+		{
+			"name": "Textures/flat_normals",
+			"shaderName": "NormalMap"
+		},
+		{
+			"name": "Textures/white",
+			"shaderName": "RoughnessMap"
+		},
+		{
+			"name": "Textures/black",
+			"shaderName": "MetalMap"
+		}
+	]
+}
