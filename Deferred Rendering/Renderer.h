@@ -67,7 +67,7 @@ public:
 		Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthBufferDSV);
 	~Renderer();
 
-	void Render(Camera* camera);
+	void Render(Camera* camera, bool vsync);
 	void PreResize();
 	void PostResize(
 		unsigned int windowWidth,

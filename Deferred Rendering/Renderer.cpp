@@ -152,7 +152,7 @@ Renderer::~Renderer()
 	delete psPerFrameData;
 }
 
-void Renderer::Render(Camera* camera)
+void Renderer::Render(Camera* camera, bool vsync)
 {
 	// Will need some assets throughout
 	Assets& assets = Assets::GetInstance();
@@ -318,7 +318,9 @@ void Renderer::Render(Camera* camera)
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	// Present and re-bind the RTV
-	swapChain->Present(0, 0);
+	swapChain->Present(
+		vsync ? 1 : 0,
+		vsync ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 	context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 
 	// Unbind all SRVs at the end of the frame so they're not still bound for input

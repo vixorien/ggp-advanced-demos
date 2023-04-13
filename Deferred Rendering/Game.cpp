@@ -127,7 +127,7 @@ void Game::Init()
 	camera = new Camera(
 		0, 0, -10,	// Position
 		3.0f,		// Move speed
-		1.0f,		// Mouse look
+		0.002f,		// Mouse look
 		this->width / (float)this->height); // Aspect ratio
 
 	// Create the renderer (last since we need some other pieces like the Sky)
@@ -877,5 +877,5 @@ void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size, const
 // --------------------------------------------------------
 void Game::Draw(float deltaTime, float totalTime)
 {
-	renderer->Render(camera);
+	renderer->Render(camera, vsync || !deviceSupportsTearing || isFullscreen);
 }
