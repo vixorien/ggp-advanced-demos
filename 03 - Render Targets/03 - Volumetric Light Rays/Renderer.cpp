@@ -102,7 +102,7 @@ void Renderer::FrameStart()
 	for (auto& rt : renderTargetRTVs) context->ClearRenderTargetView(rt.Get(), black);
 
 	// Set render targets for initial render pass
-	const int numTargets = 4;
+	const int numTargets = 2;
 	ID3D11RenderTargetView* targets[numTargets] = {};
 	targets[0] = renderTargetRTVs[RenderTargetType::SCENE_COLORS].Get();
 	targets[1] = renderTargetRTVs[RenderTargetType::SUN_AND_OCCLUDERS].Get();
