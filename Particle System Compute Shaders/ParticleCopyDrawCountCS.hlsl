@@ -16,7 +16,8 @@ void main( uint3 id : SV_DispatchThreadID )
 	// happens to be how many particles we want to draw
 	DrawArgs[0] = DrawList.IncrementCounter() * VertsPerParticle; // VertexCountPerInstance (or index count if using an index buffer)
 	DrawArgs[1] = 1; // InstanceCount
-	DrawArgs[2] = 0; // Offets
-	DrawArgs[3] = 0; // Offets
-	DrawArgs[5] = 0; // Offets
+	DrawArgs[2] = 0; // Offsets
+	DrawArgs[3] = 0; // Offsets
+	DrawArgs[4] = 0; // Offsets
+	DrawArgs[5] = 0; // Offsets
 }
