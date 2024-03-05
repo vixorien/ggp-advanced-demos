@@ -37,8 +37,7 @@ private:
 		raytracingOutputUAV_GPU{},
 		screenHeight(1),
 		screenWidth(1),
-		shaderTableRecordSize(0),
-		topLevelAccelStructureSize(0)
+		shaderTableRecordSize(0)
 	{};
 #pragma endregion
 
@@ -97,7 +96,6 @@ private:
 	UINT64 shaderTableRecordSize;
 
 	// Accel structure requirements
-	UINT64 topLevelAccelStructureSize;
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasScratchBuffer; 
 	Microsoft::WRL::ComPtr<ID3D12Resource> blasScratchBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> tlasInstanceDescBuffer;

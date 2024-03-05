@@ -695,10 +695,6 @@ void RaytracingHelper::CreateTopLevelAccelerationStructure()
 	accelStructPrebuildInfo.ScratchDataSizeInBytes = ALIGN(accelStructPrebuildInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
 	accelStructPrebuildInfo.ResultDataMaxSizeInBytes = ALIGN(accelStructPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
 
-	// Save the TLAS size
-	// TODO: Determine if we actually need this anywhere else?  One tutorial saved it...
-	topLevelAccelStructureSize = accelStructPrebuildInfo.ResultDataMaxSizeInBytes;
-
 	// Create a scratch buffer so the device has a place to temporarily store data
 	tlasScratchBuffer = DX12Helper::GetInstance().CreateBuffer(
 		accelStructPrebuildInfo.ScratchDataSizeInBytes,

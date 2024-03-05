@@ -162,7 +162,7 @@ void Game::CreateRootSigAndPipelineState()
 		D3D12_DESCRIPTOR_RANGE srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		srvRange.NumDescriptors = 4;		// Set to max number of textures at once (match pixel shader!)
-		srvRange.BaseShaderRegister = 0;	// Starts at s0 (match pixel shader!)
+		srvRange.BaseShaderRegister = 0;	// Starts at t0 (match pixel shader!)
 		srvRange.RegisterSpace = 0;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
