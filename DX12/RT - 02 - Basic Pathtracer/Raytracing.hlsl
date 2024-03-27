@@ -214,7 +214,7 @@ void RayGen()
 	for (int r = 0; r < raysPerPixel; r++)
 	{
 		float2 adjustedIndices = (float2)rayIndices;
-		adjustedIndices += rand((float)r / raysPerPixel);
+		adjustedIndices += rand2((float)r / raysPerPixel);
 
 		// Calculate the ray data
 		float3 rayOrigin;
