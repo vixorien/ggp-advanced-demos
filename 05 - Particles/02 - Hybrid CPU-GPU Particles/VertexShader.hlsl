@@ -1,23 +1,13 @@
 
-// Data that changes at most once per frame
-cbuffer perFrame : register(b0)
-{
-	matrix view;
-	matrix projection;
-};
 
-// Data that can change per material
-cbuffer perMaterial : register(b1)
-{
-	float2 uvScale;
-};
-
-// Data that can change per object
-cbuffer perObject : register(b2)
+cbuffer ExternalData : register(b0)
 {
 	matrix world;
-	matrix worldInverseTranspose;
-};
+	matrix worldInvTrans;
+	matrix view;
+	matrix projection;
+}
+
 
 
 // Struct representing a single vertex worth of data
@@ -56,11 +46,11 @@ VertexToPixel main(VertexShaderInput input)
 	output.worldPos = mul(world, float4(input.position, 1.0f)).xyz;
 
 	// Make sure the normal is in WORLD space, not "local" space
-	output.normal = normalize(mul((float3x3)worldInverseTranspose, input.normal));
-	output.tangent = normalize(mul((float3x3)worldInverseTranspose, input.tangent));
+	output.normal = normalize(mul((float3x3)worldInvTrans, input.normal));
+	output.tangent = normalize(mul((float3x3)world, input.tangent));
 
 	// Pass through the uv
-	output.uv = input.uv * uvScale;
+	output.uv = input.uv;
 
 	return output;
 }

@@ -1,8 +1,8 @@
 
 
 // Texture-related resources
-TextureCube skyTexture		: register(t0);
-SamplerState samplerOptions : register(s0);
+TextureCube SkyTexture		: register(t0);
+SamplerState BasicSampler : register(s0);
 
 
 // Struct representing the data we expect to receive from earlier pipeline stages
@@ -30,5 +30,5 @@ float4 main(VertexToPixel input) : SV_TARGET
 {
 	// When we sample a TextureCube (like "skyTexture"), we need
 	// to provide a direction in 3D space (a float3) instead of a uv coord
-	return pow(skyTexture.Sample(samplerOptions, input.sampleDir), 2.2f);
+	return SkyTexture.Sample(BasicSampler, input.sampleDir);
 }

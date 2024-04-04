@@ -3,14 +3,11 @@
 using namespace DirectX;
 
 Emitter::Emitter(
+	Microsoft::WRL::ComPtr<ID3D11Device> device,
+	std::shared_ptr<Material> material,
 	int maxParticles,
 	int particlesPerSecond,
 	float lifetime,
-	Microsoft::WRL::ComPtr<ID3D11Device> device,
-	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context,
-	SimpleVertexShader* vs,
-	SimplePixelShader* ps,
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture,
 	float startSize,
 	float endSize,
 	bool constrainYAxis,
@@ -18,29 +15,25 @@ Emitter::Emitter(
 	DirectX::XMFLOAT4 endColor,
 	DirectX::XMFLOAT3 emitterPosition,
 	DirectX::XMFLOAT3 positionRandomRange,
+	DirectX::XMFLOAT2 rotationStartMinMax,
+	DirectX::XMFLOAT2 rotationEndMinMax,
 	DirectX::XMFLOAT3 startVelocity,
 	DirectX::XMFLOAT3 velocityRandomRange,
 	DirectX::XMFLOAT3 emitterAcceleration,
-	DirectX::XMFLOAT2 rotationStartMinMax,
-	DirectX::XMFLOAT2 rotationEndMinMax,
 	unsigned int spriteSheetWidth,
 	unsigned int spriteSheetHeight,
 	float spriteSheetSpeedScale)
 	:
+	device(device),
+	material(material),
 	maxParticles(maxParticles),
 	particlesPerSecond(particlesPerSecond),
 	lifetime(lifetime),
-	device(device),
-	context(context),
-	vs(vs),
-	ps(ps),
-	texture(texture),
 	startSize(startSize),
 	endSize(endSize),
 	constrainYAxis(constrainYAxis),
 	startColor(startColor),
 	endColor(endColor),
-	emitterPosition(emitterPosition),
 	positionRandomRange(positionRandomRange),
 	startVelocity(startVelocity),
 	velocityRandomRange(velocityRandomRange),
@@ -51,7 +44,8 @@ Emitter::Emitter(
 	spriteSheetHeight(max(spriteSheetHeight, 1)),
 	spriteSheetFrameWidth(1.0f / spriteSheetWidth),
 	spriteSheetFrameHeight(1.0f / spriteSheetHeight),
-	spriteSheetSpeedScale(spriteSheetSpeedScale)
+	spriteSheetSpeedScale(spriteSheetSpeedScale),
+	particles(0)
 {
 	// Calculate emission rate
 	secondsPerParticle = 1.0f / particlesPerSecond;
@@ -61,6 +55,8 @@ Emitter::Emitter(
 	livingParticleCount = 0;
 	indexFirstAlive = 0;
 	indexFirstDead = 0;
+
+	this->transform.SetPosition(emitterPosition);
 
 	// Actually create the array and underlying GPU resources
 	CreateParticlesAndGPUResources();
@@ -72,6 +68,9 @@ Emitter::~Emitter()
 	delete[] particles;
 }
 
+Transform* Emitter::GetTransform() { return &transform; }
+std::shared_ptr<Material> Emitter::GetMaterial() { return material; }
+void Emitter::SetMaterial(std::shared_ptr<Material> material) { this->material = material; }
 
 void Emitter::CreateParticlesAndGPUResources()
 {
@@ -187,7 +186,106 @@ void Emitter::Update(float dt, float currentTime)
 		EmitParticle(currentTime);
 		timeSinceLastEmit -= secondsPerParticle;
 	}
+}
 
+
+void Emitter::UpdateSingleParticle(float currentTime, int index)
+{
+	float age = currentTime - particles[index].EmitTime;
+
+	// Update and check for death
+	if (age >= lifetime)
+	{
+		// Recent death, so retire by moving alive count (and wrap)
+		indexFirstAlive++;
+		indexFirstAlive %= maxParticles;
+		livingParticleCount--;
+	}
+}
+
+void Emitter::EmitParticle(float currentTime)
+{
+	// Any left to spawn?
+	if (livingParticleCount == maxParticles)
+		return;
+
+	// Which particle is spawning?
+	int spawnedIndex = indexFirstDead;
+
+	// Update the spawn time
+	particles[spawnedIndex].EmitTime = currentTime;
+
+	// Adjust the particle start position based on the random range (box shape)
+	particles[spawnedIndex].StartPosition = transform.GetPosition();
+	particles[spawnedIndex].StartPosition.x += positionRandomRange.x * RandomRange(-1.0f, 1.0f);
+	particles[spawnedIndex].StartPosition.y += positionRandomRange.y * RandomRange(-1.0f, 1.0f);
+	particles[spawnedIndex].StartPosition.z += positionRandomRange.z * RandomRange(-1.0f, 1.0f);
+
+	// Adjust particle start velocity based on random range
+	particles[spawnedIndex].StartVelocity = startVelocity;
+	particles[spawnedIndex].StartVelocity.x += velocityRandomRange.x * RandomRange(-1.0f, 1.0f);
+	particles[spawnedIndex].StartVelocity.y += velocityRandomRange.y * RandomRange(-1.0f, 1.0f);
+	particles[spawnedIndex].StartVelocity.z += velocityRandomRange.z * RandomRange(-1.0f, 1.0f);
+
+	// Adjust start and end rotation values based on range
+	particles[spawnedIndex].StartRotation = RandomRange(rotationStartMinMax.x, rotationStartMinMax.y);
+	particles[spawnedIndex].EndRotation = RandomRange(rotationEndMinMax.x, rotationEndMinMax.y);
+
+	// Increment the first dead particle (since it's now alive)
+	indexFirstDead++;
+	indexFirstDead %= maxParticles; // Wrap
+
+	// One more living particle
+	livingParticleCount++;
+}
+
+void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera, float currentTime)
+{
+	CopyParticlesToGPU(context);
+
+	// Set up buffers - note that we're NOT using a vertex buffer!
+	// When we draw, we'll calculate the number of vertices we expect
+	// to have given how many particles are currently alive.  We'll
+	// construct the actual vertex data on the fly in the shader.
+	UINT stride = 0;
+	UINT offset = 0;
+	ID3D11Buffer* nullBuffer = 0;
+	context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
+	context->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+
+	// Set particle-specific data and let the
+	// material take care of the rest
+	material->PrepareMaterial(&transform, camera);
+
+	// Vertex data
+	std::shared_ptr<SimpleVertexShader> vs = material->GetVertexShader();
+	vs->SetMatrix4x4("view", camera->GetView());
+	vs->SetMatrix4x4("projection", camera->GetProjection());
+	vs->SetFloat("currentTime", currentTime);
+	vs->SetFloat("lifetime", lifetime);
+	vs->SetFloat3("acceleration", emitterAcceleration);
+	vs->SetFloat("startSize", startSize);
+	vs->SetFloat("endSize", endSize);
+	vs->SetFloat4("startColor", startColor);
+	vs->SetFloat4("endColor", endColor);
+	vs->SetInt("constrainYAxis", constrainYAxis);
+	vs->SetInt("spriteSheetWidth", spriteSheetWidth);
+	vs->SetInt("spriteSheetHeight", spriteSheetHeight);
+	vs->SetFloat("spriteSheetFrameWidth", spriteSheetFrameWidth);
+	vs->SetFloat("spriteSheetFrameHeight", spriteSheetFrameHeight);
+	vs->SetFloat("spriteSheetSpeedScale", spriteSheetSpeedScale);
+	vs->CopyAllBufferData();
+
+	vs->SetShaderResourceView("ParticleData", particleDataSRV);
+
+	// Now that all of our data is in the beginning of the particle buffer,
+	// we can simply draw the correct amount of living particle indices.
+	// Each particle = 4 vertices = 6 indices for a quad
+	context->DrawIndexed(livingParticleCount * 6, 0, 0);
+}
+
+void Emitter::CopyParticlesToGPU(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context)
+{
 	// Now that we have emit and updated all particles for this frame, 
 	// we can copy them to the GPU as either one big chunk or two smaller chunks
 
@@ -221,101 +319,6 @@ void Emitter::Update(float dt, float currentTime)
 
 	// Unmap now that we're done copying
 	context->Unmap(particleDataBuffer.Get(), 0);
-}
-
-
-void Emitter::UpdateSingleParticle(float currentTime, int index)
-{
-	float age = currentTime - particles[index].EmitTime;
-
-	// Update and check for death
-	if (age >= lifetime)
-	{
-		// Recent death, so retire by moving alive count (and wrap)
-		indexFirstAlive++;
-		indexFirstAlive %= maxParticles;
-		livingParticleCount--;
-	}
-}
-
-void Emitter::EmitParticle(float currentTime)
-{
-	// Any left to spawn?
-	if (livingParticleCount == maxParticles)
-		return;
-
-	// Which particle is spawning?
-	int spawnedIndex = indexFirstDead;
-
-	// Update the spawn time
-	particles[spawnedIndex].EmitTime = currentTime;
-
-	// Adjust the particle start position based on the random range (box shape)
-	particles[spawnedIndex].StartPosition = emitterPosition;
-	particles[spawnedIndex].StartPosition.x += positionRandomRange.x * RandomRange(-1.0f, 1.0f);
-	particles[spawnedIndex].StartPosition.y += positionRandomRange.y * RandomRange(-1.0f, 1.0f);
-	particles[spawnedIndex].StartPosition.z += positionRandomRange.z * RandomRange(-1.0f, 1.0f);
-
-	// Adjust particle start velocity based on random range
-	particles[spawnedIndex].StartVelocity = startVelocity;
-	particles[spawnedIndex].StartVelocity.x += velocityRandomRange.x * RandomRange(-1.0f, 1.0f);
-	particles[spawnedIndex].StartVelocity.y += velocityRandomRange.y * RandomRange(-1.0f, 1.0f);
-	particles[spawnedIndex].StartVelocity.z += velocityRandomRange.z * RandomRange(-1.0f, 1.0f);
-
-	// Adjust start and end rotation values based on range
-	particles[spawnedIndex].StartRotation = RandomRange(rotationStartMinMax.x, rotationStartMinMax.y);
-	particles[spawnedIndex].EndRotation = RandomRange(rotationEndMinMax.x, rotationEndMinMax.y);
-
-	// Increment the first dead particle (since it's now alive)
-	indexFirstDead++;
-	indexFirstDead %= maxParticles; // Wrap
-
-	// One more living particle
-	livingParticleCount++;
-}
-
-void Emitter::Draw(Camera* camera, float currentTime)
-{
-	// Set up buffers - note that we're NOT using a vertex buffer!
-	// When we draw, we'll calculate the number of vertices we expect
-	// to have given how many particles are currently alive.  We'll
-	// construct the actual vertex data on the fly in the shader.
-	UINT stride = 0;
-	UINT offset = 0;
-	ID3D11Buffer* nullBuffer = 0;
-	context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
-	context->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-
-	// Shader setup
-	vs->SetShader();
-	ps->SetShader();
-
-	// SRVs - Particle data in VS and texture in PS
-	vs->SetShaderResourceView("ParticleData", particleDataSRV);
-	ps->SetShaderResourceView("Texture", texture);
-
-	// Vertex data
-	vs->SetMatrix4x4("view", camera->GetView());
-	vs->SetMatrix4x4("projection", camera->GetProjection());
-	vs->SetFloat("currentTime", currentTime);
-	vs->SetFloat("lifetime", lifetime);
-	vs->SetFloat3("acceleration", emitterAcceleration);
-	vs->SetFloat("startSize", startSize);
-	vs->SetFloat("endSize", endSize);
-	vs->SetFloat4("startColor", startColor);
-	vs->SetFloat4("endColor", endColor);
-	vs->SetInt("constrainYAxis", constrainYAxis);
-	vs->SetInt("spriteSheetWidth", spriteSheetWidth);
-	vs->SetInt("spriteSheetHeight", spriteSheetHeight);
-	vs->SetFloat("spriteSheetFrameWidth", spriteSheetFrameWidth);
-	vs->SetFloat("spriteSheetFrameHeight", spriteSheetFrameHeight);
-	vs->SetFloat("spriteSheetSpeedScale", spriteSheetSpeedScale);
-	vs->CopyAllBufferData();
-
-	// Now that all of our data is in the beginning of the particle buffer,
-	// we can simply draw the correct amount of living particle indices.
-	// Each particle = 4 vertices = 6 indices for a quad
-	context->DrawIndexed(livingParticleCount * 6, 0, 0);
 }
 
 int Emitter::GetParticlesPerSecond()

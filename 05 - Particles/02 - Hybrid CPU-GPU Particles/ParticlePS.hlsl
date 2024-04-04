@@ -10,12 +10,12 @@ struct VertexToPixel
 };
 
 // Textures and such
-Texture2D Texture			: register(t0);
+Texture2D Particle			: register(t0);
 SamplerState BasicSampler	: register(s0);
 
 // Entry point for this pixel shader
 float4 main(VertexToPixel input) : SV_TARGET
 {
 	// Return the texture sample
-	return Texture.Sample(BasicSampler, input.uv) * input.colorTint;
+	return Particle.Sample(BasicSampler, input.uv) * input.colorTint;
 }

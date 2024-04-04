@@ -7,7 +7,6 @@
 #include "SimpleShader.h"
 #include "Lights.h"
 #include "Sky.h"
-#include "Renderer.h"
 #include "ImGui/imgui.h"
 #include "Emitter.h"
 
@@ -32,33 +31,27 @@ public:
 
 private:
 
-	// Keep track of "stuff" to clean up
-	std::vector<Material*> materials;
-	std::vector<GameEntity*> entities;
-	Camera* camera;
-
-	// Smart renderer
-	Renderer* renderer;
+	std::vector<std::shared_ptr<GameEntity>> entities;
+	std::shared_ptr<Camera> camera;
 
 	// Lights
 	std::vector<Light> lights;
+	DirectX::XMFLOAT3 ambientColor;
+	int lightCount;
 
 	// Particles
-	std::vector<Emitter*> emitters;
-
-	// Texture related resources
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerOptions;
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> clampSampler;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> particleDepthState;
+	Microsoft::WRL::ComPtr<ID3D11BlendState> particleBlendState;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> particleDebugRasterState;
+	std::vector<std::shared_ptr<Emitter>> emitters;
+	void DrawParticles(float totalTime);
 
 	// Skybox
-	Sky* sky;
+	std::shared_ptr<Sky> sky;
 
 	// IMGUI-related methods
 	void CreateUI(float dt);
-	void UIEntity(GameEntity* entity, int index);
-	void UILight(Light& light, int index);
-	void UIEmitter(Emitter* emitter, int index);
-	void ImageWithHover(ImTextureID user_texture_id, const ImVec2& size);
+	void UIEmitter(std::shared_ptr<Emitter> emitter, int index);
 
 	// General helpers
 	void GenerateLights();

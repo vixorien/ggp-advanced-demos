@@ -2,10 +2,12 @@
 
 #include <d3d11.h>
 #include <string>
+#include <memory>
 #include <unordered_map>
 #include <WICTextureLoader.h>
 #include <wrl/client.h>
 #include <DirectXMath.h>
+#include <SpriteFont.h>
 
 #include "Mesh.h"
 #include "SimpleShader.h"
@@ -32,52 +34,72 @@ public:
 
 private:
 	static Assets* instance;
-	Assets() {};
+	Assets() : 
+		allowOnDemandLoading(true),
+		printLoadingProgress(false)	{};
 #pragma endregion
 
 public:
 	~Assets();
 
-	void Initialize(std::string rootAssetPath, Microsoft::WRL::ComPtr<ID3D11Device> device, Microsoft::WRL::ComPtr<ID3D11DeviceContext> context);
+	void Initialize(
+		std::wstring rootAssetPath,
+		std::wstring rootShaderPath,
+		Microsoft::WRL::ComPtr<ID3D11Device> device, 
+		Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, 
+		bool printLoadingProgress = false,
+		bool allowOnDemandLoading = true);
 
 	void LoadAllAssets();
-	void LoadPixelShader(std::string path, bool useAssetPath = false);
-	void LoadVertexShader(std::string path, bool useAssetPath = false);
 
-	void CreateSolidColorTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4 color);
-	void CreateTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4* pixels);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> CreateSolidColorTexture(std::wstring textureName, int width, int height, DirectX::XMFLOAT4 color);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> CreateTexture(std::wstring textureName, int width, int height, DirectX::XMFLOAT4* pixels);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> CreateFloatTexture(std::wstring textureName, int width, int height, DirectX::XMFLOAT4* pixels);
 
-	void CreateFloatTexture(std::string textureName, int width, int height, DirectX::XMFLOAT4* pixels);
+	std::shared_ptr<Mesh> GetMesh(std::wstring name);
+	std::shared_ptr<DirectX::SpriteFont> GetSpriteFont(std::wstring name);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetTexture(std::wstring name);
+	std::shared_ptr<SimplePixelShader> GetPixelShader(std::wstring name);
+	std::shared_ptr<SimpleVertexShader> GetVertexShader(std::wstring name);
 
-	Mesh* GetMesh(std::string name);
-	SimplePixelShader* GetPixelShader(std::string name);
-	SimpleVertexShader* GetVertexShader(std::string name);
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetTexture(std::string name);
+	void AddMesh(std::wstring name, std::shared_ptr<Mesh> mesh);
+	void AddSpriteFont(std::wstring name, std::shared_ptr<DirectX::SpriteFont> font);
+	void AddPixelShader(std::wstring name, std::shared_ptr<SimplePixelShader> ps);
+	void AddVertexShader(std::wstring name, std::shared_ptr<SimpleVertexShader> vs);
+	void AddTexture(std::wstring name, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture);
+
+	unsigned int GetMeshCount();
+	unsigned int GetSpriteFontCount();
+	unsigned int GetPixelShaderCount();
+	unsigned int GetVertexShaderCount();
+	unsigned int GetTextureCount();
 
 private:
 
-	void LoadMesh(std::string path);
-	void LoadTexture(std::string path);
-	void LoadDDSTexture(std::string path);
-	void LoadUnknownShader(std::string path);
+	std::shared_ptr<Mesh> LoadMesh(std::wstring path);
+	std::shared_ptr<DirectX::SpriteFont> LoadSpriteFont(std::wstring path);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> LoadTexture(std::wstring path);
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> LoadDDSTexture(std::wstring path);
+	void LoadUnknownShader(std::wstring path);
+	std::shared_ptr<SimplePixelShader> LoadPixelShader(std::wstring path);
+	std::shared_ptr<SimpleVertexShader> LoadVertexShader(std::wstring path);
 
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-	std::string rootAssetPath;
+	std::wstring rootAssetPath;
+	std::wstring rootShaderPath;
+	bool printLoadingProgress;
 
-	std::unordered_map<std::string, Mesh*> meshes;
-	std::unordered_map<std::string, SimplePixelShader*> pixelShaders;
-	std::unordered_map<std::string, SimpleVertexShader*> vertexShaders;
-	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textures;
+	bool allowOnDemandLoading;
 
-	// Helpers for determining the actual path to the executable
-	std::string GetExePath();
-	std::wstring GetExePath_Wide();
+	std::unordered_map<std::wstring, std::shared_ptr<Mesh>> meshes;
+	std::unordered_map<std::wstring, std::shared_ptr<DirectX::SpriteFont>> spriteFonts;
+	std::unordered_map<std::wstring, std::shared_ptr<SimplePixelShader>> pixelShaders;
+	std::unordered_map<std::wstring, std::shared_ptr<SimpleVertexShader>> vertexShaders;
+	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textures;
 
-	std::string GetFullPathTo(std::string relativeFilePath);
-	std::wstring GetFullPathTo_Wide(std::wstring relativeFilePath);
-
-	bool EndsWith(std::string str, std::string ending);
-	std::wstring ToWideString(std::string str);
+	// Helpers for paths
+	bool EndsWith(std::wstring str, std::wstring ending);
+	std::wstring RemoveFileExtension(std::wstring str);
 };
 

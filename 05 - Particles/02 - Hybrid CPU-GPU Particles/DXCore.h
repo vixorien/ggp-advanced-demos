@@ -8,15 +8,17 @@
 // We can include the correct library files here
 // instead of in Visual Studio settings if we want
 #pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
 
 class DXCore
 {
 public:
 	DXCore(
 		HINSTANCE hInstance,		// The application's handle
-		const char* titleBarText,	// Text for the window's title bar
+		const wchar_t* titleBarText,// Text for the window's title bar
 		unsigned int windowWidth,	// Width of the window's client area
 		unsigned int windowHeight,	// Height of the window's client area
+		bool vsync,					// Sync the framerate to the monitor?
 		bool debugTitleBarStats);	// Show extra stats (fps) in title bar?
 	~DXCore();
 
@@ -34,7 +36,7 @@ public:
 
 	// Initialization and game-loop related methods
 	HRESULT InitWindow();
-	HRESULT InitDirectX();
+	HRESULT InitDirect3D();
 	HRESULT Run();
 	void Quit();
 	virtual void OnResize();
@@ -45,18 +47,24 @@ public:
 	virtual void Draw(float deltaTime, float totalTime) = 0;
 
 protected:
-	HINSTANCE	hInstance;		// The handle to the application
-	HWND		hWnd;			// The handle to the window itself
-	std::string titleBarText;	// Custom text in window's title bar
-	bool		titleBarStats;	// Show extra stats in title bar?
+	HINSTANCE		hInstance;		// The handle to the application
+	HWND			hWnd;			// The handle to the window itself
+	std::wstring	titleBarText;	// Custom text in window's title bar
+	bool			titleBarStats;	// Show extra stats in title bar?
 
 	// Size of the window's client area
-	unsigned int width;
-	unsigned int height;
+	unsigned int windowWidth;
+	unsigned int windowHeight;
 
 	// Does our window currently have focus?
 	// Helpful if we want to pause while not the active window
 	bool hasFocus;
+
+	// Should our framerate sync to the vertical refresh
+	// of the monitor (true) or run as fast as possible (false)?
+	bool vsync;
+	bool deviceSupportsTearing;
+	BOOL isFullscreen; // Due to alt+enter key combination (must be BOOL typedef)
 
 	// DirectX related objects and variables
 	D3D_FEATURE_LEVEL		dxFeatureLevel;
@@ -65,18 +73,10 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext>	context;
 
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> backBufferRTV;
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthStencilView;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthBufferDSV;
 
 	// Helper function for allocating a console window
 	void CreateConsoleWindow(int bufferLines, int bufferColumns, int windowLines, int windowColumns);
-
-	// Helpers for determining the actual path to the executable
-	std::string GetExePath();
-	std::wstring GetExePath_Wide();
-
-	std::string GetFullPathTo(std::string relativeFilePath);
-	std::wstring GetFullPathTo_Wide(std::wstring relativeFilePath);
-
 
 private:
 	// Timing related data

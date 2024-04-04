@@ -1,92 +1,108 @@
 #include "Material.h"
 
-
-
 Material::Material(
-	SimpleVertexShader* vs,
-	SimplePixelShader* ps,
-	DirectX::XMFLOAT4 color,
-	float shininess,
-	DirectX::XMFLOAT2 uvScale)
+	std::shared_ptr<SimplePixelShader> ps, 
+	std::shared_ptr<SimpleVertexShader> vs, 
+	DirectX::XMFLOAT3 tint, 
+	DirectX::XMFLOAT2 uvScale,
+	DirectX::XMFLOAT2 uvOffset) 
+	:
+	ps(ps),
+	vs(vs),
+	colorTint(tint),
+	uvScale(uvScale),
+	uvOffset(uvOffset),
+	roughness(0),
+	useSpecularMap(false)
 {
-	this->vs = vs;
-	this->ps = ps;
-	this->color = color;
-	this->shininess = shininess;
-	this->uvScale = uvScale;
+
+}
+
+// Getters
+std::shared_ptr<SimplePixelShader> Material::GetPixelShader() { return ps; }
+std::shared_ptr<SimpleVertexShader> Material::GetVertexShader() { return vs; }
+DirectX::XMFLOAT2 Material::GetUVScale() { return uvScale; }
+DirectX::XMFLOAT2 Material::GetUVOffset() { return uvOffset; }
+DirectX::XMFLOAT3 Material::GetColorTint() { return colorTint; }
+
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Material::GetTextureSRV(std::string name)
+{
+	// Search for the key
+	auto it = textureSRVs.find(name);
+
+	// Not found, return null
+	if (it == textureSRVs.end())
+		return 0;
+
+	// Return the texture ComPtr
+	return it->second;
+}
+
+Microsoft::WRL::ComPtr<ID3D11SamplerState> Material::GetSampler(std::string name)
+{
+	// Search for the key
+	auto it = samplers.find(name);
+
+	// Not found, return null
+	if (it == samplers.end())
+		return 0;
+
+	// Return the sampler ComPtr
+	return it->second;
+}
+
+// Setters
+void Material::SetPixelShader(std::shared_ptr<SimplePixelShader> ps) { this->ps = ps; }
+void Material::SetVertexShader(std::shared_ptr<SimpleVertexShader> vs) { this->vs = vs; }
+void Material::SetUVScale(DirectX::XMFLOAT2 scale) { uvScale = scale; }
+void Material::SetUVOffset(DirectX::XMFLOAT2 offset) { uvOffset = offset; }
+void Material::SetColorTint(DirectX::XMFLOAT3 tint) { this->colorTint = tint; }
+
+
+void Material::AddTextureSRV(std::string name, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv)
+{
+	textureSRVs.insert({ name, srv });
+}
+
+void Material::AddSampler(std::string name, Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler)
+{
+	samplers.insert({ name, sampler });
+}
+
+void Material::RemoveTextureSRV(std::string name)
+{
+	textureSRVs.erase(name);
+}
+
+void Material::RemoveSampler(std::string name)
+{
+	samplers.erase(name);
 }
 
 
-Material::~Material()
+void Material::PrepareMaterial(Transform* transform, std::shared_ptr<Camera> camera)
 {
-}
-
-void Material::PrepareMaterial(Transform* transform, Camera* cam)
-{
-	// Turn shaders on
+	// Turn on these shaders
 	vs->SetShader();
 	ps->SetShader();
 
-	// Set vertex shader data
+	// Send data to the vertex shader
 	vs->SetMatrix4x4("world", transform->GetWorldMatrix());
-	vs->SetMatrix4x4("worldInverseTranspose", transform->GetWorldInverseTransposeMatrix());
-	vs->SetMatrix4x4("view", cam->GetView());
-	vs->SetMatrix4x4("projection", cam->GetProjection());
-	vs->SetFloat2("uvScale", uvScale);
+	vs->SetMatrix4x4("worldInvTrans", transform->GetWorldInverseTransposeMatrix());
+	vs->SetMatrix4x4("view", camera->GetView());
+	vs->SetMatrix4x4("projection", camera->GetProjection());
 	vs->CopyAllBufferData();
 
-	// Set pixel shader data
-	ps->SetFloat4("Color", color); 
-	ps->SetFloat("Shininess", shininess);
-	ps->CopyBufferData("perMaterial");
+	// Send data to the pixel shader
+	ps->SetFloat3("colorTint", colorTint);
+	ps->SetFloat("roughness", roughness);
+	ps->SetFloat3("cameraPosition", camera->GetTransform()->GetPosition());
+	ps->SetFloat2("uvScale", uvScale);
+	ps->SetFloat2("uvOffset", uvOffset);
+	ps->SetInt("useSpecularMap", (int)useSpecularMap);
+	ps->CopyAllBufferData();
 
 	// Loop and set any other resources
-	for (auto t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
-	for (auto s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
-}
-
-void Material::SetPerMaterialDataAndResources(bool copyToGPUNow)
-{
-	// Set vertex shader per-material vars
-	vs->SetFloat2("uvScale", uvScale);
-	if (copyToGPUNow)
-	{
-		vs->CopyBufferData("perMaterial");
-	}
-
-	// Set pixel shader per-material vars
-	ps->SetFloat4("Color", color);
-	ps->SetFloat("Shininess", shininess);
-	if (copyToGPUNow)
-	{
-		ps->CopyBufferData("perMaterial");
-	}
-
-	// Loop and set any other resources
-	for (auto t : psTextureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto t : vsTextureSRVs) { vs->SetShaderResourceView(t.first.c_str(), t.second); }
-	for (auto s : psSamplers) { ps->SetSamplerState(s.first.c_str(), s.second); }
-	for (auto s : vsSamplers) { vs->SetSamplerState(s.first.c_str(), s.second); }
-}
-
-void Material::AddPSTextureSRV(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv)
-{
-	psTextureSRVs.insert({ shaderName, srv });
-}
-
-void Material::AddVSTextureSRV(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv)
-{
-	vsTextureSRVs.insert({ shaderName, srv });
-}
-
-void Material::AddPSSampler(std::string samplerName, Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler)
-{
-	psSamplers.insert({ samplerName, sampler });
-}
-
-void Material::AddVSSampler(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler)
-{
-	vsSamplers.insert({ shaderName, sampler });
+	for (auto& t : textureSRVs) { ps->SetShaderResourceView(t.first.c_str(), t.second.Get()); }
+	for (auto& s : samplers) { ps->SetSamplerState(s.first.c_str(), s.second.Get()); }
 }

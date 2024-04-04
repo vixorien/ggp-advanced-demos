@@ -5,6 +5,7 @@
 #include "Game.h"
 #include "Vertex.h"
 #include "Input.h"
+#include "PathHelpers.h"
 #include "Assets.h"
 
 #include "WICTextureLoader.h"
@@ -35,14 +36,15 @@ using namespace DirectX;
 // --------------------------------------------------------
 Game::Game(HINSTANCE hInstance)
 	: DXCore(
-		hInstance,		   // The application's handle
-		"DirectX Game",	   // Text for the window's title bar
-		1280,			   // Width of the window's client area
-		720,			   // Height of the window's client area
-		true)			   // Show extra stats (fps) in title bar?
+		hInstance,			// The application's handle
+		L"DirectX Game",	// Text for the window's title bar (as a wide-character string)
+		1280,				// Width of the window's client area
+		720,				// Height of the window's client area
+		false,				// Sync the framerate to the monitor refresh? (lock framerate)
+		true),				// Show extra stats (fps) in title bar?
+	ambientColor(0, 0, 0), // Ambient is zero'd out since it's not physically-based
+	lightCount(3)
 {
-	camera = 0;
-
 	// Seed random
 	srand((unsigned int)time(0));
 
@@ -66,18 +68,7 @@ Game::~Game()
 	// - If we weren't using smart pointers, we'd need
 	//   to call Release() on each DirectX object
 
-	// Clean up our other resources
-	for (auto& m : materials) delete m;
-	for (auto& e : entities) delete e;
-	for (auto& e : emitters) delete e;
-
-	// Delete any one-off objects
-	delete sky;
-	delete camera;
-	delete renderer;
-
 	// Delete singletons
-	delete& Input::GetInstance();
 	delete& Assets::GetInstance();
 
 	// IMGUI
@@ -94,20 +85,12 @@ Game::~Game()
 // --------------------------------------------------------
 void Game::Init()
 {
-	// IMGUI
-	{
-		// Initialize ImGui
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-		ImGuiIO& io = ImGui::GetIO();
-
-		// Pick a style
-		ImGui::StyleColorsDark();
-
-		// Setup Platform/Renderer backends
-		ImGui_ImplWin32_Init(hWnd);
-		ImGui_ImplDX11_Init(device.Get(), context.Get());
-	}
+	// Initialize ImGui itself & platform/renderer backends
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui_ImplWin32_Init(hWnd);
+	ImGui_ImplDX11_Init(device.Get(), context.Get());
+	ImGui::StyleColorsDark();
 
 	// Initialize the input manager with the window's handle
 	Input::GetInstance().Initialize(this->hWnd);
@@ -115,37 +98,29 @@ void Game::Init()
 	// Asset loading and entity creation
 	LoadAssetsAndCreateEntities();
 
-	// Tell the input assembler stage of the pipeline what kind of
-	// geometric primitives (points, lines or triangles) we want to draw.  
-	// Essentially: "What kind of shape should the GPU draw with our data?"
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// Make our camera
-	camera = new Camera(
-		0, 0, -10,	// Position
-		3.0f,		// Move speed
-		1.0f,		// Mouse look
-		this->width / (float)this->height); // Aspect ratio
-
-	// Create the renderer (last since we need some other pieces like the Sky)
-	renderer = new Renderer(
-		entities,
-		lights,
-		emitters,
-		10, // Just a few
-		sky,
-		width,
-		height,
-		device,
-		context,
-		swapChain,
-		backBufferRTV,
-		depthStencilView);
-
-
-	// Set up lights once the renderer is active,
-	// as that now tracks the active light count
+	// Set up lights
+	lightCount = 3;
 	GenerateLights();
+
+	// Set initial graphics API state
+	//  - These settings persist until we change them
+	{
+		// Tell the input assembler (IA) stage of the pipeline what kind of
+		// geometric primitives (points, lines or triangles) we want to draw.  
+		// Essentially: "What kind of shape should the GPU draw with our vertices?"
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	}
+
+	// Create the camera
+	camera = std::make_shared<Camera>(
+		0.0f, 1.0f, -15.0f, // Position
+		5.0f,				// Move speed
+		0.002f,				// Look speed
+		XM_PIDIV4,			// Field of view
+		(float)windowWidth / windowHeight,  // Aspect ratio
+		0.01f,				// Near clip
+		100.0f,				// Far clip
+		CameraProjectionType::Perspective);
 }
 
 
@@ -155,306 +130,247 @@ void Game::Init()
 void Game::LoadAssetsAndCreateEntities()
 {
 	Assets& assets = Assets::GetInstance();
-	assets.Initialize("..\\..\\..\\..\\Assets\\", device, context);
-	assets.LoadAllAssets();
+	assets.Initialize(L"../../../../Assets/", L"./", device, context, true, true);
 
-	// Create a random texture for SSAO
-	const int textureSize = 4;
-	const int totalPixels = textureSize * textureSize;
-	XMFLOAT4 randomPixels[totalPixels] = {};
-	for (int i = 0; i < totalPixels; i++)
-	{
-		XMVECTOR randomVec = XMVectorSet(RandomRange(-1, 1), RandomRange(-1, 1), 0, 0);
-		XMStoreFloat4(&randomPixels[i], XMVector3Normalize(randomVec));
-	}
-	assets.CreateFloatTexture("random", textureSize, textureSize, randomPixels);
-
-
-	// Describe and create our sampler state
+	// Create a sampler state for texture sampling options
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;
 	D3D11_SAMPLER_DESC sampDesc = {};
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; // What happens outside the 0-1 uv range?
 	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+	sampDesc.Filter = D3D11_FILTER_ANISOTROPIC;		// How do we handle sampling "between" pixels?
 	sampDesc.MaxAnisotropy = 16;
 	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
-	device->CreateSamplerState(&sampDesc, samplerOptions.GetAddressOf());
-
-	// Also create a clamp sampler
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	device->CreateSamplerState(&sampDesc, clampSampler.GetAddressOf());
+	device->CreateSamplerState(&sampDesc, sampler.GetAddressOf());
 
 
-	// Create the sky
-	sky = new Sky(
-		assets.GetTexture("Skies\\Night\\right.png"),
-		assets.GetTexture("Skies\\Night\\left.png"),
-		assets.GetTexture("Skies\\Night\\up.png"),
-		assets.GetTexture("Skies\\Night\\down.png"),
-		assets.GetTexture("Skies\\Night\\front.png"),
-		assets.GetTexture("Skies\\Night\\back.png"),
-		samplerOptions,
+	// Create the sky (loading custom shaders in-line below)
+	sky = std::make_shared<Sky>(
+		FixPath(L"../../../../Assets/Skies/Night Moon/right.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Night Moon/left.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Night Moon/up.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Night Moon/down.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Night Moon/front.png").c_str(),
+		FixPath(L"../../../../Assets/Skies/Night Moon/back.png").c_str(),
+		assets.GetMesh(L"Models/cube"),
+		assets.GetVertexShader(L"SkyVS"),
+		assets.GetPixelShader(L"SkyPS"),
+		sampler,
 		device,
 		context);
 
-	// Grab basic shaders for all these materials
-	SimpleVertexShader* vs = assets.GetVertexShader("VertexShader.cso");
-	SimplePixelShader* ps = assets.GetPixelShader("PixelShader.cso");
-	SimplePixelShader* psPBR = assets.GetPixelShader("PixelShaderPBR.cso");
+	// Grab shaders needed below
+	std::shared_ptr<SimpleVertexShader> vertexShader = assets.GetVertexShader(L"VertexShader");
+	std::shared_ptr<SimplePixelShader> pixelShader = assets.GetPixelShader(L"PixelShaderPBR");
 
 	// Create basic materials
-	Material* cobbleMat2x = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	cobbleMat2x->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\cobblestone_albedo.png"));
-	cobbleMat2x->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\cobblestone_normals.png"));
-	cobbleMat2x->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\cobblestone_roughness.png"));
-	cobbleMat2x->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> cobbleMat2x = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	cobbleMat2x->AddSampler("BasicSampler", sampler);
+	cobbleMat2x->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/cobblestone_albedo"));
+	cobbleMat2x->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/cobblestone_normals"));
+	cobbleMat2x->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/cobblestone_roughness"));
+	cobbleMat2x->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/cobblestone_metal"));
 
-	Material* floorMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	floorMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\floor_albedo.png"));
-	floorMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\floor_normals.png"));
-	floorMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\floor_roughness.png"));
-	floorMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> cobbleMat4x = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 4));
+	cobbleMat4x->AddSampler("BasicSampler", sampler);
+	cobbleMat4x->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/cobblestone_albedo"));
+	cobbleMat4x->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/cobblestone_normals"));
+	cobbleMat4x->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/cobblestone_roughness"));
+	cobbleMat4x->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/cobblestone_metal"));
 
-	Material* paintMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	paintMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\paint_albedo.png"));
-	paintMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\paint_normals.png"));
-	paintMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\paint_roughness.png"));
-	paintMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> floorMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	floorMat->AddSampler("BasicSampler", sampler);
+	floorMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/floor_albedo"));
+	floorMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/floor_normals"));
+	floorMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/floor_roughness"));
+	floorMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/floor_metal"));
 
-	Material* scratchedMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	scratchedMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\scratched_albedo.png"));
-	scratchedMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\scratched_normals.png"));
-	scratchedMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\scratched_roughness.png"));
-	scratchedMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> paintMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	paintMat->AddSampler("BasicSampler", sampler);
+	paintMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/paint_albedo"));
+	paintMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/paint_normals"));
+	paintMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/paint_roughness"));
+	paintMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/paint_metal"));
 
-	Material* bronzeMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	bronzeMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\bronze_albedo.png"));
-	bronzeMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\bronze_normals.png"));
-	bronzeMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\bronze_roughness.png"));
-	bronzeMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	scratchedMat->AddSampler("BasicSampler", sampler);
+	scratchedMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/scratched_albedo"));
+	scratchedMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/scratched_normals"));
+	scratchedMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/scratched_roughness"));
+	scratchedMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/scratched_metal"));
 
-	Material* roughMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	roughMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\rough_albedo.png"));
-	roughMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\rough_normals.png"));
-	roughMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\rough_roughness.png"));
-	roughMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	bronzeMat->AddSampler("BasicSampler", sampler);
+	bronzeMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/bronze_albedo"));
+	bronzeMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/bronze_normals"));
+	bronzeMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/bronze_roughness"));
+	bronzeMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/bronze_metal"));
 
-	Material* woodMat = new Material(vs, ps, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	woodMat->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\wood_albedo.png"));
-	woodMat->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\wood_normals.png"));
-	woodMat->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\wood_roughness.png"));
-	woodMat->AddPSSampler("BasicSampler", samplerOptions);
+	std::shared_ptr<Material> roughMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	roughMat->AddSampler("BasicSampler", sampler);
+	roughMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/rough_albedo"));
+	roughMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/rough_normals"));
+	roughMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/rough_roughness"));
+	roughMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/rough_metal"));
 
-
-	materials.push_back(cobbleMat2x);
-	materials.push_back(floorMat);
-	materials.push_back(paintMat);
-	materials.push_back(scratchedMat);
-	materials.push_back(bronzeMat);
-	materials.push_back(roughMat);
-	materials.push_back(woodMat);
-
-	// Create PBR materials
-	Material* cobbleMat2xPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	cobbleMat2xPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\cobblestone_albedo.png"));
-	cobbleMat2xPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\cobblestone_normals.png"));
-	cobbleMat2xPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\cobblestone_roughness.png"));
-	cobbleMat2xPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\cobblestone_metal.png"));
-	cobbleMat2xPBR->AddPSSampler("BasicSampler", samplerOptions);
-	cobbleMat2xPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* floorMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	floorMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\floor_albedo.png"));
-	floorMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\floor_normals.png"));
-	floorMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\floor_roughness.png"));
-	floorMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\floor_metal.png"));
-	floorMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	floorMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* paintMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	paintMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\paint_albedo.png"));
-	paintMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\paint_normals.png"));
-	paintMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\paint_roughness.png"));
-	paintMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\paint_metal.png"));
-	paintMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	paintMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* scratchedMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	scratchedMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\scratched_albedo.png"));
-	scratchedMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\scratched_normals.png"));
-	scratchedMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\scratched_roughness.png"));
-	scratchedMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\scratched_metal.png"));
-	scratchedMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	scratchedMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* bronzeMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	bronzeMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\bronze_albedo.png"));
-	bronzeMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\bronze_normals.png"));
-	bronzeMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\bronze_roughness.png"));
-	bronzeMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\bronze_metal.png"));
-	bronzeMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	bronzeMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* roughMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	roughMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\rough_albedo.png"));
-	roughMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\rough_normals.png"));
-	roughMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\rough_roughness.png"));
-	roughMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\rough_metal.png"));
-	roughMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	roughMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	Material* woodMatPBR = new Material(vs, psPBR, XMFLOAT4(1, 1, 1, 1), 256.0f, XMFLOAT2(2, 2));
-	woodMatPBR->AddPSTextureSRV("AlbedoTexture", assets.GetTexture("Textures\\wood_albedo.png"));
-	woodMatPBR->AddPSTextureSRV("NormalTexture", assets.GetTexture("Textures\\wood_normals.png"));
-	woodMatPBR->AddPSTextureSRV("RoughnessTexture", assets.GetTexture("Textures\\wood_roughness.png"));
-	woodMatPBR->AddPSTextureSRV("MetalTexture", assets.GetTexture("Textures\\wood_metal.png"));
-	woodMatPBR->AddPSSampler("BasicSampler", samplerOptions);
-	woodMatPBR->AddPSSampler("ClampSampler", clampSampler);
-
-	materials.push_back(cobbleMat2xPBR);
-	materials.push_back(floorMatPBR);
-	materials.push_back(paintMatPBR);
-	materials.push_back(scratchedMatPBR);
-	materials.push_back(bronzeMatPBR);
-	materials.push_back(roughMatPBR);
-	materials.push_back(woodMatPBR);
+	std::shared_ptr<Material> woodMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
+	woodMat->AddSampler("BasicSampler", sampler);
+	woodMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/wood_albedo"));
+	woodMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/wood_normals"));
+	woodMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/wood_roughness"));
+	woodMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/wood_metal"));
 
 
-	// === Create the PBR entities =====================================
-	Mesh* sphereMesh = assets.GetMesh("Models\\sphere.obj");
+	// === Create the scene ===
+	std::shared_ptr<GameEntity> sphere = std::make_shared<GameEntity>(assets.GetMesh(L"Models/sphere"), scratchedMat);
+	sphere->GetTransform()->SetPosition(-5, 0, 0);
+	entities.push_back(sphere);
 
-	GameEntity* cobSpherePBR = new GameEntity(sphereMesh, cobbleMat2xPBR);
-	cobSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	cobSpherePBR->GetTransform()->SetPosition(-6, 2, 0);
+	std::shared_ptr<GameEntity> helix = std::make_shared<GameEntity>(assets.GetMesh(L"Models/helix"), paintMat);
+	entities.push_back(helix);
 
-	GameEntity* woodSpherePBR = new GameEntity(sphereMesh, woodMatPBR);
-	woodSpherePBR->GetTransform()->SetScale(2, 2, 2);
-	woodSpherePBR->GetTransform()->SetPosition(6, 2, 0);
-
-	entities.push_back(cobSpherePBR);
-	entities.push_back(woodSpherePBR);
-
-	// Create the non-PBR entities ==============================
-	GameEntity* cobSphere = new GameEntity(sphereMesh, cobbleMat2x);
-	cobSphere->GetTransform()->SetScale(2, 2, 2);
-	cobSphere->GetTransform()->SetPosition(-6, -2, 0);
-
-	GameEntity* woodSphere = new GameEntity(sphereMesh, woodMat);
-	woodSphere->GetTransform()->SetScale(2, 2, 2);
-	woodSphere->GetTransform()->SetPosition(6, -2, 0);
-
-	entities.push_back(cobSphere);
-	entities.push_back(woodSphere);
+	std::shared_ptr<GameEntity> cube = std::make_shared<GameEntity>(assets.GetMesh(L"Models/cube"), woodMat);
+	cube->GetTransform()->SetPosition(5, 0, 0);
+	cube->GetTransform()->SetScale(2, 2, 2);
+	entities.push_back(cube);
 
 
+	// Grab loaded particle resources
+	std::shared_ptr<SimpleVertexShader> particleVS = assets.GetVertexShader(L"ParticleVS");
+	std::shared_ptr<SimplePixelShader> particlePS = assets.GetPixelShader(L"ParticlePS");
+
+	// Create particle materials
+	std::shared_ptr<Material> fireParticle = std::make_shared<Material>(particlePS, particleVS, XMFLOAT3(1, 1, 1));
+	fireParticle->AddSampler("BasicSampler", sampler);
+	fireParticle->AddTextureSRV("Particle", assets.GetTexture(L"Textures/Particles/Black/fire_01"));
+
+	std::shared_ptr<Material> twirlParticle = std::make_shared<Material>(particlePS, particleVS, XMFLOAT3(1, 1, 1));
+	twirlParticle->AddSampler("BasicSampler", sampler);
+	twirlParticle->AddTextureSRV("Particle", assets.GetTexture(L"Textures/Particles/Black/twirl_02"));
+
+	std::shared_ptr<Material> starParticle = std::make_shared<Material>(particlePS, particleVS, XMFLOAT3(1, 1, 1));
+	starParticle->AddSampler("BasicSampler", sampler);
+	starParticle->AddTextureSRV("Particle", assets.GetTexture(L"Textures/Particles/Black/star_04"));
+
+	std::shared_ptr<Material> animParticle = std::make_shared<Material>(particlePS, particleVS, XMFLOAT3(1, 1, 1));
+	animParticle->AddSampler("BasicSampler", sampler);
+	animParticle->AddTextureSRV("Particle", assets.GetTexture(L"Textures/Particles/flame_animated"));
 
 	
+	// Particle states ====
 
-	// Set up particle emitters
-	Emitter* flamethrower = new Emitter(
-		310,	// Max particles
-		100,	// Particles emitted per second
-		3.0f,	// Lifetime of each particle
+	// A depth state for the particles
+	D3D11_DEPTH_STENCIL_DESC dsDesc = {};
+	dsDesc.DepthEnable = true;
+	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO; // Turns off depth writing
+	dsDesc.DepthFunc = D3D11_COMPARISON_LESS;
+	device->CreateDepthStencilState(&dsDesc, particleDepthState.GetAddressOf());
+
+	// Blend for particles (additive)
+	D3D11_BLEND_DESC blend = {};
+	blend.AlphaToCoverageEnable = false;
+	blend.IndependentBlendEnable = false;
+	blend.RenderTarget[0].BlendEnable = true;
+	blend.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blend.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA; // Still respect pixel shader output alpha
+	blend.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	device->CreateBlendState(&blend, particleBlendState.GetAddressOf());
+
+	// Debug rasterizer state for particles
+	D3D11_RASTERIZER_DESC rd = {};
+	rd.CullMode = D3D11_CULL_BACK;
+	rd.DepthClipEnable = true;
+	rd.FillMode = D3D11_FILL_WIREFRAME;
+	device->CreateRasterizerState(&rd, particleDebugRasterState.GetAddressOf());
+
+
+	// Flame thrower
+	emitters.push_back(std::make_shared<Emitter>(
 		device,
-		context,
-		assets.GetVertexShader("ParticleVS.cso"),
-		assets.GetPixelShader("ParticlePS.cso"),
-		assets.GetTexture("Textures\\Particles\\cloud.png"),
-		0.25f,	// Start size
-		2.0f,	// End size
-		false,	// Constrain Y axis rotation for billboard
-		{ 1.0f, 0.1f, 0.1f, 0.5f },// Start color
-		{ 1.0f, 1.0f, 0.1f, 0.0f },	// End color
-		{ -1, 0, 0 },				// Position
-		{ 0.1f, 0.1f, 0.1f },		// Position spawn range
-		{ -2.0f, 4, 0 },			// Start velocity
-		{ 0.1f, 0.1f, 0.1f },		// Velocity random range
-		{ 0, -3.0f, 0 },			// Constant acceleration
-		{ -XM_PI, XM_PI },			// Start rotation random range
-		{ -XM_PI, XM_PI }			// End rotation random range
-		);
+		fireParticle,
+		160,							// Max particles
+		30,								// Particles per second
+		5.0f,							// Particle lifetime
+		0.1f,							// Start size
+		4.0f,							// End size
+		false,
+		XMFLOAT4(1, 0.1f, 0.1f, 0.7f),	// Start color
+		XMFLOAT4(1, 0.6f, 0.1f, 0),		// End color
+		XMFLOAT3(2, 0, 0),				// Emitter position
+		XMFLOAT3(0.1f, 0.1f, 0.1f),		// Position randomness range
+		XMFLOAT2(-2, 2),
+		XMFLOAT2(-2, 2),				// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(-2, 2, 0),				// Start velocity
+		XMFLOAT3(0.2f, 0.2f, 0.2f),		// Velocity randomness range
+		XMFLOAT3(0, -1, 0)));			// Constant acceleration
+		
 
-	// Set up particle emitters
-	Emitter* beamUp = new Emitter(
-		110,	// Max particles
-		50,		// Particles emitted per second
-		2.0f,	// Lifetime of each particle
+	// Erratic swirly portal
+	emitters.push_back(std::make_shared<Emitter>(
 		device,
-		context,
-		assets.GetVertexShader("ParticleVS.cso"),
-		assets.GetPixelShader("ParticlePS.cso"),
-		assets.GetTexture("Textures\\Particles\\trace_01.png"),
-		1.0f,	// Start size
-		0.0f,	// End size
-		true,	// Constrain Y axis rotation for billboard
-		{ 1.0f, 0.1f, 1.0f, 1.0f },	// Start color
-		{ 0.1f, 0.1f, 1.0f, 0.0f },	// End color
-		{ 3, 0, 0 },				// Position
-		{ 0.3f, 0.1f, 0.3f },		// Position spawn range
-		{ 0, 0, 0 },				// Start velocity
-		{ 0, 0, 0 },				// Velocity random range
-		{ 0, 3.0f, 0 },				// Constant acceleration
-		{ 0, 0 },					// Start rotation random range
-		{ 0, 0 }					// End rotation random range
-	);
+		twirlParticle,
+		45,								// Max particles
+		20,								// Particles per second
+		2.0f,							// Particle lifetime
+		3.0f,							// Start size
+		2.0f,							// End size
+		false,
+		XMFLOAT4(0.2f, 0.1f, 0.1f, 0.0f),// Start color
+		XMFLOAT4(0.2f, 0.7f, 0.1f, 1.0f),// End color
+		XMFLOAT3(3.5f, 3.5f, 0),		// Emitter position
+		XMFLOAT3(0, 0, 0),				// Position randomness range
+		XMFLOAT2(-5, 5),
+		XMFLOAT2(-5, 5),			// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(0, 0, 0),				// Start velocity
+		XMFLOAT3(0, 0, 0),				// Velocity randomness range
+		XMFLOAT3(0, 0, 0)));			// Constant acceleration
 
-	// Set up particle emitters
-	Emitter* rain = new Emitter(
-		310,	// Max particles
-		100,	// Particles emitted per second
-		3.0f,	// Lifetime of each particle
+	// Falling star field
+	emitters.push_back(std::make_shared<Emitter>(
 		device,
-		context,
-		assets.GetVertexShader("ParticleVS.cso"),
-		assets.GetPixelShader("ParticlePS.cso"),
-		assets.GetTexture("Textures\\Particles\\trace_01.png"),
-		0.25f,						// Start size
-		0.25f,						// End size
-		true,						// Constrain Y axis rotation for billboard
-		{ 0.5f, 0.5f, 1.0f, 1.0f },	// Start color
-		{ 0.5f, 0.5f, 1.0f, 1.0f },	// End color
-		{ 0, 15, 0 },				// Position
-		{ 10, 0, 10 },				// Position spawn range
-		{ 0, -2, 0 },				// Start velocity
-		{ 0, 0, 0 },				// Velocity random range
-		{ 0, -6.0f, 0 },			// Constant acceleration
-		{ XM_PI, XM_PI },			// Start rotation random range
-		{ XM_PI, XM_PI }			// End rotation random range
-	);
+		starParticle,
+		250,							// Max particles
+		100,							// Particles per second
+		2.0f,							// Particle lifetime
+		2.0f,							// Start size
+		0.0f,							// End size
+		false,
+		XMFLOAT4(0.1f, 0.2f, 0.5f, 0.0f),// Start color
+		XMFLOAT4(0.1f, 0.1f, 0.3f, 3.0f),// End color (ending with high alpha so we hit 1.0 sooner)
+		XMFLOAT3(-2.5f, -1, 0),			// Emitter position
+		XMFLOAT3(1, 0, 1),				// Position randomness range
+		XMFLOAT2(0, 0),
+		XMFLOAT2(-3, 3),			// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(0, 0, 0),				// Start velocity
+		XMFLOAT3(0.1f, 0, 0.1f),		// Velocity randomness range
+		XMFLOAT3(0, -2, 0)));			// Constant acceleration
 
-	// Set up particle emitters
-	Emitter* fire = new Emitter(
-		15,		// Max particles
-		5,		// Particles emitted per second
-		2.0f,	// Lifetime of each particle
+
+	// Animated fire texture
+	emitters.push_back(std::make_shared<Emitter>(
 		device,
-		context,
-		assets.GetVertexShader("ParticleVS.cso"),
-		assets.GetPixelShader("ParticlePS.cso"),
-		assets.GetTexture("Textures\\Particles\\flame_animated.png"),
-		2.0f,	// Start size
-		1.0f,	// End size
-		false,	// Constrain Y axis rotation for billboard
-		{ 1.0f, 1.0f, 1.0f, 0.75f },// Start color
-		{ 1.0f, 1.0f, 1.0f, 0.0f },	// End color
-		{ 0, -2, 0 },				// Position
-		{ 0, 0, 0 },				// Position spawn range
-		{ 0, 0, 0 },				// Start velocity
-		{ 0.1f, 0.1f, 0.1f },		// Velocity random range
-		{ 0, 0, 0 },				// Constant acceleration
-		{ -XM_PI, XM_PI },			// Start rotation random range
-		{ -XM_PI, XM_PI },			// End rotation random range
-		8,							// Sprite sheet frame count X
-		8,							// Sprite sheet frame count Y
-		1.0f						// Animation speed scale
-	);
-
-	emitters.push_back(flamethrower);
-	emitters.push_back(beamUp);
-	emitters.push_back(rain);
-	emitters.push_back(fire);
+		animParticle, 
+		5,						// Max particles
+		2,						// Particles per second
+		2.0f,					// Particle lifetime
+		2.0f,					// Start size
+		2.0f,					// End size
+		false,
+		XMFLOAT4(1, 1, 1, 1),	// Start color
+		XMFLOAT4(1, 1, 1, 0),	// End color
+		XMFLOAT3(2, -2, 0),		// Emitter position
+		XMFLOAT3(0, 0, 0),		// Position randomness range
+		XMFLOAT2(-2, 2),
+		XMFLOAT2(-2, 2),	// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(0, 0, 0),		// Start velocity
+		XMFLOAT3(0, 0, 0),		// Velocity randomness range
+		XMFLOAT3(0, 0, 0),		// Constant acceleration
+		8,
+		8));
 }
 
 
@@ -515,20 +431,11 @@ void Game::GenerateLights()
 // --------------------------------------------------------
 void Game::OnResize()
 {
-	// Prepare to resize the window by having the renderer release
-	// its references to the back buffers, which is necessary
-	// before the swap chain can actually resize those buffers
-	renderer->PreResize();
-
 	// Handle base-level DX resize stuff
 	DXCore::OnResize();
 
-	// Update the renderer
-	renderer->PostResize(width, height, backBufferRTV, depthStencilView);
-
 	// Update our projection matrix to match the new aspect ratio
-	if (camera)
-		camera->UpdateProjectionMatrix(this->width / (float)this->height);
+	if (camera) camera->UpdateProjectionMatrix((float)windowWidth / windowHeight);
 }
 
 // --------------------------------------------------------
@@ -548,11 +455,6 @@ void Game::Update(float deltaTime, float totalTime)
 	// Update the camera
 	camera->Update(deltaTime);
 
-	// Move an object
-	entities[0]->GetTransform()->Rotate(0, deltaTime, 0);
-	float scale = 2.0f + sin(totalTime) / 2.0f;
-	entities[0]->GetTransform()->SetScale(scale, scale, scale);
-
 	// Update all emitters
 	for (auto& e : emitters)
 		e->Update(deltaTime, totalTime);
@@ -570,27 +472,11 @@ void Game::CreateUI(float dt)
 {
 	// IMGUI
 	{
-		// Reset input manager's gui state
-		// so we don't taint our own input
-		Input& input = Input::GetInstance();
-		input.SetGuiKeyboardCapture(false);
-		input.SetGuiMouseCapture(false);
-
-		// Set io info
+		// Feed fresh input data to ImGui
 		ImGuiIO& io = ImGui::GetIO();
 		io.DeltaTime = dt;
-		io.DisplaySize.x = (float)this->width;
-		io.DisplaySize.y = (float)this->height;
-		io.KeyCtrl = input.KeyDown(VK_CONTROL);
-		io.KeyShift = input.KeyDown(VK_SHIFT);
-		io.KeyAlt = input.KeyDown(VK_MENU);
-		io.MousePos.x = (float)input.GetMouseX();
-		io.MousePos.y = (float)input.GetMouseY();
-		io.MouseDown[0] = input.MouseLeftDown();
-		io.MouseDown[1] = input.MouseRightDown();
-		io.MouseDown[2] = input.MouseMiddleDown();
-		io.MouseWheel = input.GetMouseWheel();
-		input.GetKeyArray(io.KeysDown, 256);
+		io.DisplaySize.x = (float)this->windowWidth;
+		io.DisplaySize.y = (float)this->windowHeight;
 
 		// Reset the frame
 		ImGui_ImplDX11_NewFrame();
@@ -598,8 +484,9 @@ void Game::CreateUI(float dt)
 		ImGui::NewFrame();
 
 		// Determine new input capture
-		input.SetGuiKeyboardCapture(io.WantCaptureKeyboard);
-		input.SetGuiMouseCapture(io.WantCaptureMouse);
+		Input& input = Input::GetInstance();
+		input.SetKeyboardCapture(io.WantCaptureKeyboard);
+		input.SetMouseCapture(io.WantCaptureMouse);
 	}
 
 	// Combined into a single window
@@ -615,15 +502,6 @@ void Game::CreateUI(float dt)
 			ImGui::ShowDemoWindow();
 	}
 
-	// Toggle point lights
-	{
-		ImGui::SameLine();
-
-		bool visible = renderer->GetPointLightsVisible();
-		if (ImGui::Button(visible ? "Hide Lights" : "Show Lights"))
-			renderer->SetPointLightsVisible(!visible);
-	}
-
 	// Emitters
 	if (ImGui::CollapsingHeader("Particle Emitters"))
 	{
@@ -635,225 +513,11 @@ void Game::CreateUI(float dt)
 		ImGui::Indent(-10.0f);
 	}
 
-	// All entity transforms
-	if (ImGui::CollapsingHeader("Lights"))
-	{
-		int lightCount = (int)renderer->GetActiveLightCount();
-		if (ImGui::SliderInt("Light Count", &lightCount, 0, MAX_LIGHTS))
-			renderer->SetActiveLightCount((unsigned int)lightCount);
-
-		while (lightCount >= lights.size())
-		{
-			Light light = {};
-			lights.push_back(light);
-		}
-
-		for (int i = 0; i < lightCount; i++)
-		{
-			UILight(lights[i], i);
-		}
-	}
-
-	// All scene entities
-	if (ImGui::CollapsingHeader("Entities"))
-	{
-		if (ImGui::CollapsingHeader("Set All Materials To..."))
-		{
-			for (int i = 0; i < materials.size(); i++)
-			{
-				std::string label = "Material " + std::to_string(i);
-				if (ImGui::Button(label.c_str()))
-				{
-					for (auto e : entities) e->SetMaterial(materials[i]);
-				}
-			}
-		}
-
-		for (int i = 0; i < entities.size(); i++)
-		{
-			UIEntity(entities[i], i);
-		}
-	}
-
-	// SSAO Options
-	if (ImGui::CollapsingHeader("SSAO Options"))
-	{
-		ImVec2 size = ImGui::GetItemRectSize();
-		float rtHeight = size.x * ((float)height / width);
-
-		bool ssao = renderer->GetSSAOEnabled();
-		if (ImGui::Button(ssao ? "SSAO Enabled" : "SSAO Disabled"))
-			renderer->SetSSAOEnabled(!ssao);
-
-		ImGui::SameLine();
-		bool ssaoOnly = renderer->GetSSAOOutputOnly();
-		if (ImGui::Button("SSAO Output Only"))
-			renderer->SetSSAOOutputOnly(!ssaoOnly);
-
-		int ssaoSamples = renderer->GetSSAOSamples();
-		if (ImGui::SliderInt("SSAO Samples", &ssaoSamples, 1, 64))
-			renderer->SetSSAOSamples(ssaoSamples);
-
-		float ssaoRadius = renderer->GetSSAORadius();
-		if (ImGui::SliderFloat("SSAO Sample Radius", &ssaoRadius, 0.0f, 2.0f))
-			renderer->SetSSAORadius(ssaoRadius);
-
-		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_RESULTS).Get(), ImVec2(size.x, rtHeight));
-		ImageWithHover(renderer->GetRenderTargetSRV(RenderTargetType::SSAO_BLUR).Get(), ImVec2(size.x, rtHeight));
-	}
-
-	if (ImGui::CollapsingHeader("All Render Targets"))
-	{
-		ImVec2 size = ImGui::GetItemRectSize();
-		float rtHeight = size.x * ((float)height / width);
-
-		for (int i = 0; i < RenderTargetType::RENDER_TARGET_TYPE_COUNT; i++)
-		{
-			ImageWithHover(renderer->GetRenderTargetSRV((RenderTargetType)i).Get(), ImVec2(size.x, rtHeight));
-		}
-
-		ImageWithHover(Assets::GetInstance().GetTexture("random").Get(), ImVec2(256, 256));
-	}
-
 	ImGui::End();
 }
 
-void Game::UIEntity(GameEntity* entity, int index)
-{
-	std::string indexStr = std::to_string(index);
 
-	std::string nodeName = "Entity " + indexStr;
-	if (ImGui::TreeNode(nodeName.c_str()))
-	{
-		// Transform -----------------------
-		if (ImGui::CollapsingHeader("Transform"))
-		{
-			Transform* transform = entity->GetTransform();
-			XMFLOAT3 pos = transform->GetPosition();
-			XMFLOAT3 rot = transform->GetPitchYawRoll();
-			XMFLOAT3 scale = transform->GetScale();
-
-			if (ImGui::DragFloat3("Position", &pos.x, 0.1f))
-			{
-				transform->SetPosition(pos.x, pos.y, pos.z);
-			}
-
-			if (ImGui::DragFloat3("Pitch/Yaw/Roll", &rot.x, 0.1f))
-			{
-				transform->SetRotation(rot.x, rot.y, rot.z);
-			}
-
-			if (ImGui::DragFloat3("Scale", &scale.x, 0.1f, 0.0f))
-			{
-				transform->SetScale(scale.x, scale.y, scale.z);
-			}
-		}
-
-		// Material ------------------------
-		if (ImGui::CollapsingHeader("Material"))
-		{
-			std::string comboID = "Material##" + indexStr;
-
-			// Need the material index to preview the name
-			// (Ugh, gross O(n) search over and over)
-			int index = (int)std::distance(materials.begin(), std::find(materials.begin(), materials.end(), entity->GetMaterial()));
-			std::string previewName = "Material " + std::to_string(index);
-
-			// Start the material drop down box
-			if (ImGui::BeginCombo(comboID.c_str(), previewName.c_str()))
-			{
-				// Show all materials
-				for (int i = 0; i < materials.size(); i++)
-				{
-					// Is this one selected?
-					bool selected = (entity->GetMaterial() == materials[i]);
-
-					// Create the entry
-					std::string matName = "Material " + std::to_string(i);
-					if (ImGui::Selectable(matName.c_str(), selected))
-						entity->SetMaterial(materials[i]);
-
-					if (selected)
-						ImGui::SetItemDefaultFocus();
-				}
-
-				ImGui::EndCombo();
-			}
-		}
-
-		ImGui::TreePop();
-	}
-
-}
-
-void Game::UILight(Light& light, int index)
-{
-	std::string indexStr = std::to_string(index);
-
-	std::string nodeName = "Light " + indexStr;
-	if (ImGui::TreeNode(nodeName.c_str()))
-	{
-		std::string radioDirID = "Directional##" + indexStr;
-		std::string radioPointID = "Point##" + indexStr;
-		std::string radioSpotID = "Spot##" + indexStr;
-
-		if (ImGui::RadioButton(radioDirID.c_str(), light.Type == LIGHT_TYPE_DIRECTIONAL))
-		{
-			light.Type = LIGHT_TYPE_DIRECTIONAL;
-		}
-		ImGui::SameLine();
-
-		if (ImGui::RadioButton(radioPointID.c_str(), light.Type == LIGHT_TYPE_POINT))
-		{
-			light.Type = LIGHT_TYPE_POINT;
-		}
-		ImGui::SameLine();
-
-		if (ImGui::RadioButton(radioSpotID.c_str(), light.Type == LIGHT_TYPE_SPOT))
-		{
-			light.Type = LIGHT_TYPE_SPOT;
-		}
-
-		// Direction
-		if (light.Type == LIGHT_TYPE_DIRECTIONAL || light.Type == LIGHT_TYPE_SPOT)
-		{
-			std::string dirID = "Direction##" + indexStr;
-			ImGui::DragFloat3(dirID.c_str(), &light.Direction.x, 0.1f);
-
-			// Normalize the direction
-			XMVECTOR dirNorm = XMVector3Normalize(XMLoadFloat3(&light.Direction));
-			XMStoreFloat3(&light.Direction, dirNorm);
-		}
-
-		// Position & Range
-		if (light.Type == LIGHT_TYPE_POINT || light.Type == LIGHT_TYPE_SPOT)
-		{
-			std::string posID = "Position##" + indexStr;
-			ImGui::DragFloat3(posID.c_str(), &light.Position.x, 0.1f);
-
-
-			std::string rangeID = "Range##" + indexStr;
-			ImGui::SliderFloat(rangeID.c_str(), &light.Range, 0.1f, 100.0f);
-		}
-
-		// Spot falloff
-		if (light.Type == LIGHT_TYPE_SPOT)
-		{
-			std::string spotFalloffID = "Spot Falloff##" + indexStr;
-			ImGui::SliderFloat(spotFalloffID.c_str(), &light.SpotFalloff, 0.1f, 128.0f);
-		}
-
-		std::string buttonID = "Color##" + indexStr;
-		ImGui::ColorEdit3(buttonID.c_str(), &light.Color.x);
-
-		std::string intenseID = "Intensity##" + indexStr;
-		ImGui::SliderFloat(intenseID.c_str(), &light.Intensity, 0.0f, 10.0f);
-
-		ImGui::TreePop();
-	}
-}
-
-void Game::UIEmitter(Emitter* emitter, int index)
+void Game::UIEmitter(std::shared_ptr<Emitter> emitter, int index)
 {
 	std::string indexStr = std::to_string(index);
 
@@ -877,7 +541,6 @@ void Game::UIEmitter(Emitter* emitter, int index)
 
 			ImGui::SliderFloat("Lifetime", &emitter->lifetime, 0.1f, 25.0f);
 
-			// TODO: Max particles?
 			ImGui::Indent(-5.0f);
 		}
 
@@ -886,7 +549,10 @@ void Game::UIEmitter(Emitter* emitter, int index)
 		ImGui::Text("Movement");
 		{
 			ImGui::Indent(5.0f);
-			ImGui::DragFloat3("Emitter Position", &emitter->emitterPosition.x, 0.05f);
+
+			XMFLOAT3 pos = emitter->GetTransform()->GetPosition();
+			if (ImGui::DragFloat3("Emitter Position", &pos.x, 0.05f))
+				emitter->GetTransform()->SetPosition(pos);
 			ImGui::DragFloat3("Position Randomness", &emitter->positionRandomRange.x, 0.05f);
 
 			ImGui::DragFloat3("Starting Velocity", &emitter->startVelocity.x, 0.05f);
@@ -935,48 +601,91 @@ void Game::UIEmitter(Emitter* emitter, int index)
 	}
 }
 
-void Game::ImageWithHover(ImTextureID user_texture_id, const ImVec2& size)
-{
-	// Draw the image
-	ImGui::Image(user_texture_id, size);
-	
-	// Check for hover
-	if (ImGui::IsItemHovered())
-	{
-		// Zoom amount and aspect of the image
-		float zoom = 0.03f;
-		float aspect = (float)size.x / size.y;
-
-		// Get the coords of the image
-		ImVec2 topLeft = ImGui::GetItemRectMin();
-		ImVec2 bottomRight = ImGui::GetItemRectMax();
-		
-		// Get the mouse pos as a percent across the image, clamping near the edge
-		ImVec2 mousePosGlobal = ImGui::GetMousePos();
-		ImVec2 mousePos = ImVec2(mousePosGlobal.x - topLeft.x, mousePosGlobal.y - topLeft.y);
-		ImVec2 uvPercent = ImVec2(mousePos.x / size.x, mousePos.y / size.y);
-
-		uvPercent.x = max(uvPercent.x, zoom / 2);
-		uvPercent.x = min(uvPercent.x, 1 - zoom / 2);
-		uvPercent.y = max(uvPercent.y, zoom / 2 * aspect);
-		uvPercent.y = min(uvPercent.y, 1 - zoom / 2 * aspect);
-
-		// Figure out the uv coords for the zoomed image
-		ImVec2 uvTL = ImVec2(uvPercent.x - zoom / 2, uvPercent.y - zoom / 2 * aspect);
-		ImVec2 uvBR = ImVec2(uvPercent.x + zoom / 2, uvPercent.y + zoom / 2 * aspect);
-
-		// Draw a floating box with a zoomed view of the image
-		ImGui::BeginTooltip();
-		ImGui::Image(user_texture_id, ImVec2(256,256), uvTL, uvBR);
-		ImGui::EndTooltip();
-	}
-}
-
 
 // --------------------------------------------------------
 // Clear the screen, redraw everything, present to the user
 // --------------------------------------------------------
 void Game::Draw(float deltaTime, float totalTime)
 {
-	renderer->Render(camera, totalTime);
+	// Frame START
+	// - These things should happen ONCE PER FRAME
+	// - At the beginning of Game::Draw() before drawing *anything*
+	{
+		// Clear the back buffer (erases what's on the screen)
+		const float bgColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
+		context->ClearRenderTargetView(backBufferRTV.Get(), bgColor);
+
+		// Clear the depth buffer (resets per-pixel occlusion information)
+		context->ClearDepthStencilView(depthBufferDSV.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+	}
+
+	// Loop through the game entities in the current scene and draw
+	for (auto& e : entities)
+	{
+		std::shared_ptr<SimplePixelShader> ps = e->GetMaterial()->GetPixelShader();
+		ps->SetFloat3("ambientColor", ambientColor);
+		ps->SetData("lights", &lights[0], sizeof(Light) * (int)lights.size());
+		ps->SetInt("lightCount", lightCount);
+
+		// Draw one entity
+		e->Draw(context, camera);
+	}
+
+	// Draw the sky after all regular entities
+	sky->Draw(camera);
+
+	// Draw all emitters
+	DrawParticles(totalTime);
+
+	// Frame END
+	// - These should happen exactly ONCE PER FRAME
+	// - At the very end of the frame (after drawing *everything*)
+	{
+		// Draw the UI after everything else
+		ImGui::Render();
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+		// Present the back buffer to the user
+		//  - Puts the results of what we've drawn onto the window
+		//  - Without this, the user never sees anything
+		bool vsyncNecessary = vsync || !deviceSupportsTearing || isFullscreen;
+		swapChain->Present(
+			vsyncNecessary ? 1 : 0,
+			vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
+
+		// Must re-bind buffers after presenting, as they become unbound
+		context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
+	}
+}
+
+void Game::DrawParticles(float totalTime)
+{
+	// Particle drawing =============
+	{
+
+		// Particle states
+		context->OMSetBlendState(particleBlendState.Get(), 0, 0xffffffff);	// Additive blending
+		context->OMSetDepthStencilState(particleDepthState.Get(), 0);		// No depth WRITING
+
+		// Draw all of the emitters
+		for (auto& e : emitters)
+		{
+			e->Draw(context, camera, totalTime);
+		}
+
+		// Should we also draw them in wireframe?
+		if (Input::GetInstance().KeyDown('C'))
+		{
+			context->RSSetState(particleDebugRasterState.Get());
+			for (auto& e : emitters)
+			{
+				e->Draw(context, camera, totalTime);
+			}
+		}
+
+		// Reset to default states for next frame
+		context->OMSetBlendState(0, 0, 0xffffffff);
+		context->OMSetDepthStencilState(0, 0);
+		context->RSSetState(0);
+	}
 }

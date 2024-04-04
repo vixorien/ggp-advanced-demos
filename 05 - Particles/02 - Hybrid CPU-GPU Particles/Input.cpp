@@ -1,9 +1,28 @@
 #include "Input.h"
+#include <hidusage.h>
 
 // Singleton requirement
 Input* Input::instance;
 
 // --------------- Basic usage -----------------
+// 
+// This class is set up as a singleton, meaning there
+// is only ever one instance of the class.  You can
+// access that instance through the static GetInstance()
+// function, like so:
+// 
+//   Input::GetInstance().SomeFunctionHere()
+// 
+// To make your code less verbose, I suggest storing
+// a reference to this instance in a temporary variable
+// if you plan on call multiple functions in a row:
+// 
+//   Input& input = Input::GetInstance();
+//   if (input.KeyDown('W')) { }
+//   if (input.KeyDown('A')) { }
+//   if (input.KeyDown('S')) { }
+//   if (input.KeyDown('D')) { }
+// 
 // 
 // The keyboard functions all take a single character
 // like 'W', ' ' or '8' (which will implicitly cast 
@@ -16,42 +35,56 @@ Input* Input::instance;
 // 
 // Checking if various keys are down or up:
 // 
-//  if (Input::GetInstance().KeyDown('W')) { }
-//  if (Input::GetInstance().KeyUp('2')) { }
-//  if (Input::GetInstance().KeyDown(VK_SHIFT)) { }
+//   Input& input = Input::GetInstance();
+//   if (input.KeyDown('W')) { }
+//   if (input.KeyUp('2')) { }
+//   if (input.KeyDown(VK_SHIFT)) { }
 //
 // 
 // Checking if a key was initially pressed or released 
 // this frame:  
 // 
-//  if (Input::GetInstance().KeyPressed('Q')) { }
-//  if (Input::GetInstance().KeyReleased(' ')) { }
+//   Input& input = Input::GetInstance();
+//   if (input.KeyPressed('Q')) { }
+//   if (input.KeyReleased(' ')) { }
 // 
 // (Note that these functions will only return true on 
 // the FIRST frame that a key is pressed or released.)
 // 
 // 
-// Checking for mouse input:
+// Checking for mouse button input is similar:
 // 
-//  if (Input::GetInstance().MouseLeftDown()) { }
-//  if (Input::GetInstance().MouseRightDown()) { }
-//  if (Input::GetInstance().MouseMiddleUp()) { }
-//  if (Input::GetInstance().MouseLeftPressed()) { }
-//  if (Input::GetInstance().MouseRightReleased()) { }
+//   Input& input = Input::GetInstance();
+//   if (input.MouseLeftDown()) { }
+//   if (input.MouseRightDown()) { }
+//   if (input.MouseMiddleUp()) { }
+//   if (input.MouseLeftPressed()) { }
+//   if (input.MouseRightReleased()) { }
 //
-// ---------------------------------------------
-
-// -------------- Less verbose -----------------
 // 
-// If you'd rather not have to type Input::GetInstance()
-// over and over, you can save the reference in a variable:
-//
-//  Input& input = Input::GetInstance();
-//  if (input.KeyDown('W')) { }
-//  if (input.KeyDown('A')) { }
-//  if (input.KeyDown('S')) { }
-//  if (input.KeyDown('D')) { }
-//
+// To handle relative mouse movement, you can use either
+// "standard" or "raw" mouse input, as shown below:  
+// 
+//  - *Standard* input simply reads the cursor position on
+//    the screen each frame and calculates the delta,
+//    which respects pointer acceleration.  Use these
+//    functions if you expect the same pointer behavior
+//    as your mouse cursor in Windows.
+// 
+//       Input& input = Input::GetInstance();
+//       int xDelta = input.GetMouseXDelta();
+//       int yDelta = input.GetMouseYDelta();
+// 
+//  - *Raw* input is read directly from the device, and is
+//    a measure of how far the *mouse* moved, not the *cursor*.
+//    Use these functions if you want high-precision movements
+//    independent of the operating system or screen pixels.
+// 
+//       Input& input = Input::GetInstance();
+//       int xRawDelta = input.GetRawMouseXDelta();
+//       int yRawDelta = input.GetRawMouseYDelta();
+//                                ^^^
+//  
 // ---------------------------------------------
 
 
@@ -83,11 +116,17 @@ void Input::Initialize(HWND windowHandle)
 	mouseX = 0; mouseY = 0;
 	prevMouseX = 0; prevMouseY = 0;
 	mouseXDelta = 0; mouseYDelta = 0;
-
-	guiWantsKeyboard = false;
-	guiWantsMouse = false;
+	keyboardCaptured = false; mouseCaptured = false;
 
 	this->windowHandle = windowHandle;
+
+	// Register for raw input from the mouse
+	RAWINPUTDEVICE mouse = {};
+	mouse.usUsagePage = HID_USAGE_PAGE_GENERIC;
+	mouse.usUsage = HID_USAGE_GENERIC_MOUSE;
+	mouse.dwFlags = RIDEV_INPUTSINK;
+	mouse.hwndTarget = windowHandle;
+	RegisterRawInputDevices(&mouse, 1, sizeof(mouse));
 }
 
 // ----------------------------------------------------------
@@ -101,7 +140,9 @@ void Input::Update()
 	memcpy(prevKbState, kbState, sizeof(unsigned char) * 256);
 
 	// Get the latest keys (from Windows)
-	GetKeyboardState(kbState);
+	// Note the use of (void), which denotes to the compiler
+	// that we're intentionally ignoring the return value
+	(void)GetKeyboardState(kbState);
 
 	// Get the current mouse position then make it relative to the window
 	POINT mousePos = {};
@@ -119,15 +160,17 @@ void Input::Update()
 }
 
 // ----------------------------------------------------------
-//  Resets the mouse wheel value at the end of the frame.
-//  This cannot occur earlier in the frame, since the wheel
-//  input comes from Win32 windowing messages, which are
+//  Resets the mouse wheel value and raw mouse delta at the 
+//  end of the frame. This cannot occur earlier in the frame, 
+//  since these come from Win32 windowing messages, which are
 //  handled between frames.
 // ----------------------------------------------------------
 void Input::EndOfFrame()
 {
 	// Reset wheel value
 	wheelDelta = 0;
+	rawMouseXDelta = 0;
+	rawMouseYDelta = 0;
 }
 
 // ----------------------------------------------------------
@@ -144,6 +187,43 @@ int Input::GetMouseY() { return mouseY; }
 // ---------------------------------------------------------------
 int Input::GetMouseXDelta() { return mouseXDelta; }
 int Input::GetMouseYDelta() { return mouseYDelta; }
+
+
+// ---------------------------------------------------------------
+//  Passes raw mouse input data to the input manager to be
+//  processed.  This input is the lParam of the WM_INPUT
+//  windows message, captured from (presumably) DXCore.
+// 
+//  See the following article for a discussion on different
+//  types of mouse input, not including GetCursorPos():
+//  https://learn.microsoft.com/en-us/windows/win32/dxtecharts/taking-advantage-of-high-dpi-mouse-movement
+// ---------------------------------------------------------------
+void Input::ProcessRawMouseInput(LPARAM lParam)
+{
+	// Variables for the raw data and its size
+	unsigned char rawInputBytes[sizeof(RAWINPUT)] = {};
+	unsigned int sizeOfData = sizeof(RAWINPUT);
+
+	// Get raw input data from the lowest possible level and verify
+	if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInputBytes, &sizeOfData, sizeof(RAWINPUTHEADER)) == -1)
+		return;
+
+	// Got data, so cast to the proper type and check the results
+	RAWINPUT* raw = (RAWINPUT*)rawInputBytes;
+	if (raw->header.dwType == RIM_TYPEMOUSE)
+	{
+		// This is mouse data, so grab the movement values
+		rawMouseXDelta = raw->data.mouse.lLastX;
+		rawMouseYDelta = raw->data.mouse.lLastY;
+	}
+}
+
+// ---------------------------------------------------------------
+//  Get the mouse's change (delta) in position since last
+//  frame based on raw mouse data (no pointer acceleration)
+// ---------------------------------------------------------------
+int Input::GetRawMouseXDelta() { return rawMouseXDelta; }
+int Input::GetRawMouseYDelta() { return rawMouseYDelta; }
 
 
 // ---------------------------------------------------------------
@@ -165,6 +245,28 @@ void Input::SetWheelDelta(float delta)
 }
 
 
+// ---------------------------------------------------------------
+//  Sets whether or not keyboard input is "captured" elsewhere.
+//  If the keyboard is "captured", the input manager will report 
+//  false on all keyboard input.
+// ---------------------------------------------------------------
+void Input::SetKeyboardCapture(bool captured)
+{
+	keyboardCaptured = captured;
+}
+
+
+// ---------------------------------------------------------------
+//  Sets whether or not mouse input is "captured" elsewhere.
+//  If the mouse is "captured", the input manager will report 
+//  false on all mouse input.
+// ---------------------------------------------------------------
+void Input::SetMouseCapture(bool captured)
+{
+	mouseCaptured = captured;
+}
+
+
 // ----------------------------------------------------------
 //  Is the given key down this frame?
 //  
@@ -176,7 +278,7 @@ bool Input::KeyDown(int key)
 {
 	if (key < 0 || key > 255) return false;
 
-	return (kbState[key] & 0x80) != 0 && !guiWantsKeyboard;
+	return (kbState[key] & 0x80) != 0 && !keyboardCaptured;
 }
 
 // ----------------------------------------------------------
@@ -190,7 +292,7 @@ bool Input::KeyUp(int key)
 {
 	if (key < 0 || key > 255) return false;
 
-	return !(kbState[key] & 0x80) && !guiWantsKeyboard;
+	return !(kbState[key] & 0x80) && !keyboardCaptured;
 }
 
 // ----------------------------------------------------------
@@ -206,8 +308,8 @@ bool Input::KeyPress(int key)
 
 	return
 		kbState[key] & 0x80 &&			// Down now
-		!(prevKbState[key] & 0x80)		// Up last frame
-		&& !guiWantsKeyboard;
+		!(prevKbState[key] & 0x80) &&	// Up last frame
+		!keyboardCaptured;
 }
 
 // ----------------------------------------------------------
@@ -223,8 +325,8 @@ bool Input::KeyRelease(int key)
 
 	return
 		!(kbState[key] & 0x80) &&	// Up now
-		prevKbState[key] & 0x80	// Down last frame
-		&& !guiWantsKeyboard;
+		prevKbState[key] & 0x80 &&	// Down last frame
+		!keyboardCaptured;
 }
 
 
@@ -232,7 +334,8 @@ bool Input::KeyRelease(int key)
 //  A utility function to fill a given array of booleans 
 //  with the current state of the keyboard.  This is most
 //  useful when hooking the engine's input up to another
-//  system, such as a user interface library.
+//  system, such as a user interface library.  (You probably 
+//  won't use this very much, if at all!)
 // 
 //  keyArray - pointer to a boolean array which will be
 //             filled with the current keyboard state
@@ -259,28 +362,28 @@ bool Input::GetKeyArray(bool* keyArray, int size)
 // ----------------------------------------------------------
 //  Is the specific mouse button down this frame?
 // ----------------------------------------------------------
-bool Input::MouseLeftDown() { return (kbState[VK_LBUTTON] & 0x80) != 0 && !guiWantsMouse; }
-bool Input::MouseRightDown() { return (kbState[VK_RBUTTON] & 0x80) != 0 && !guiWantsMouse; }
-bool Input::MouseMiddleDown() { return (kbState[VK_MBUTTON] & 0x80) != 0 && !guiWantsMouse; }
+bool Input::MouseLeftDown() { return (kbState[VK_LBUTTON] & 0x80) != 0 && !mouseCaptured; }
+bool Input::MouseRightDown() { return (kbState[VK_RBUTTON] & 0x80) != 0 && !mouseCaptured; }
+bool Input::MouseMiddleDown() { return (kbState[VK_MBUTTON] & 0x80) != 0 && !mouseCaptured; }
 
 
 // ----------------------------------------------------------
 //  Is the specific mouse button up this frame?
 // ----------------------------------------------------------
-bool Input::MouseLeftUp() { return !(kbState[VK_LBUTTON] & 0x80) && !guiWantsMouse; }
-bool Input::MouseRightUp() { return !(kbState[VK_RBUTTON] & 0x80) && !guiWantsMouse; }
-bool Input::MouseMiddleUp() { return !(kbState[VK_MBUTTON] & 0x80) && !guiWantsMouse; }
+bool Input::MouseLeftUp() { return !(kbState[VK_LBUTTON] & 0x80) && !mouseCaptured; }
+bool Input::MouseRightUp() { return !(kbState[VK_RBUTTON] & 0x80) && !mouseCaptured; }
+bool Input::MouseMiddleUp() { return !(kbState[VK_MBUTTON] & 0x80) && !mouseCaptured; }
 
 
 // ----------------------------------------------------------
 //  Was the specific mouse button initially 
 // pressed or released this frame?
 // ----------------------------------------------------------
-bool Input::MouseLeftPress() { return kbState[VK_LBUTTON] & 0x80 && !(prevKbState[VK_LBUTTON] & 0x80) && !guiWantsMouse; }
-bool Input::MouseLeftRelease() { return !(kbState[VK_LBUTTON] & 0x80) && prevKbState[VK_LBUTTON] & 0x80 && !guiWantsMouse; }
+bool Input::MouseLeftPress() { return kbState[VK_LBUTTON] & 0x80 && !(prevKbState[VK_LBUTTON] & 0x80) && !mouseCaptured; }
+bool Input::MouseLeftRelease() { return !(kbState[VK_LBUTTON] & 0x80) && prevKbState[VK_LBUTTON] & 0x80 && !mouseCaptured; }
 
-bool Input::MouseRightPress() { return kbState[VK_RBUTTON] & 0x80 && !(prevKbState[VK_RBUTTON] & 0x80) && !guiWantsMouse; }
-bool Input::MouseRightRelease() { return !(kbState[VK_RBUTTON] & 0x80) && prevKbState[VK_RBUTTON] & 0x80 && !guiWantsMouse; }
+bool Input::MouseRightPress() { return kbState[VK_RBUTTON] & 0x80 && !(prevKbState[VK_RBUTTON] & 0x80) && !mouseCaptured; }
+bool Input::MouseRightRelease() { return !(kbState[VK_RBUTTON] & 0x80) && prevKbState[VK_RBUTTON] & 0x80 && !mouseCaptured; }
 
-bool Input::MouseMiddlePress() { return kbState[VK_MBUTTON] & 0x80 && !(prevKbState[VK_MBUTTON] & 0x80) && !guiWantsMouse; }
-bool Input::MouseMiddleRelease() { return !(kbState[VK_MBUTTON] & 0x80) && prevKbState[VK_MBUTTON] & 0x80 && !guiWantsMouse; }
+bool Input::MouseMiddlePress() { return kbState[VK_MBUTTON] & 0x80 && !(prevKbState[VK_MBUTTON] & 0x80) && !mouseCaptured; }
+bool Input::MouseMiddleRelease() { return !(kbState[VK_MBUTTON] & 0x80) && prevKbState[VK_MBUTTON] & 0x80 && !mouseCaptured; }

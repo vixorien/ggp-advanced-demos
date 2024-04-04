@@ -5,27 +5,22 @@
 #define MAX_LIGHTS 128
 
 // Data that only changes once per frame
-cbuffer perFrame : register(b0)
+cbuffer ExternalData : register(b0)
 {
-	// An array of light data
-	Light Lights[MAX_LIGHTS];
+	// Scene related
+	Light lights[MAX_LIGHTS];
+	int lightCount;
 
-	// The amount of lights THIS FRAME
-	int LightCount;
+	float3 ambientColor;
 
-	// Needed for specular (reflection) calculation
-	float3 CameraPosition;
+	// Camera related
+	float3 cameraPosition;
 
-	// The number of mip levels in the specular IBL map
-	int SpecIBLTotalMipLevels;
-};
-
-// Data that can change per material
-cbuffer perMaterial : register(b1)
-{
-	// Surface color
-	float4 Color;
-};
+	// Material related
+	float3 colorTint;
+	float2 uvScale;
+	float2 uvOffset;
+}
 
 
 // Defines the input to this pixel shader
@@ -39,46 +34,32 @@ struct VertexToPixel
 	float3 worldPos			: POSITION; // The world position of this PIXEL
 };
 
-struct PS_Output
-{
-	float4 colorNoAmbient	: SV_TARGET0;
-	float4 ambientColor		: SV_TARGET1;
-	float4 normals			: SV_TARGET2;
-	float depths			: SV_TARGET3;
-};
-
 
 // Texture-related variables
-Texture2D AlbedoTexture			: register(t0);
-Texture2D NormalTexture			: register(t1);
-Texture2D RoughnessTexture		: register(t2);
-Texture2D MetalTexture			: register(t3);
-
-// IBL (indirect PBR) textures
-Texture2D BrdfLookUpMap			: register(t4);
-TextureCube IrradianceIBLMap	: register(t5);
-TextureCube SpecularIBLMap		: register(t6);
+Texture2D Albedo			: register(t0);
+Texture2D NormalMap			: register(t1);
+Texture2D RoughnessMap		: register(t2);
+Texture2D MetalMap			: register(t3);
 
 // Samplers
 SamplerState BasicSampler		: register(s0);
-SamplerState ClampSampler		: register(s1);
 
 // Entry point for this pixel shader
-PS_Output main(VertexToPixel input)
+float4 main(VertexToPixel input) : SV_TARGET0
 {
 	// Always re-normalize interpolated direction vectors
 	input.normal = normalize(input.normal);
 	input.tangent = normalize(input.tangent);
 
 	// Sample various textures
-	input.normal = NormalMapping(NormalTexture, BasicSampler, input.uv, input.normal, input.tangent);
-	float roughness = RoughnessTexture.Sample(BasicSampler, input.uv).r;
-	float metal = MetalTexture.Sample(BasicSampler, input.uv).r;
+	input.normal = NormalMapping(NormalMap, BasicSampler, input.uv, input.normal, input.tangent);
+	float roughness = RoughnessMap.Sample(BasicSampler, input.uv).r;
+	float metal = MetalMap.Sample(BasicSampler, input.uv).r;
 
 	// Gamma correct the texture back to linear space and apply the color tint
-	float4 surfaceColor = AlbedoTexture.Sample(BasicSampler, input.uv);
-	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * Color.rgb;
-
+	float4 surfaceColor = Albedo.Sample(BasicSampler, input.uv);
+	surfaceColor.rgb = pow(surfaceColor.rgb, 2.2) * colorTint.rgb;
+	
 	// Specular color - Assuming albedo texture is actually holding specular color if metal == 1
 	// Note the use of lerp here - metal is generally 0 or 1, but might be in between
 	// because of linear texture sampling, so we want lerp the specular color to match
@@ -88,46 +69,26 @@ PS_Output main(VertexToPixel input)
 	float3 totalDirectLight = float3(0,0,0);
 
 	// Loop through all lights this frame
-	for(int i = 0; i < LightCount; i++)
+	for(int i = 0; i < lightCount; i++)
 	{
 		// Which kind of light?
-		switch (Lights[i].Type)
+		switch (lights[i].Type)
 		{
 		case LIGHT_TYPE_DIRECTIONAL:
-			totalDirectLight += DirLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalDirectLight += DirLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 
 		case LIGHT_TYPE_POINT:
-			totalDirectLight += PointLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalDirectLight += PointLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 
 		case LIGHT_TYPE_SPOT:
-			totalDirectLight += SpotLightPBR(Lights[i], input.normal, input.worldPos, CameraPosition, roughness, metal, surfaceColor.rgb, specColor);
+			totalDirectLight += SpotLightPBR(lights[i], input.normal, input.worldPos, cameraPosition, roughness, metal, surfaceColor.rgb, specColor);
 			break;
 		}
 	}
 
-	// Calculate requisite reflection vectors
-	float3 viewToCam = normalize(CameraPosition - input.worldPos);
-	float3 viewRefl = normalize(reflect(-viewToCam, input.normal));
-	float NdotV = saturate(dot(input.normal, viewToCam));
-
-	// Indirect lighting
-	float3 indirectDiffuse = IndirectDiffuse(IrradianceIBLMap, BasicSampler, input.normal);
-	float3 indirectSpecular = IndirectSpecular(
-		SpecularIBLMap, SpecIBLTotalMipLevels,
-		BrdfLookUpMap, ClampSampler, // MUST use the clamp sampler here!
-		viewRefl, NdotV,
-		roughness, specColor);
-
-	// Balance indirect diff/spec
-	float3 balancedIndirectDiff = DiffuseEnergyConserve(indirectDiffuse, indirectSpecular, metal) * surfaceColor.rgb;
-
+	
 	// Multiple render target output
-	PS_Output output;
-	output.colorNoAmbient	= float4(totalDirectLight + indirectSpecular, 1); // No gamma correction yet!
-	output.ambientColor		= float4(balancedIndirectDiff, 1); // Gamma correction
-	output.normals			= float4(input.normal * 0.5f + 0.5f, 1);
-	output.depths			= input.screenPosition.z;
-	return output;
+	return float4(pow(totalDirectLight, 1.0f / 2.2f), 1);
 }

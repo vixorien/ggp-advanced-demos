@@ -289,7 +289,7 @@ void ISimpleShader::Log(std::string message, WORD color)
 	SetConsoleTextAttribute(hConsole, color);
 
 	printf_s(message.c_str());
-	OutputDebugString(message.c_str());
+	OutputDebugStringA(message.c_str());
 
 	// Swap back
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
