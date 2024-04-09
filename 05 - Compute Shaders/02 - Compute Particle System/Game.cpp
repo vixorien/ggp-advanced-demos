@@ -281,7 +281,6 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT3(0.2f, 0.2f, 0.2f),		// Velocity randomness range
 		XMFLOAT3(0, -1, 0)));			// Constant acceleration
 		
-	return;
 	// Erratic swirly portal
 	emitters.push_back(std::make_shared<Emitter>(
 		device,

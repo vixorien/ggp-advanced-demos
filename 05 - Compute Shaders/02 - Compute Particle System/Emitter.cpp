@@ -318,10 +318,37 @@ void Emitter::Update(float dt, float currentTime)
 		updateCS->DispatchByThreads(maxParticles, 1, 1);
 	}
 
+	//// PREPARE DRAW DATA ===============
+	//{
+	//	// TODO: Necessary?
+	//	// Binding order issues with next stage, so just reset here
+	//	context->CSSetUnorderedAccessViews(0, 8, none, 0);
+
+	//	// Get draw data
+	//	copyDrawCountCS->SetShader();
+	//	copyDrawCountCS->SetInt("VertsPerParticle", 6);
+	//	copyDrawCountCS->CopyAllBufferData();
+	//	copyDrawCountCS->SetUnorderedAccessView("DrawArgs", drawArgsUAV);
+	//	copyDrawCountCS->SetUnorderedAccessView("DrawList", particleDrawUAV); // Don't reset counter!!!
+	//	copyDrawCountCS->DispatchByThreads(1, 1, 1);
+
+	//	// TODO: Reset here too?
+	//	context->CSSetUnorderedAccessViews(0, 8, none, 0);
+
+	//	// Copy dead counter
+	//	context->CopyStructureCount(deadListCounterBuffer.Get(), 0, particleDeadUAV.Get());
+	//}
+}
+
+
+
+void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera, float currentTime)
+{
 	// PREPARE DRAW DATA ===============
 	{
 		// TODO: Necessary?
 		// Binding order issues with next stage, so just reset here
+		ID3D11UnorderedAccessView* none[8] = {};
 		context->CSSetUnorderedAccessViews(0, 8, none, 0);
 
 		// Get draw data
@@ -338,12 +365,7 @@ void Emitter::Update(float dt, float currentTime)
 		// Copy dead counter
 		context->CopyStructureCount(deadListCounterBuffer.Get(), 0, particleDeadUAV.Get());
 	}
-}
 
-
-
-void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera, float currentTime)
-{
 	// Set up buffers - note that we're NOT using a vertex buffer!
 	// When we draw, we'll calculate the number of vertices we expect
 	// to have given how many particles are currently alive.  We'll
