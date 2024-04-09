@@ -92,9 +92,6 @@ void Game::Init()
 	ImGui_ImplDX11_Init(device.Get(), context.Get());
 	ImGui::StyleColorsDark();
 
-	// Initialize the input manager with the window's handle
-	Input::GetInstance().Initialize(this->hWnd);
-
 	// Asset loading and entity creation
 	LoadAssetsAndCreateEntities();
 
@@ -164,27 +161,6 @@ void Game::LoadAssetsAndCreateEntities()
 	std::shared_ptr<SimplePixelShader> pixelShader = assets.GetPixelShader(L"PixelShaderPBR");
 
 	// Create basic materials
-	std::shared_ptr<Material> cobbleMat2x = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
-	cobbleMat2x->AddSampler("BasicSampler", sampler);
-	cobbleMat2x->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/cobblestone_albedo"));
-	cobbleMat2x->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/cobblestone_normals"));
-	cobbleMat2x->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/cobblestone_roughness"));
-	cobbleMat2x->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/cobblestone_metal"));
-
-	std::shared_ptr<Material> cobbleMat4x = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 4));
-	cobbleMat4x->AddSampler("BasicSampler", sampler);
-	cobbleMat4x->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/cobblestone_albedo"));
-	cobbleMat4x->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/cobblestone_normals"));
-	cobbleMat4x->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/cobblestone_roughness"));
-	cobbleMat4x->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/cobblestone_metal"));
-
-	std::shared_ptr<Material> floorMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
-	floorMat->AddSampler("BasicSampler", sampler);
-	floorMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/floor_albedo"));
-	floorMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/floor_normals"));
-	floorMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/floor_roughness"));
-	floorMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/floor_metal"));
-
 	std::shared_ptr<Material> paintMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
 	paintMat->AddSampler("BasicSampler", sampler);
 	paintMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/paint_albedo"));
@@ -198,20 +174,6 @@ void Game::LoadAssetsAndCreateEntities()
 	scratchedMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/scratched_normals"));
 	scratchedMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/scratched_roughness"));
 	scratchedMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/scratched_metal"));
-
-	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
-	bronzeMat->AddSampler("BasicSampler", sampler);
-	bronzeMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/bronze_albedo"));
-	bronzeMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/bronze_normals"));
-	bronzeMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/bronze_roughness"));
-	bronzeMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/bronze_metal"));
-
-	std::shared_ptr<Material> roughMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
-	roughMat->AddSampler("BasicSampler", sampler);
-	roughMat->AddTextureSRV("Albedo", assets.GetTexture(L"Textures/rough_albedo"));
-	roughMat->AddTextureSRV("NormalMap", assets.GetTexture(L"Textures/rough_normals"));
-	roughMat->AddTextureSRV("RoughnessMap", assets.GetTexture(L"Textures/rough_roughness"));
-	roughMat->AddTextureSRV("MetalMap", assets.GetTexture(L"Textures/rough_metal"));
 
 	std::shared_ptr<Material> woodMat = std::make_shared<Material>(pixelShader, vertexShader, XMFLOAT3(1, 1, 1), XMFLOAT2(4, 2));
 	woodMat->AddSampler("BasicSampler", sampler);
@@ -286,7 +248,6 @@ void Game::LoadAssetsAndCreateEntities()
 	rd.DepthClipEnable = true;
 	rd.FillMode = D3D11_FILL_WIREFRAME;
 	device->CreateRasterizerState(&rd, particleDebugRasterState.GetAddressOf());
-
 
 	// Flame thrower
 	emitters.push_back(std::make_shared<Emitter>(

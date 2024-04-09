@@ -68,7 +68,7 @@ Emitter::Emitter(
 	// Set up any one-time GPU buffers (that don't depend on
 	// the number of particles in this emitter)
 	{
-		// DRAW ARGUMENTSS ================
+		// DRAW ARGUMENTS ================
 		{
 			// Buffer
 			D3D11_BUFFER_DESC argsDesc = {};
@@ -121,6 +121,14 @@ void Emitter::CreateGPUResources()
 {
 	// Delete and release existing resources
 	indexBuffer.Reset();
+
+	particlePoolUAV.Reset();
+	particlePoolSRV.Reset();
+
+	particleDeadUAV.Reset();
+
+	particleDrawUAV.Reset();
+	particleDrawSRV.Reset();
 	
 	// INDEX BUFFER ==========================
 	{
