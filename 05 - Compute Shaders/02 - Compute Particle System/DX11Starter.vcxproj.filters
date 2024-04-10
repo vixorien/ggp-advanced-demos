@@ -167,6 +167,9 @@
     <None Include="ParticleIncludes.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="SimplexNoise.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl">
@@ -227,6 +230,12 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="ParticleCopyDrawCountCS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="ParticleFlowEmitCS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="ParticleFlowUpdateCS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

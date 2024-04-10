@@ -61,7 +61,9 @@ public:
 		DirectX::XMFLOAT3 emitterAcceleration = DirectX::XMFLOAT3(0, 0, 0),
 		unsigned int spriteSheetWidth = 1,
 		unsigned int spriteSheetHeight = 1,
-		float spriteSheetSpeedScale = 1.0f
+		float spriteSheetSpeedScale = 1.0f,
+		bool paused = false,
+		bool visible = true
 	);
 	~Emitter();
 
@@ -77,6 +79,10 @@ public:
 	void SetParticlesPerSecond(int particlesPerSecond);
 	int GetMaxParticles();
 	void SetMaxParticles(int maxParticles);
+	bool GetPaused();
+	void SetPaused(bool paused);
+	bool GetVisible();
+	void SetVisible(bool visible);
 
 	// Emitter-level data (this is the same for all particles)
 	DirectX::XMFLOAT3 emitterAcceleration;
@@ -109,6 +115,9 @@ private:
 	int particlesPerSecond;
 	float secondsPerParticle;
 	float timeSinceLastEmit;
+	bool paused;
+	bool visible;
+	float totalEmitterTime;
 
 	// Sprite sheet options
 	int spriteSheetWidth;

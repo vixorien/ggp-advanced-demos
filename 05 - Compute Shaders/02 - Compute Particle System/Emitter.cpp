@@ -26,7 +26,9 @@ Emitter::Emitter(
 	DirectX::XMFLOAT3 emitterAcceleration,
 	unsigned int spriteSheetWidth,
 	unsigned int spriteSheetHeight,
-	float spriteSheetSpeedScale)
+	float spriteSheetSpeedScale,
+	bool paused,
+	bool visible)
 	:
 	device(device),
 	material(material),
@@ -52,7 +54,10 @@ Emitter::Emitter(
 	spriteSheetHeight(max(spriteSheetHeight, 1)),
 	spriteSheetFrameWidth(1.0f / spriteSheetWidth),
 	spriteSheetFrameHeight(1.0f / spriteSheetHeight),
-	spriteSheetSpeedScale(spriteSheetSpeedScale)
+	spriteSheetSpeedScale(spriteSheetSpeedScale),
+	paused(paused),
+	visible(visible),
+	totalEmitterTime(0.0f)
 {
 	// Grab the context from the device
 	device->GetImmediateContext(context.GetAddressOf());
@@ -269,11 +274,15 @@ void Emitter::CreateGPUResources()
 
 void Emitter::Update(float dt, float currentTime)
 {
+	if (paused)
+		return;
+
 	// TODO: Reset UAVs?
 	ID3D11UnorderedAccessView* none[8] = {};
 	context->CSSetUnorderedAccessViews(0, 8, none, 0);
 
 	// Add to the time
+	totalEmitterTime += dt;
 	timeSinceLastEmit += dt;
 
 	// EMIT ========================
@@ -286,7 +295,7 @@ void Emitter::Update(float dt, float currentTime)
 		// Emit an appropriate amount of particles
 		emitCS->SetShader();
 		emitCS->SetInt("EmitCount", emitCount);
-		emitCS->SetFloat("CurrentTime", currentTime);
+		emitCS->SetFloat("CurrentTime", totalEmitterTime);
 		emitCS->SetInt("MaxParticles", (int)maxParticles);
 		emitCS->SetFloat3("StartPosition", transform.GetPosition());
 		emitCS->SetFloat3("StartVelocity", startVelocity);
@@ -307,7 +316,8 @@ void Emitter::Update(float dt, float currentTime)
 	{
 		// Update
 		updateCS->SetShader();
-		updateCS->SetFloat("CurrentTime", currentTime);
+		updateCS->SetFloat("DeltaTime", dt);
+		updateCS->SetFloat("CurrentTime", totalEmitterTime);
 		updateCS->SetFloat("Lifetime", lifetime);
 		updateCS->SetInt("MaxParticles", maxParticles);
 		updateCS->SetUnorderedAccessView("ParticlePool", particlePoolUAV);
@@ -318,32 +328,15 @@ void Emitter::Update(float dt, float currentTime)
 		updateCS->DispatchByThreads(maxParticles, 1, 1);
 	}
 
-	//// PREPARE DRAW DATA ===============
-	//{
-	//	// TODO: Necessary?
-	//	// Binding order issues with next stage, so just reset here
-	//	context->CSSetUnorderedAccessViews(0, 8, none, 0);
-
-	//	// Get draw data
-	//	copyDrawCountCS->SetShader();
-	//	copyDrawCountCS->SetInt("VertsPerParticle", 6);
-	//	copyDrawCountCS->CopyAllBufferData();
-	//	copyDrawCountCS->SetUnorderedAccessView("DrawArgs", drawArgsUAV);
-	//	copyDrawCountCS->SetUnorderedAccessView("DrawList", particleDrawUAV); // Don't reset counter!!!
-	//	copyDrawCountCS->DispatchByThreads(1, 1, 1);
-
-	//	// TODO: Reset here too?
-	//	context->CSSetUnorderedAccessViews(0, 8, none, 0);
-
-	//	// Copy dead counter
-	//	context->CopyStructureCount(deadListCounterBuffer.Get(), 0, particleDeadUAV.Get());
-	//}
 }
 
 
 
 void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::shared_ptr<Camera> camera, float currentTime)
 {
+	if (!visible)
+		return;
+
 	// PREPARE DRAW DATA ===============
 	{
 		// TODO: Necessary?
@@ -384,7 +377,7 @@ void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::sha
 	std::shared_ptr<SimpleVertexShader> vs = material->GetVertexShader();
 	vs->SetMatrix4x4("view", camera->GetView());
 	vs->SetMatrix4x4("projection", camera->GetProjection());
-	vs->SetFloat("currentTime", currentTime);
+	vs->SetFloat("currentTime", totalEmitterTime);
 	vs->SetFloat("lifetime", lifetime);
 	vs->SetFloat3("acceleration", emitterAcceleration);
 	vs->SetFloat("startSize", startSize);
@@ -436,6 +429,10 @@ void Emitter::SetMaxParticles(int maxParticles)
 	timeSinceLastEmit = 0.0f;
 }
 
+bool Emitter::GetPaused() { return paused; }
+void Emitter::SetPaused(bool paused) { this->paused = paused; }
+bool Emitter::GetVisible() { return visible; }
+void Emitter::SetVisible(bool visible) { this->visible = visible; }
 
 bool Emitter::IsSpriteSheet()
 {

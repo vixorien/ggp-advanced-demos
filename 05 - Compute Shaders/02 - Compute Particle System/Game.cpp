@@ -253,6 +253,7 @@ void Game::LoadAssetsAndCreateEntities()
 	// Particle compute shaders
 	std::shared_ptr<SimpleComputeShader> emitCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleEmitCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> updateCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleUpdateCS.cso").c_str());
+	std::shared_ptr<SimpleComputeShader> flowUpdateCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleFlowUpdateCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> deadListInitCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleDeadListInitCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> copyDrawCountCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleCopyDrawCountCS.cso").c_str());
 
@@ -349,12 +350,39 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT3(2, -2, 0),		// Emitter position
 		XMFLOAT3(0, 0, 0),		// Position randomness range
 		XMFLOAT2(-2, 2),
-		XMFLOAT2(-2, 2),	// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(-2, 2),		// Random rotation ranges (startMin, startMax, endMin, endMax)
 		XMFLOAT3(0, 0, 0),		// Start velocity
 		XMFLOAT3(0, 0, 0),		// Velocity randomness range
 		XMFLOAT3(0, 0, 0),		// Constant acceleration
 		8,
 		8));
+
+	// Flow field
+	emitters.push_back(std::make_shared<Emitter>(
+		device,
+		starParticle,
+		emitCS,
+		flowUpdateCS,
+		deadListInitCS,
+		copyDrawCountCS,
+		50000,					// Max particles
+		1000,					// Particles per second
+		60.0f,					// Particle lifetime
+		0.1f,					// Start size
+		0.1f,					// End size
+		false,
+		XMFLOAT4(1,1,1,1),		// Start color
+		XMFLOAT4(1, 1, 1, 0),	// End color (ending with high alpha so we hit 1.0 sooner)
+		XMFLOAT3(0, 0, 0),		// Emitter position
+		XMFLOAT3(3, 3, 3),		// Position randomness range
+		XMFLOAT2(-3, 3),
+		XMFLOAT2(-3, 3),		// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(0, 0, 0),		// Start velocity
+		XMFLOAT3(0, 0, 0),		// Velocity randomness range
+		XMFLOAT3(0, 0, 0),		// Constant acceleration
+		1, 1, 1.0f,				// Sprite sheet
+		true,
+		false));
 }
 
 
@@ -515,6 +543,10 @@ void Game::UIEmitter(std::shared_ptr<Emitter> emitter, int index)
 		{
 			ImGui::Indent(5.0f);
 
+			bool paused = emitter->GetPaused();
+			if (ImGui::Checkbox("Paused", &paused))
+				emitter->SetPaused(paused);
+
 			int maxPart = emitter->GetMaxParticles();
 			if (ImGui::DragInt("Max Particles", &maxPart, 1.0f, 1, 2000))
 				emitter->SetMaxParticles(maxPart);
@@ -551,6 +583,11 @@ void Game::UIEmitter(std::shared_ptr<Emitter> emitter, int index)
 		ImGui::Text("Visuals");
 		{
 			ImGui::Indent(5.0f);
+			bool vis = emitter->GetVisible();
+			if (ImGui::Checkbox("Visible", &vis))
+				emitter->SetVisible(vis);
+
+			
 			ImGui::ColorEdit4("Starting Color", &emitter->startColor.x);
 			ImGui::ColorEdit4("Ending Color", &emitter->endColor.x);
 
