@@ -116,7 +116,7 @@ VertexToPixel main(uint id : SV_VertexID)
 	
 	// Finalize output
 	output.uv = saturate(uvs[cornerID]);
-	output.colorTint = lerp(startColor, endColor, agePercent);
+	output.colorTint = lerp(startColor, endColor, agePercent) * float4(p.ColorTint, 1);
 	return output;
 }
 	

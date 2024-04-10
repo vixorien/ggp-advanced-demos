@@ -9,6 +9,9 @@ struct Particle
 	float Alive;
 	float3 StartVelocity;
 
+	float3 ColorTint;
+	float PAD;
+
 	float StartRotation;
 	float EndRotation;
 	float2 PAD2;

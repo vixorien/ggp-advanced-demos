@@ -43,7 +43,8 @@ Game::Game(HINSTANCE hInstance)
 		false,				// Sync the framerate to the monitor refresh? (lock framerate)
 		true),				// Show extra stats (fps) in title bar?
 	ambientColor(0, 0, 0), // Ambient is zero'd out since it's not physically-based
-	lightCount(3)
+	lightCount(3),
+	useFlowEmitter(false)
 {
 	// Seed random
 	srand((unsigned int)time(0));
@@ -253,10 +254,11 @@ void Game::LoadAssetsAndCreateEntities()
 	// Particle compute shaders
 	std::shared_ptr<SimpleComputeShader> emitCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleEmitCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> updateCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleUpdateCS.cso").c_str());
-	std::shared_ptr<SimpleComputeShader> flowUpdateCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleFlowUpdateCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> deadListInitCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleDeadListInitCS.cso").c_str());
 	std::shared_ptr<SimpleComputeShader> copyDrawCountCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleCopyDrawCountCS.cso").c_str());
 
+	std::shared_ptr<SimpleComputeShader> flowEmitCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleFlowEmitCS.cso").c_str());
+	std::shared_ptr<SimpleComputeShader> flowUpdateCS = std::make_shared<SimpleComputeShader>(device, context, FixPath(L"ParticleFlowUpdateCS.cso").c_str());
 
 	// Flame thrower
 	emitters.push_back(std::make_shared<Emitter>(
@@ -358,31 +360,31 @@ void Game::LoadAssetsAndCreateEntities()
 		8));
 
 	// Flow field
-	emitters.push_back(std::make_shared<Emitter>(
+	flowEmitter = std::make_shared<Emitter>(
 		device,
 		starParticle,
-		emitCS,
+		flowEmitCS,
 		flowUpdateCS,
 		deadListInitCS,
 		copyDrawCountCS,
-		50000,					// Max particles
-		1000,					// Particles per second
+		1000000,				// Max particles
+		10000,					// Particles per second
 		60.0f,					// Particle lifetime
 		0.1f,					// Start size
 		0.1f,					// End size
 		false,
-		XMFLOAT4(1,1,1,1),		// Start color
+		XMFLOAT4(1, 1, 1, 1),	// Start color
 		XMFLOAT4(1, 1, 1, 0),	// End color (ending with high alpha so we hit 1.0 sooner)
 		XMFLOAT3(0, 0, 0),		// Emitter position
-		XMFLOAT3(3, 3, 3),		// Position randomness range
-		XMFLOAT2(-3, 3),
-		XMFLOAT2(-3, 3),		// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT3(5, 5, 5),		// Position randomness range
+		XMFLOAT2(-10, 10),
+		XMFLOAT2(-10, 10),		// Random rotation ranges (startMin, startMax, endMin, endMax)
 		XMFLOAT3(0, 0, 0),		// Start velocity
 		XMFLOAT3(0, 0, 0),		// Velocity randomness range
 		XMFLOAT3(0, 0, 0),		// Constant acceleration
 		1, 1, 1.0f,				// Sprite sheet
 		true,
-		false));
+		false);
 }
 
 
@@ -468,8 +470,11 @@ void Game::Update(float deltaTime, float totalTime)
 	camera->Update(deltaTime);
 
 	// Update all emitters
-	for (auto& e : emitters)
-		e->Update(deltaTime, totalTime);
+	if (useFlowEmitter)
+		flowEmitter->Update(deltaTime, totalTime);
+	else
+		for (auto& e : emitters)
+			e->Update(deltaTime, totalTime);
 
 	// Create the UI during update!
 	CreateUI(deltaTime);
@@ -518,10 +523,19 @@ void Game::CreateUI(float dt)
 	if (ImGui::CollapsingHeader("Particle Emitters"))
 	{
 		ImGui::Indent(10.0f);
-		for (int i = 0; i < emitters.size(); i++)
+
+		if (ImGui::Checkbox("Show Flow Field Emitter", &useFlowEmitter))
 		{
-			UIEmitter(emitters[i], i);
+			flowEmitter->SetVisible(useFlowEmitter);
+			flowEmitter->SetPaused(!useFlowEmitter);
 		}
+
+		if (useFlowEmitter)
+			UIEmitter(flowEmitter, 0);
+		else
+			for (int i = 0; i < emitters.size(); i++)
+				UIEmitter(emitters[i], i);
+
 		ImGui::Indent(-10.0f);
 	}
 
@@ -689,10 +703,11 @@ void Game::DrawParticles(float totalTime)
 		context->OMSetDepthStencilState(particleDepthState.Get(), 0);		// No depth WRITING
 
 		// Draw all of the emitters
-		for (auto& e : emitters)
-		{
-			e->Draw(context, camera, totalTime);
-		}
+		if (useFlowEmitter)
+			flowEmitter->Draw(context, camera, totalTime);
+		else
+			for (auto& e : emitters)
+				e->Draw(context, camera, totalTime);
 
 		// Should we also draw them in wireframe?
 		if (Input::GetInstance().KeyDown('C'))

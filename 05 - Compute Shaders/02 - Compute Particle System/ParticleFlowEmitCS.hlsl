@@ -48,11 +48,24 @@ void main( uint3 id : SV_DispatchThreadID )
 	emitParticle.StartPosition = StartPosition;
 	emitParticle.StartVelocity = StartVelocity;
 	
-	// Seed random and generate random numbers
-	uint rng = id.x + (uint)(CurrentTime * 1000);
-	emitParticle.StartPosition.x += PosRandomRange.x * rand_float(rng, -1.0f, 1.0f);
-	emitParticle.StartPosition.y += PosRandomRange.y * rand_float(rng, -1.0f, 1.0f);
-	emitParticle.StartPosition.z += PosRandomRange.z * rand_float(rng, -1.0f, 1.0f);
+	// Seed for random adjusted by scaled time (to ensure 
+	// consecutive frames get different values)
+	float consecutiveFrameScale = 10000.0f;
+	uint rng = id.x + (uint)(CurrentTime * consecutiveFrameScale);
+
+	// Create a random starting position value (to be scaled later)
+	// and use it to tint the particles based on location
+	float3 randomStartPos = float3(
+		rand_float(rng, -1.0f, 1.0f),
+		rand_float(rng, -1.0f, 1.0f),
+		rand_float(rng, -1.0f, 1.0f)
+	);
+	emitParticle.ColorTint = randomStartPos * 0.5f + 0.5f;
+
+	// Generate random values
+	emitParticle.StartPosition.x += PosRandomRange.x * randomStartPos.x;
+	emitParticle.StartPosition.y += PosRandomRange.y * randomStartPos.y;
+	emitParticle.StartPosition.z += PosRandomRange.z * randomStartPos.z;
 	emitParticle.StartVelocity.x += VelRandomRange.x * rand_float(rng, -1.0f, 1.0f);
 	emitParticle.StartVelocity.y += VelRandomRange.y * rand_float(rng, -1.0f, 1.0f);
 	emitParticle.StartVelocity.z += VelRandomRange.z * rand_float(rng, -1.0f, 1.0f);

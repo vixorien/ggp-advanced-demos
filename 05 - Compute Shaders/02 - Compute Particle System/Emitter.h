@@ -16,6 +16,8 @@
 
 // We'll be mimicking this in HLSL
 // so we need to care about alignment!
+// Note: We're no longer using this directly in C++,
+// however, we DO need to know the size to create the proper buffer
 struct Particle
 {
 	float EmitTime;
@@ -23,6 +25,9 @@ struct Particle
 
 	float Alive;
 	DirectX::XMFLOAT3 StartVelocity;
+
+	DirectX::XMFLOAT3 StartColor;
+	float PAD;
 
 	float StartRotation;
 	float EndRotation;
