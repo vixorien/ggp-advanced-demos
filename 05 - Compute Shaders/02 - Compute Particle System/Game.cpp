@@ -278,8 +278,8 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT4(1, 0.6f, 0.1f, 0),		// End color
 		XMFLOAT3(2, 0, 0),				// Emitter position
 		XMFLOAT3(0.1f, 0.1f, 0.1f),		// Position randomness range
-		XMFLOAT2(-2, 2),
-		XMFLOAT2(-2, 2),				// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(-2, 2),				// Random start rotation ranges (min, max)
+		XMFLOAT2(-2, 2),				// Random end rotation ranges (min, max)
 		XMFLOAT3(-2, 2, 0),				// Start velocity
 		XMFLOAT3(0.2f, 0.2f, 0.2f),		// Velocity randomness range
 		XMFLOAT3(0, -1, 0)));			// Constant acceleration
@@ -302,8 +302,8 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT4(0.2f, 0.7f, 0.1f, 1.0f),// End color
 		XMFLOAT3(3.5f, 3.5f, 0),		// Emitter position
 		XMFLOAT3(0, 0, 0),				// Position randomness range
-		XMFLOAT2(-5, 5),
-		XMFLOAT2(-5, 5),			// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(-5, 5),				// Random start rotation ranges (min, max)
+		XMFLOAT2(-5, 5),				// Random end rotation ranges (min, max)
 		XMFLOAT3(0, 0, 0),				// Start velocity
 		XMFLOAT3(0, 0, 0),				// Velocity randomness range
 		XMFLOAT3(0, 0, 0)));			// Constant acceleration
@@ -326,8 +326,8 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT4(0.1f, 0.1f, 0.3f, 3.0f),// End color (ending with high alpha so we hit 1.0 sooner)
 		XMFLOAT3(-2.5f, -1, 0),			// Emitter position
 		XMFLOAT3(1, 0, 1),				// Position randomness range
-		XMFLOAT2(0, 0),
-		XMFLOAT2(-3, 3),			// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(0, 0),					// Random start rotation ranges (min, max)
+		XMFLOAT2(-3, 3),				// Random end rotation ranges (min, max)
 		XMFLOAT3(0, 0, 0),				// Start velocity
 		XMFLOAT3(0.1f, 0, 0.1f),		// Velocity randomness range
 		XMFLOAT3(0, -2, 0)));			// Constant acceleration
@@ -351,8 +351,8 @@ void Game::LoadAssetsAndCreateEntities()
 		XMFLOAT4(1, 1, 1, 0),	// End color
 		XMFLOAT3(2, -2, 0),		// Emitter position
 		XMFLOAT3(0, 0, 0),		// Position randomness range
-		XMFLOAT2(-2, 2),
-		XMFLOAT2(-2, 2),		// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(-2, 2),		// Random start rotation ranges (min, max)
+		XMFLOAT2(-2, 2),		// Random end rotation ranges (min, max)
 		XMFLOAT3(0, 0, 0),		// Start velocity
 		XMFLOAT3(0, 0, 0),		// Velocity randomness range
 		XMFLOAT3(0, 0, 0),		// Constant acceleration
@@ -368,17 +368,17 @@ void Game::LoadAssetsAndCreateEntities()
 		deadListInitCS,
 		copyDrawCountCS,
 		1000000,				// Max particles
-		10000,					// Particles per second
+		100000,					// Particles per second
 		60.0f,					// Particle lifetime
-		0.1f,					// Start size
+		0.05f,					// Start size
 		0.1f,					// End size
 		false,
 		XMFLOAT4(1, 1, 1, 1),	// Start color
-		XMFLOAT4(1, 1, 1, 0),	// End color (ending with high alpha so we hit 1.0 sooner)
+		XMFLOAT4(1, 1, 1, 0),	// End color
 		XMFLOAT3(0, 0, 0),		// Emitter position
 		XMFLOAT3(5, 5, 5),		// Position randomness range
-		XMFLOAT2(-10, 10),
-		XMFLOAT2(-10, 10),		// Random rotation ranges (startMin, startMax, endMin, endMax)
+		XMFLOAT2(-10, 10),		// Random start rotation ranges (min, max)
+		XMFLOAT2(-10, 10),		// Random end rotation ranges (min, max)
 		XMFLOAT3(0, 0, 0),		// Start velocity
 		XMFLOAT3(0, 0, 0),		// Velocity randomness range
 		XMFLOAT3(0, 0, 0),		// Constant acceleration

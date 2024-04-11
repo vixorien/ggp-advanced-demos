@@ -48,10 +48,9 @@ void main( uint3 id : SV_DispatchThreadID )
 	emitParticle.StartPosition = StartPosition;
 	emitParticle.StartVelocity = StartVelocity;
 	
-	// Seed for random adjusted by scaled time (to ensure 
-	// consecutive frames get different values)
-	float consecutiveFrameScale = 10000.0f;
-	uint rng = id.x + (uint)(CurrentTime * consecutiveFrameScale);
+	// Seed for random uses the emit index, so each
+	// unique particle has its own seed
+	uint rng = emitIndex;
 
 	// Create a random starting position value (to be scaled later)
 	// and use it to tint the particles based on location
