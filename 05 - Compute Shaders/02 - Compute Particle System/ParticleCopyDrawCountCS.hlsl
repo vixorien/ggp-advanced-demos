@@ -19,5 +19,4 @@ void main( uint3 id : SV_DispatchThreadID )
 	DrawArgs[2] = 0; // Offsets
 	DrawArgs[3] = 0; // Offsets
 	DrawArgs[4] = 0; // Offsets
-	DrawArgs[5] = 0; // Offsets
 }
