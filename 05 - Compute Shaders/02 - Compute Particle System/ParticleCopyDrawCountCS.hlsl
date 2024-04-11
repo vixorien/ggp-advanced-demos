@@ -6,8 +6,8 @@ cbuffer ExternalData : register(b0)
 	int VertsPerParticle;
 }
 
-RWBuffer<uint>							DrawArgs	: register(u0);
-RWStructuredBuffer<ParticleDrawData>	DrawList	: register(u1);
+RWBuffer<uint>				DrawArgs	: register(u0);
+RWStructuredBuffer<uint>	DrawList	: register(u1);
 
 [numthreads(1, 1, 1)]
 void main( uint3 id : SV_DispatchThreadID )

@@ -17,11 +17,6 @@ struct Particle
 	float2 PAD2;
 };
 
-struct ParticleDrawData
-{
-	uint Index;
-};
-
 // RNG =====================
 // Random number generation
 // From: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/

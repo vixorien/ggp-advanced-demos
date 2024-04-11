@@ -25,8 +25,8 @@ cbuffer externalData : register(b0)
 };
 
 
-StructuredBuffer<Particle>			ParticlePool	: register(t0);
-StructuredBuffer<ParticleDrawData>	DrawList		: register(t1);
+StructuredBuffer<Particle>	ParticlePool	: register(t0);
+StructuredBuffer<uint>		DrawList		: register(t1);
 
 // Defines the output data of our vertex shader
 struct VertexToPixel
@@ -49,8 +49,8 @@ VertexToPixel main(uint id : SV_VertexID)
 
 	// Grab one particle and its starting position
 	// Look up the draw info, then this particle
-	ParticleDrawData draw = DrawList.Load(particleID);
-	Particle p = ParticlePool.Load(draw.Index);
+	uint drawIndex = DrawList.Load(particleID);
+	Particle p = ParticlePool.Load(drawIndex);
 
 	// Calculate the age and age "percentage" (0 to 1)
 	float age = currentTime - p.EmitTime;

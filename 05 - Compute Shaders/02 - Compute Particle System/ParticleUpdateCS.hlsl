@@ -10,9 +10,9 @@ cbuffer ExternalData : register(b0)
 }
 
 // Order should match EmitCS (RW binding issues)
-RWStructuredBuffer<Particle>			ParticlePool	: register(u0);
-AppendStructuredBuffer<uint>			DeadList		: register(u1);
-RWStructuredBuffer<ParticleDrawData>	DrawList		: register(u2);
+RWStructuredBuffer<Particle>	ParticlePool	: register(u0);
+AppendStructuredBuffer<uint>	DeadList		: register(u1);
+RWStructuredBuffer<uint>		DrawList		: register(u2);
 
 [numthreads(32, 1, 1)]
 void main( uint3 id : SV_DispatchThreadID )
@@ -48,9 +48,6 @@ void main( uint3 id : SV_DispatchThreadID )
 		uint drawIndex = DrawList.IncrementCounter();
 
 		// Set up draw data
-		ParticleDrawData drawData;
-		drawData.Index = id.x; // This particle's actual index
-
-		DrawList[drawIndex] = drawData;
+		DrawList[drawIndex] = id.x;
 	}
 }

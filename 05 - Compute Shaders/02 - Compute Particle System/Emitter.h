@@ -34,11 +34,6 @@ struct Particle
 	DirectX::XMFLOAT2 PAD2;
 };
 
-struct ParticleDrawData
-{
-	unsigned int index;
-};
-
 class Emitter
 {
 public:

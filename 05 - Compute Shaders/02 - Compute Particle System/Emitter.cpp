@@ -228,10 +228,10 @@ void Emitter::CreateGPUResources()
 		Microsoft::WRL::ComPtr<ID3D11Buffer> drawListBuffer;
 		D3D11_BUFFER_DESC drawDesc = {};
 		drawDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		drawDesc.ByteWidth = sizeof(ParticleDrawData) * maxParticles;
+		drawDesc.ByteWidth = sizeof(unsigned int) * maxParticles;
 		drawDesc.CPUAccessFlags = 0;
 		drawDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		drawDesc.StructureByteStride = sizeof(ParticleDrawData);
+		drawDesc.StructureByteStride = sizeof(unsigned int);
 		drawDesc.Usage = D3D11_USAGE_DEFAULT;
 		device->CreateBuffer(&drawDesc, 0, drawListBuffer.GetAddressOf());
 
