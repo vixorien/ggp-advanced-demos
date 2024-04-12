@@ -304,7 +304,7 @@ void Emitter::CopyOneParticle(int index, std::shared_ptr<Camera> camera)
 
 		// Get the U/V indices (basically column & row index across the sprite sheet)
 		int uIndex = ssIndex % spriteSheetWidth;
-		int vIndex = ssIndex / spriteSheetHeight; // Integer division is important here!
+		int vIndex = ssIndex / spriteSheetWidth; // Integer division is important here!
 
 		// Convert to a top-left corner in uv space (0-1)
 		float u = uIndex / (float)spriteSheetWidth;

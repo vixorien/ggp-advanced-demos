@@ -46,8 +46,6 @@ void main( uint3 id : SV_DispatchThreadID )
 		// Increment the counter on the draw list, then put
 		// the new draw data at the returned (pre-increment) index
 		uint drawIndex = DrawList.IncrementCounter();
-
-		// Set up draw data
 		DrawList[drawIndex] = id.x;
 	}
 }

@@ -328,6 +328,8 @@ void Emitter::Update(float dt, float currentTime)
 		updateCS->DispatchByThreads(maxParticles, 1, 1);
 	}
 
+	// Copy dead counter
+	context->CopyStructureCount(deadListCounterBuffer.Get(), 0, particleDeadUAV.Get());
 }
 
 
@@ -355,8 +357,7 @@ void Emitter::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context, std::sha
 		// TODO: Reset here too?
 		context->CSSetUnorderedAccessViews(0, 8, none, 0);
 
-		// Copy dead counter
-		context->CopyStructureCount(deadListCounterBuffer.Get(), 0, particleDeadUAV.Get());
+		
 	}
 
 	// Set up buffers - note that we're NOT using a vertex buffer!

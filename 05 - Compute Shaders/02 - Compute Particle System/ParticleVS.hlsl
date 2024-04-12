@@ -44,13 +44,13 @@ VertexToPixel main(uint id : SV_VertexID)
 	VertexToPixel output;
 
 	// Get id info
-	uint particleID = id / 4; // Every group of 4 verts are ONE particle!
-	uint cornerID = id % 4; // 0,1,2,3 = the corner of the particle "quad"
+	uint drawID = id / 4;	 // Every group of 4 verts are ONE particle!
+	uint cornerID = id % 4;	 // 0,1,2,3 = the corner of the particle "quad"
 
-	// Grab one particle and its starting position
-	// Look up the draw info, then this particle
-	uint drawIndex = DrawList.Load(particleID);
-	Particle p = ParticlePool.Load(drawIndex);
+	// Use drawID to get an entry from the draw list
+	// Draw list holds actual particle IDs
+	uint particleID = DrawList.Load(drawID);
+	Particle p = ParticlePool.Load(particleID);
 
 	// Calculate the age and age "percentage" (0 to 1)
 	float age = currentTime - p.EmitTime;
@@ -102,7 +102,7 @@ VertexToPixel main(uint id : SV_VertexID)
 
 	// Get the U/V indices (basically column & row index across the sprite sheet)
 	uint uIndex = ssIndex % spriteSheetWidth;
-	uint vIndex = ssIndex / spriteSheetHeight; // Integer division is important here!
+	uint vIndex = ssIndex / spriteSheetWidth; // Integer division is important here!
 
 	// Convert to a top-left corner in uv space (0-1)
 	float u = uIndex / (float)spriteSheetWidth;

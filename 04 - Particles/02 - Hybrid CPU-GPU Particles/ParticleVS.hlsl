@@ -112,7 +112,7 @@ VertexToPixel main(uint id : SV_VertexID)
 
 	// Get the U/V indices (basically column & row index across the sprite sheet)
 	uint uIndex = ssIndex % spriteSheetWidth;
-	uint vIndex = ssIndex / spriteSheetHeight; // Integer division is important here!
+	uint vIndex = ssIndex / spriteSheetWidth; // Integer division is important here!
 
 	// Convert to a top-left corner in uv space (0-1)
 	float u = uIndex / (float)spriteSheetWidth;
