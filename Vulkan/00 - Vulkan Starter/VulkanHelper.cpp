@@ -29,6 +29,34 @@ void VulkanHelper::Initialize(
 	this->vkCommandPool = vkCommandPool;
 }
 
+// -------------------------------------------------------
+// Helper to look up the index for the available memory
+// types, based on requirements and desired properties
+// 
+// memRequirements - What kind of memory is required?
+// memFlags - How do we want the memory to work?
+// --------------------------------------------------------
+uint32_t VulkanHelper::GetMemoryType(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags memFlags)
+{
+	// Grab the properties of memory on the device
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProperties);
+
+	unsigned int memTypeIndex = -1;
+	for (unsigned int i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		// Validate memory type from requirements
+		if (!(memRequirements.memoryTypeBits & (1 << i))) continue;
+
+		// Validate memory flags to get proper type of memory
+		if (!((memProperties.memoryTypes[i].propertyFlags & memFlags) == memFlags)) continue;
+
+		// Success
+		return i;
+	}
+
+	return -1;
+}
 
 // --------------------------------------------------------
 // Helper for creating a static buffer that will get
@@ -53,33 +81,16 @@ VkResult VulkanHelper::CreateStaticBuffer(
 	bufferDesc.usage = bufferUsage;
 	bufferDesc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	
-	VkResult bufferResult = vkCreateBuffer(vkDevice, &bufferDesc, 0, &buffer);
-	if (bufferResult != VK_SUCCESS)
-		return bufferResult;
+	VK_TRY(vkCreateBuffer(vkDevice, &bufferDesc, 0, &buffer));
 
-	// Next, get the buffer's memory requirements and the device's memory properties
+	// Next, get the buffer's memory requirements
 	VkMemoryRequirements memReqs;
 	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReqs);
 
-	VkPhysicalDeviceMemoryProperties memProps;
-	vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
-
 	// Find the index of the available memory suitable for this buffer
 	VkMemoryPropertyFlags memFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-	unsigned int memTypeIndex = -1;
-	for (unsigned int i = 0; i < memProps.memoryTypeCount; i++)
-	{
-		// Validate memory type from requirements
-		if (!(memReqs.memoryTypeBits & (1 << i))) continue;
-
-		// Validate memory flags to get proper type of memory
-		if (!((memProps.memoryTypes[i].propertyFlags & memFlags) == memFlags)) continue;
-
-		// Success
-		memTypeIndex = i;
-		break;
-	}
-
+	uint32_t memTypeIndex = GetMemoryType(memReqs, memFlags);
+	
 	// Did we find suitable memory?
 	if (memTypeIndex == -1)
 		return VK_ERROR_UNKNOWN;
@@ -90,9 +101,7 @@ VkResult VulkanHelper::CreateStaticBuffer(
 	memDesc.allocationSize = memReqs.size;
 	memDesc.memoryTypeIndex = memTypeIndex;
 
-	VkResult allocResult = vkAllocateMemory(vkDevice, &memDesc, 0, &bufferMemory);
-	if (allocResult != VK_SUCCESS)
-		return allocResult;
+	VK_TRY(vkAllocateMemory(vkDevice, &memDesc, 0, &bufferMemory));
 
 	// Bind this memory to the buffer
 	vkBindBufferMemory(vkDevice, buffer, bufferMemory, 0);

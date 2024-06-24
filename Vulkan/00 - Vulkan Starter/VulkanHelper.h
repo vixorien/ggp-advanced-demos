@@ -51,6 +51,10 @@ public:
 	);
 
 	// Resource creation
+	uint32_t GetMemoryType(
+		VkMemoryRequirements memRequirements,
+		VkMemoryPropertyFlags memProperties);
+	
 	VkResult CreateStaticBuffer(
 		uint64_t dataStride,
 		uint64_t dataCount,
