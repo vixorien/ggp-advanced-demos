@@ -44,10 +44,6 @@ public:
 		VkCommandBuffer vkCommandBuffer,
 		VkQueue vkGraphicsQueue,
 		VkCommandPool vkCommandPool
-		//Microsoft::WRL::ComPtr<ID3D12Device> device,
-		//Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
-		//Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-		//Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator
 	);
 
 	// Resource creation
@@ -75,16 +71,6 @@ private:
 	VkCommandBuffer vkCommandBuffer;
 	VkQueue vkGraphicsQueue;
 	VkCommandPool vkCommandPool;
-	//// Overall device
-	//Microsoft::WRL::ComPtr<ID3D12Device> device;
-
-	//// Command list related
-	//// Note: We're assuming a single command list for the entire
-	//// engine at this point.  That's not always true for more
-	//// complex engines but should be fine for us
-	//Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>	commandList;
-	//Microsoft::WRL::ComPtr<ID3D12CommandQueue>			commandQueue;
-	//Microsoft::WRL::ComPtr<ID3D12CommandAllocator>		commandAllocator;
 
 	//// Basic CPU/GPU synchronization
 	//Microsoft::WRL::ComPtr<ID3D12Fence> waitFence;

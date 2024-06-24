@@ -74,119 +74,100 @@ VkResult VulkanHelper::CreateStaticBuffer(
 	VkBuffer& buffer,
 	VkDeviceMemory& bufferMemory)
 {
-	// First set up the buffer itself
-	VkBufferCreateInfo bufferDesc = {};
-	bufferDesc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferDesc.size = dataStride * dataCount;
-	bufferDesc.usage = bufferUsage;
-	bufferDesc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
-	VK_TRY(vkCreateBuffer(vkDevice, &bufferDesc, 0, &buffer));
+	// --- STAGING BUFFER for initial CPU -> GPU copy ---
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+	{
+		// First set up the buffer itself
+		VkBufferCreateInfo bufferDesc = {};
+		bufferDesc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferDesc.size = dataStride * dataCount;
+		bufferDesc.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		bufferDesc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	// Next, get the buffer's memory requirements
-	VkMemoryRequirements memReqs;
-	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReqs);
+		VK_TRY(vkCreateBuffer(vkDevice, &bufferDesc, 0, &stagingBuffer));
 
-	// Find the index of the available memory suitable for this buffer
-	VkMemoryPropertyFlags memFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-	uint32_t memTypeIndex = GetMemoryType(memReqs, memFlags);
-	
-	// Did we find suitable memory?
-	if (memTypeIndex == -1)
-		return VK_ERROR_UNKNOWN;
+		// Next, get the buffer's memory requirements
+		VkMemoryRequirements memReqs;
+		vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReqs);
 
-	// Allocate the actual physical memory
-	VkMemoryAllocateInfo memDesc = {};
-	memDesc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	memDesc.allocationSize = memReqs.size;
-	memDesc.memoryTypeIndex = memTypeIndex;
+		// Allocate the actual physical memory
+		VkMemoryAllocateInfo memDesc = {};
+		memDesc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		memDesc.allocationSize = memReqs.size;
+		memDesc.memoryTypeIndex = GetMemoryType(
+			memReqs,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	VK_TRY(vkAllocateMemory(vkDevice, &memDesc, 0, &bufferMemory));
+		VK_TRY(vkAllocateMemory(vkDevice, &memDesc, 0, &stagingMemory));
 
-	// Bind this memory to the buffer
-	vkBindBufferMemory(vkDevice, buffer, bufferMemory, 0);
+		// Bind this memory to the buffer
+		vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0);
 
-	// Map, memcpy, unmap
-	void* mapped;
-	size_t size = dataStride * dataCount;
-	vkMapMemory(vkDevice, bufferMemory, 0, size, 0, &mapped);
-	memcpy(mapped, data, size);
-	vkUnmapMemory(vkDevice, bufferMemory);
+		// Map, memcpy, unmap into staging buffer
+		void* mapped;
+		size_t size = dataStride * dataCount;
+		vkMapMemory(vkDevice, stagingMemory, 0, size, 0, &mapped);
+		memcpy(mapped, data, size);
+		vkUnmapMemory(vkDevice, stagingMemory);
+	}
+
+	// --- FINAL BUFFER for actual GPU storage ---
+	{
+		// First set up the buffer itself
+		VkBufferCreateInfo bufferDesc = {};
+		bufferDesc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferDesc.size = dataStride * dataCount;
+		bufferDesc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | bufferUsage;
+		bufferDesc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VK_TRY(vkCreateBuffer(vkDevice, &bufferDesc, 0, &buffer));
+
+		// Next, get the buffer's memory requirements
+		VkMemoryRequirements memReqs;
+		vkGetBufferMemoryRequirements(vkDevice, buffer, &memReqs);
+
+		// Allocate the actual physical memory
+		VkMemoryAllocateInfo memDesc = {};
+		memDesc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		memDesc.allocationSize = memReqs.size;
+		memDesc.memoryTypeIndex = GetMemoryType(
+			memReqs,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		VK_TRY(vkAllocateMemory(vkDevice, &memDesc, 0, &bufferMemory));
+
+		// Bind this memory to the buffer
+		vkBindBufferMemory(vkDevice, buffer, bufferMemory, 0);
+	}
+
+	// --- COPY from staging to final ---
+	{
+		// Begin details
+		VkCommandBufferBeginInfo beginDesc = {};
+		beginDesc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginDesc.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkBeginCommandBuffer(vkCommandBuffer, &beginDesc);
+
+		// Copy command
+		VkBufferCopy copy = {};
+		copy.size = dataStride * dataCount;
+		vkCmdCopyBuffer(vkCommandBuffer, stagingBuffer, buffer, 1, &copy);
+
+		// End and submit
+		vkEndCommandBuffer(vkCommandBuffer);
+		
+		VkSubmitInfo submit = {};
+		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit.commandBufferCount = 1;
+		submit.pCommandBuffers = &vkCommandBuffer;
+		VK_TRY(vkQueueSubmit(vkGraphicsQueue, 1, &submit, 0));
+		
+		// Wait until finished to proceed
+		vkQueueWaitIdle(vkGraphicsQueue);
+	}
 
 	return VK_SUCCESS;
-	
-	
-	//// The overall buffer we'll be creating
-	//Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
-
-	//// Describes the final heap
-	//D3D12_HEAP_PROPERTIES props = {};
-	//props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	//props.CreationNodeMask = 1;
-	//props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	//props.Type = D3D12_HEAP_TYPE_DEFAULT;
-	//props.VisibleNodeMask = 1;
-
-	//D3D12_RESOURCE_DESC desc = {};
-	//desc.Alignment = 0;
-	//desc.DepthOrArraySize = 1;
-	//desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	//desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	//desc.Format = DXGI_FORMAT_UNKNOWN;
-	//desc.Height = 1; // Assuming this is a regular buffer, not a texture
-	//desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	//desc.MipLevels = 1;
-	//desc.SampleDesc.Count = 1;
-	//desc.SampleDesc.Quality = 0;
-	//desc.Width = (UINT64)dataStride * (UINT64)dataCount; // Size of the buffer
-
-	//device->CreateCommittedResource(
-	//	&props,
-	//	D3D12_HEAP_FLAG_NONE,
-	//	&desc,
-	//	D3D12_RESOURCE_STATE_COPY_DEST, // Will eventually be "common", but we're copying to it first!
-	//	0,
-	//	IID_PPV_ARGS(buffer.GetAddressOf()));
-
-	//// Now create an intermediate upload heap for copying initial data
-	//D3D12_HEAP_PROPERTIES uploadProps = {};
-	//uploadProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	//uploadProps.CreationNodeMask = 1;
-	//uploadProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	//uploadProps.Type = D3D12_HEAP_TYPE_UPLOAD; // Can only ever be Generic_Read state
-	//uploadProps.VisibleNodeMask = 1;
-
-	//Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap;
-	//device->CreateCommittedResource(
-	//	&uploadProps,
-	//	D3D12_HEAP_FLAG_NONE,
-	//	&desc,
-	//	D3D12_RESOURCE_STATE_GENERIC_READ,
-	//	0,
-	//	IID_PPV_ARGS(uploadHeap.GetAddressOf()));
-
-	//// Do a straight map/memcpy/unmap
-	//void* gpuAddress = 0;
-	//uploadHeap->Map(0, 0, &gpuAddress);
-	//memcpy(gpuAddress, data, dataStride * dataCount);
-	//uploadHeap->Unmap(0, 0);
-
-	//// Copy the whole buffer from uploadheap to vert buffer
-	//commandList->CopyResource(buffer.Get(), uploadHeap.Get());
-
-	//// Transition the buffer to generic read for the rest of the app lifetime (presumable)
-	//D3D12_RESOURCE_BARRIER rb = {};
-	//rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	//rb.Transition.pResource = buffer.Get();
-	//rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	//rb.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-	//rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	//commandList->ResourceBarrier(1, &rb);
-
-	//// Execute the command list and return the finished buffer
-	//CloseExecuteAndResetCommandList();
-	//return buffer;
 }
 
 // --------------------------------------------------------
