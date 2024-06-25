@@ -8,12 +8,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <string>
-#include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
+#include <vector>
 
-// We can include the correct library files here
-// instead of in Visual Studio settings if we want
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
 
 class VKCore
 {
@@ -41,7 +37,6 @@ public:
 
 	// Initialization and game-loop related methods
 	HRESULT InitWindow();
-	//HRESULT InitDirect3D();
 	VkResult InitVulkan();
 	HRESULT Run();
 	void Quit();
@@ -91,6 +86,15 @@ protected:
 	VkImage vkBackBufferImages[numBackBuffers];
 	VkImageView vkBackBufferViews[numBackBuffers];
 
+	// Vulkan extensions and validation layer checks
+	std::vector<VkLayerProperties> GetLayerProperties(bool printNames);
+	std::vector<VkExtensionProperties> GetInstanceExtensions(bool printNames);
+	std::vector<VkExtensionProperties> GetDeviceExtensions(VkPhysicalDevice physicalDevice, const char* layerNameOrNull, bool printNames);
+
+	// Vulkan error callbacks (for debug mode)
+#if defined(DEBUG) || defined(_DEBUG)
+	VkDebugUtilsMessengerEXT debugMessenger;
+#endif
 
 	// DirectX related objects and variables
 	//D3D_FEATURE_LEVEL		dxFeatureLevel;

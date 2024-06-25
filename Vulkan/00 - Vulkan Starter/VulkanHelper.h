@@ -63,7 +63,6 @@ public:
 	void CloseExecuteAndResetCommandList();
 	void WaitForGPU();
 
-
 private:
 
 	VkPhysicalDevice vkPhysicalDevice;

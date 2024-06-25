@@ -4,6 +4,7 @@
 
 #include <WindowsX.h>
 #include <sstream>
+#include <iostream>
 
 // Define the static instance variable so our OS-level 
 // message handling function below can talk to our object
@@ -65,7 +66,10 @@ VKCore::VKCore(
 	vkSwapchain(0),
 	vkBackBufferImages{},
 	vkBackBufferViews{},
-	backBufferColorFormat(VK_FORMAT_R8G8B8A8_UNORM)
+	backBufferColorFormat(VK_FORMAT_B8G8R8A8_UNORM)
+#if defined(DEBUG) || defined(_DEBUG)
+	, debugMessenger(0)
+#endif
 {
 	// Save a static reference to this object.
 	//  - Since the OS-level message function must be a non-member (global) function, 
@@ -98,6 +102,10 @@ VKCore::~VKCore()
 	vkDestroySwapchainKHR(vkDevice, vkSwapchain, 0);
 	vkDestroyDevice(vkDevice, 0);
 	vkDestroySurfaceKHR(vkInstance, vkSurface, 0);
+#if defined(DEBUG) || defined(_DEBUG)
+	PFN_vkDestroyDebugUtilsMessengerEXT f = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(vkInstance, "vkDestroyDebugUtilsMessengerEXT");
+	if (f != 0) f(vkInstance, debugMessenger, 0);
+#endif
 	vkDestroyInstance(vkInstance, 0);
 
 	// Delete singletons
@@ -185,77 +193,79 @@ HRESULT VKCore::InitWindow()
 	return S_OK;
 }
 
+#if defined(DEBUG) || defined(_DEBUG)
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL ErrorCallback(
+	VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+	VkDebugUtilsMessageTypeFlagsEXT type,
+	const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+	void* otherData
+)
+{
+	printf("%s", callbackData->pMessage);
+	printf("\n\n");
+	return VK_FALSE;
+}
+#endif
+
 
 // https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Instance
 // Dynamic rendering: https://lesleylai.info/en/vk-khr-dynamic-rendering/
 VkResult VKCore::InitVulkan()
 {
+
+#if defined(DEBUG) || defined(_DEBUG)
+	// --- DEBUG MESSENGER DETAILS ---------------------
+	// This happens first because it is used in several
+	// places, including the initial vulkan instance
+	VkDebugUtilsMessengerCreateInfoEXT debugDesc = {};
+	debugDesc.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	debugDesc.messageSeverity =
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	debugDesc.messageType =
+		//VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	debugDesc.pfnUserCallback = ErrorCallback;
+#endif
+
 	// --- VULKAN INSTANCE -----------------------------
 
 	// Describe the vulkan app
 	VkApplicationInfo appDesc = {};
+	appDesc.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appDesc.apiVersion = VK_API_VERSION_1_3;
 	appDesc.applicationVersion = 0; // TODO: Does this matter?
 	appDesc.engineVersion = 0; // TODO: Does this matter?
 	appDesc.pApplicationName = "Test"; // TODO: Get this from param?
 	appDesc.pEngineName = "Who cares?"; // TODO: Does this matter?
-	appDesc.pNext = 0; // Null
-	appDesc.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-
-	// Check extensions!
-
-	//// Get the total first
-	//uint32_t totalExtCount = 0;
-	//vkEnumerateInstanceExtensionProperties(0, &totalExtCount, 0);
-
-	//// Make enough room and query
-	//VkExtensionProperties* extensions = new VkExtensionProperties[totalExtCount];
-	//vkEnumerateInstanceExtensionProperties(0, &totalExtCount, extensions);
-
-	//// Print and clean up
-	//for (uint32_t i = 0; i < totalExtCount; i++)
-	//{
-	//	printf(extensions[i].extensionName);
-	//	printf("\n");
-	//}
-	//delete[] extensions;
-
-	// Found these as Vulkan extensions:
-	/*
-		VK_KHR_device_group_creation
-		VK_KHR_external_fence_capabilities
-		VK_KHR_external_memory_capabilities
-		VK_KHR_external_semaphore_capabilities
-		VK_KHR_get_physical_device_properties2
-		VK_KHR_get_surface_capabilities2
-		VK_KHR_surface
-		VK_KHR_surface_protected_capabilities
-		VK_KHR_win32_surface
-		VK_EXT_debug_report
-		VK_EXT_debug_utils
-		VK_EXT_surface_maintenance1
-		VK_EXT_swapchain_colorspace
-		VK_NV_external_memory_capabilities
-		VK_KHR_portability_enumeration
-		VK_LUNARG_direct_driver_loading 
-	*/
-
-	// Also need DEVICE extension: VK_KHR_swapchain 
 
 	// Extensions we want to load
 	const char* extensionNames[] =
 	{
 		"VK_KHR_surface",
-		"VK_KHR_win32_surface"
+		"VK_KHR_win32_surface",
+		"VK_EXT_swapchain_colorspace"
+#if defined(DEBUG) || defined(_DEBUG)
+		, VK_EXT_DEBUG_UTILS_EXTENSION_NAME // Only in debug mode
+#endif
 	};
 	uint32_t extensionCount = ARRAYSIZE(extensionNames);
 
 	// Describe the vulkan instance we want, including extensions
 	VkInstanceCreateInfo createDesc = {};
-	createDesc.pApplicationInfo = &appDesc;
 	createDesc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createDesc.pApplicationInfo = &appDesc;
 	createDesc.enabledExtensionCount = extensionCount;
 	createDesc.ppEnabledExtensionNames = extensionNames;
+#if defined(DEBUG) || defined(_DEBUG)
+	createDesc.pNext = &debugDesc;
+#else
+	createDesc.pNext = 0; // Null
+#endif
 
 	VK_TRY(vkCreateInstance(&createDesc, 0, &vkInstance));
 
@@ -264,9 +274,9 @@ VkResult VKCore::InitVulkan()
 	// Create window surface
 	// TODO: Do we need this in addition to a swap chain?  Or just a swap chain?
 	VkWin32SurfaceCreateInfoKHR surfaceDesc = {};
+	surfaceDesc.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	surfaceDesc.hinstance = this->hInstance;
 	surfaceDesc.hwnd = this->hWnd;
-	surfaceDesc.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	VK_TRY(vkCreateWin32SurfaceKHR(vkInstance, &surfaceDesc, 0, &vkSurface));
 
 	// --- DEVICE ------------------------------
@@ -359,8 +369,28 @@ VkResult VKCore::InitVulkan()
 
 	VK_TRY(vkCreateDevice(vkPhysicalDevice, &deviceDesc, 0, &vkDevice));
 
+	// --- DEBUG MESSENGER -----------------------------
+#if defined(DEBUG) || defined(_DEBUG)
+	// Look up extension method for debug messenger creation
+	PFN_vkCreateDebugUtilsMessengerEXT f = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(vkInstance, "vkCreateDebugUtilsMessengerEXT");
+	if (f == 0) return VK_ERROR_EXTENSION_NOT_PRESENT;
+	VK_TRY(f(vkInstance, &debugDesc, 0, &debugMessenger));
+
+#endif
+
+
 	// --- QUEUE HANDLE -----------------------------
 	vkGetDeviceQueue(vkDevice, graphicsQueueIndex, 0, &vkGraphicsQueue);
+
+
+	// --- SWAP CHAIN REQUIREMENTS ------------------
+
+	// Grab number of formats, then fill the buffer
+	//uint32_t formatCount = 0;
+	//vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, 0);
+	//std::vector<VkSurfaceFormatKHR> formats(formatCount);
+	//vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, formats.data());
+
 
 	// --- SWAP CHAIN -------------------------------
 	VkSwapchainCreateInfoKHR swapchainDesc = {};
@@ -368,7 +398,7 @@ VkResult VKCore::InitVulkan()
 	swapchainDesc.surface = vkSurface;
 	swapchainDesc.minImageCount = numBackBuffers;
 	swapchainDesc.imageArrayLayers = 1;
-	swapchainDesc.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	swapchainDesc.imageColorSpace = VK_COLOR_SPACE_PASS_THROUGH_EXT; // Could be VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	swapchainDesc.imageExtent.width = windowWidth;
 	swapchainDesc.imageExtent.height = windowHeight;
 	swapchainDesc.imageFormat = backBufferColorFormat;
@@ -376,6 +406,7 @@ VkResult VKCore::InitVulkan()
 	swapchainDesc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainDesc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainDesc.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	swapchainDesc.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	swapchainDesc.clipped = VK_TRUE;
 
 	VK_TRY(vkCreateSwapchainKHR(
@@ -436,6 +467,76 @@ VkResult VKCore::InitVulkan()
 
 	return VK_SUCCESS;
 }
+
+std::vector<VkLayerProperties> VKCore::GetLayerProperties(bool printNames)
+{
+	// Get the total first
+	uint32_t totalLayerCount = 0;
+	vkEnumerateInstanceLayerProperties(&totalLayerCount, 0);
+
+	// Make enough room and query
+	std::vector<VkLayerProperties> layerProperties(totalLayerCount);
+	vkEnumerateInstanceLayerProperties(&totalLayerCount, layerProperties.data());
+
+	// Should we print the names?
+	if (printNames)
+	{
+		for (auto& l : layerProperties)
+		{
+			printf(l.layerName);
+			printf("\n");
+		}
+	}
+
+	return layerProperties;
+}
+
+std::vector<VkExtensionProperties> VKCore::GetInstanceExtensions(bool printNames)
+{
+	// Get the total first
+	uint32_t totalExtCount = 0;
+	vkEnumerateInstanceExtensionProperties(0, &totalExtCount, 0);
+
+	// Make enough room and query
+	std::vector<VkExtensionProperties> extensionProperties(totalExtCount);
+	vkEnumerateInstanceExtensionProperties(0, &totalExtCount, extensionProperties.data());
+
+	// Should we print the names?
+	if (printNames)
+	{
+		for (auto& e : extensionProperties)
+		{
+			printf(e.extensionName);
+			printf("\n");
+		}
+	}
+
+	return extensionProperties;
+}
+
+std::vector<VkExtensionProperties> VKCore::GetDeviceExtensions(VkPhysicalDevice physicalDevice, const char* layerNameOrNull, bool printNames)
+{
+	// Get the total first
+	uint32_t totalExtCount = 0;
+	vkEnumerateDeviceExtensionProperties(physicalDevice, layerNameOrNull, &totalExtCount, 0);
+
+	// Make enough room and query
+	std::vector<VkExtensionProperties> extensionProperties(totalExtCount);
+	vkEnumerateDeviceExtensionProperties(physicalDevice, layerNameOrNull, &totalExtCount, extensionProperties.data());
+
+	// Should we print the names?
+	if (printNames)
+	{
+		for (auto& e : extensionProperties)
+		{
+			printf(e.extensionName);
+			printf("\n");
+		}
+	}
+
+	return extensionProperties;
+}
+
 
 
 // --------------------------------------------------------

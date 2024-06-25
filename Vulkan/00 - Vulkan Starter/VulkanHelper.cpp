@@ -214,3 +214,5 @@ void VulkanHelper::WaitForGPU()
 	//	WaitForSingleObject(waitFenceEvent, INFINITE);
 	//}
 }
+
+
