@@ -86,6 +86,9 @@ protected:
 	VkImage vkBackBufferImages[numBackBuffers];
 	VkImageView vkBackBufferViews[numBackBuffers];
 
+	VkViewport viewport;
+	VkRect2D scissor;
+
 	// Vulkan extensions and validation layer checks
 	std::vector<VkLayerProperties> GetLayerProperties(bool printNames);
 	std::vector<VkExtensionProperties> GetInstanceExtensions(bool printNames);

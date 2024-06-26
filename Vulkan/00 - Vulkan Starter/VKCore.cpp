@@ -66,7 +66,9 @@ VKCore::VKCore(
 	vkSwapchain(0),
 	vkBackBufferImages{},
 	vkBackBufferViews{},
-	backBufferColorFormat(VK_FORMAT_B8G8R8A8_UNORM)
+	backBufferColorFormat(VK_FORMAT_B8G8R8A8_UNORM),
+	viewport{},
+	scissor{}
 #if defined(DEBUG) || defined(_DEBUG)
 	, debugMessenger(0)
 #endif
@@ -465,6 +467,19 @@ VkResult VKCore::InitVulkan()
 		vkGraphicsQueue,
 		vkCommandPool);
 
+	// --- VIEWPORT and SCISSOR ----------------------------
+	viewport.x = 0.0f;
+	viewport.y = (float)windowHeight; // Flipping upside down to match DX12?
+	viewport.width = (float)windowWidth;
+	viewport.height = -viewport.y; // Flipping upside down to match DX12?
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = windowWidth;
+	scissor.extent.height = windowHeight;
+
 	return VK_SUCCESS;
 }
 
@@ -549,116 +564,74 @@ std::vector<VkExtensionProperties> VKCore::GetDeviceExtensions(VkPhysicalDevice 
 // --------------------------------------------------------
 void VKCore::OnResize()
 {
-	//VulkanHelper& VulkanHelper = VulkanHelper::GetInstance();
+	// Wait for the GPU
+	vkDeviceWaitIdle(vkDevice);
 
-	//// Wait for the GPU to finish all work, since we'll
-	//// be destroying and recreating resources
-	//VulkanHelper.WaitForGPU();
+	// Remove the existing swap chain
+	for (unsigned int i = 0; i < numBackBuffers; i++)
+		vkDestroyImageView(vkDevice, vkBackBufferViews[i], 0);
+	vkDestroySwapchainKHR(vkDevice, vkSwapchain, 0);
 
-	//// Release the back buffers using ComPtr's Reset()
-	//for (unsigned int i = 0; i < numBackBuffers; i++)
-	//	backBuffers[i].Reset();
+	// --- SWAP CHAIN -------------------------------
+	VkSwapchainCreateInfoKHR swapchainDesc = {};
+	swapchainDesc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainDesc.surface = vkSurface;
+	swapchainDesc.minImageCount = numBackBuffers;
+	swapchainDesc.imageArrayLayers = 1;
+	swapchainDesc.imageColorSpace = VK_COLOR_SPACE_PASS_THROUGH_EXT; // Could be VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	swapchainDesc.imageExtent.width = windowWidth;
+	swapchainDesc.imageExtent.height = windowHeight;
+	swapchainDesc.imageFormat = backBufferColorFormat;
+	swapchainDesc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapchainDesc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchainDesc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchainDesc.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	swapchainDesc.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	swapchainDesc.clipped = VK_TRUE;
 
-	//// Resize the swap chain (assuming a basic color format here)
-	//swapChain->ResizeBuffers(
-	//	numBackBuffers, 
-	//	windowWidth,
-	//	windowHeight, 
-	//	DXGI_FORMAT_R8G8B8A8_UNORM, 
-	//	deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+	vkCreateSwapchainKHR(
+		vkDevice,
+		&swapchainDesc,
+		0,
+		&vkSwapchain);
 
-	//// Go through the steps to setup the back buffers again
-	//// Note: This assumes the descriptor heap already exists
-	//// and that the rtvDescriptorSize was previously set
-	//for (unsigned int i = 0; i < numBackBuffers; i++)
-	//{
-	//	// Grab this buffer from the swap chain
-	//	swapChain->GetBuffer(i, IID_PPV_ARGS(backBuffers[i].GetAddressOf()));
+	// --- GET SWAP CHAIN IMAGES --------------------------
+	unsigned int swapCount = numBackBuffers;
+	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &swapCount, vkBackBufferImages);
 
-	//	// Make a handle for it
-	//	rtvHandles[i] = rtvHeap->GetCPUDescriptorHandleForHeapStart();
-	//	rtvHandles[i].ptr += rtvDescriptorSize * (size_t)i;
+	// --- CREATE SWAP CHAIN VIEWS -----------------------
+	for (int i = 0; i < numBackBuffers; i++)
+	{
+		VkImageViewCreateInfo viewDesc = {};
+		viewDesc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewDesc.image = vkBackBufferImages[i];
+		viewDesc.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewDesc.format = backBufferColorFormat;
+		viewDesc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // Zero
+		viewDesc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY; // Zero
+		viewDesc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY; // Zero
+		viewDesc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY; // Zero
+		viewDesc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewDesc.subresourceRange.baseArrayLayer = 0;
+		viewDesc.subresourceRange.layerCount = 1;
+		viewDesc.subresourceRange.baseMipLevel = 0;
+		viewDesc.subresourceRange.levelCount = 1;
 
-	//	// Create the render target view
-	//	device->CreateRenderTargetView(backBuffers[i].Get(), 0, rtvHandles[i]);
-	//}
+		vkCreateImageView(vkDevice, &viewDesc, 0, &vkBackBufferViews[i]);
+	}
 
-	//// Reset back to the first back buffer
-	//currentSwapBuffer = 0;
+	// --- UPDATE VIEWPORT & SCISSOR ---------------------
+	viewport.x = 0.0f;
+	viewport.y = (float)windowHeight; // Flipping upside down to match DX12?
+	viewport.width = (float)windowWidth;
+	viewport.height = -viewport.y; // Flipping upside down to match DX12?
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
 
-	//// Reset the depth buffer and create it again
-	//{
-	//	depthStencilBuffer.Reset();
-
-	//	// Describe the depth stencil buffer resource
-	//	D3D12_RESOURCE_DESC depthBufferDesc = {};
-	//	depthBufferDesc.Alignment = 0;
-	//	depthBufferDesc.DepthOrArraySize = 1;
-	//	depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	//	depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-	//	depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	//	depthBufferDesc.Height = windowHeight;
-	//	depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	//	depthBufferDesc.MipLevels = 1;
-	//	depthBufferDesc.SampleDesc.Count = 1;
-	//	depthBufferDesc.SampleDesc.Quality = 0;
-	//	depthBufferDesc.Width = windowWidth;
-
-	//	// Describe the clear value that will most often be used
-	//	// for this buffer (which optimizes the clearing of the buffer)
-	//	D3D12_CLEAR_VALUE clear = {};
-	//	clear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	//	clear.DepthStencil.Depth = 1.0f;
-	//	clear.DepthStencil.Stencil = 0;
-
-	//	// Describe the memory heap that will house this resource
-	//	D3D12_HEAP_PROPERTIES props = {};
-	//	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	//	props.CreationNodeMask = 1;
-	//	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	//	props.Type = D3D12_HEAP_TYPE_DEFAULT;
-	//	props.VisibleNodeMask = 1;
-
-	//	// Actually create the resource, and the heap in which it
-	//	// will reside, and map the resource to that heap
-	//	device->CreateCommittedResource(
-	//		&props,
-	//		D3D12_HEAP_FLAG_NONE,
-	//		&depthBufferDesc,
-	//		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-	//		&clear,
-	//		IID_PPV_ARGS(depthStencilBuffer.GetAddressOf()));
-
-	//	// Now recreate the depth stencil view
-	//	dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-	//	device->CreateDepthStencilView(
-	//		depthStencilBuffer.Get(),
-	//		0,	// Default view (first mip)
-	//		dsvHandle);
-	//}
-
-	//// Recreate the viewport and scissor rects, too,
-	//// since the window size has changed
-	//{
-	//	// Set up the viewport so we render into the correct
-	//	// portion of the render target
-	//	viewport.Width = (float)windowWidth;
-	//	viewport.Height = (float)windowHeight;
-
-	//	// Define a scissor rectangle that defines a portion of
-	//	// the render target for clipping.  This is different from
-	//	// a viewport in that it is applied after the pixel shader.
-	//	// We need at least one of these, but we're rendering to 
-	//	// the entire window, so it'll be the same size.
-	//	scissorRect.right = windowWidth;
-	//	scissorRect.bottom = windowHeight;
-	//}
-
-	//// Are we in a fullscreen state?
-	//swapChain->GetFullscreenState(&isFullscreen, 0);
-
-	//// Wait for the GPU before we proceed
-	//VulkanHelper.WaitForGPU();
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = windowWidth;
+	scissor.extent.height = windowHeight;
 }
 
 

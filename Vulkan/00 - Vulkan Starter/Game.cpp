@@ -158,27 +158,21 @@ void Game::CreateGraphicsPipeline()
 	iaDesc.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	iaDesc.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-	// Viewport & scissor rect
-	VkViewport vp = {};
-	vp.x = 0.0f;
-	vp.y = (float)windowHeight; // Flipping upside down to match DX12?
-	vp.width = (float)windowWidth;
-	vp.height = -vp.y; // Flipping upside down to match DX12?
-	vp.minDepth = 0.0f;
-	vp.maxDepth = 1.0f;
-
-	VkRect2D scissor = {};
-	scissor.offset.x = 0;
-	scissor.offset.y = 0;
-	scissor.extent.width = windowWidth;
-	scissor.extent.height = windowHeight;
+	// We'll be keeping the viewport and scissor rect dynamic
+	VkDynamicState dynamicStates[2] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	
+	VkPipelineDynamicStateCreateInfo dynamicDesc = {};
+	dynamicDesc.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicDesc.dynamicStateCount = ARRAYSIZE(dynamicStates);
+	dynamicDesc.pDynamicStates = dynamicStates;
 
 	VkPipelineViewportStateCreateInfo vpDesc = {};
 	vpDesc.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	vpDesc.viewportCount = 1;
-	vpDesc.pViewports = &vp;
 	vpDesc.scissorCount = 1;
-	vpDesc.pScissors = &scissor;
 	
 	// Rasterizer
 	VkPipelineRasterizationStateCreateInfo rsDesc = {};
@@ -257,6 +251,7 @@ void Game::CreateGraphicsPipeline()
 		pipeDesc.pRasterizationState = &rsDesc;
 		pipeDesc.pVertexInputState = &vertexInputDesc;
 		pipeDesc.pViewportState = &vpDesc;
+		pipeDesc.pDynamicState = &dynamicDesc;
 	}
 
 	if (vkCreateGraphicsPipelines(vkDevice, 0, 1, &pipeDesc, 0, &vkPipeline) != VK_SUCCESS)
@@ -338,8 +333,10 @@ void Game::Draw(float deltaTime, float totalTime)
 	beginDesc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	vkBeginCommandBuffer(vkCommandBuffer, &beginDesc);
 
-	// Bind the pipeline state
+	// Bind the pipeline state and set viewport & scissor
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+	vkCmdSetViewport(vkCommandBuffer, 0, 1, &viewport);
+	vkCmdSetScissor(vkCommandBuffer, 0, 1, &scissor);
 
 	// Bind geometry
 	VkDeviceSize offsets[] = { 0 };
